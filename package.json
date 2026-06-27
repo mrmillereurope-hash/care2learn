@@ -1,0 +1,15 @@
+{
+  "name": "care2learn-backend",
+  "version": "1.0.0",
+  "description": "Care2Learn — mandatory training platform for UK social care",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.8.0"
+  }
+}
