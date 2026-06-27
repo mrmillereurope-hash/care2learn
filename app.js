@@ -106,6 +106,9 @@ function fmtMoney(pence) {
   return PRICING.currency + pounds.toLocaleString(undefined, opts);
 }
 
+// Stripe payment link for pay-as-you-go checkout.
+const STRIPE_PAYG_LINK = "https://buy.stripe.com/00w8wO5cTeVm4N728adZ601";
+
 // Build the interactive pricing calculator for the landing page.
 function buildCalculator() {
   const courseCount = state.courses.length;
@@ -192,7 +195,7 @@ function buildCalculator() {
             <div class="est-perlearner" style="margin-top:14px">Your estimated cost <span>(one-off)</span></div>
             <div class="est-cost"><span class="est-cost-v" id="v-total">${cur}${total.toLocaleString()}</span></div>
             <div class="est-sub" id="v-break">${calc.learners} learners × ${calc.courses} courses × ${cur}${PRICING.paygPerCourse}</div>
-            <button class="btn-primary plan-cta" id="plan-cta">Get started</button>
+            <button class="btn-primary plan-cta" id="plan-cta">Buy now</button>
           </div>
         </div>`;
       const sl = card.querySelector("#s-learn");
@@ -207,7 +210,9 @@ function buildCalculator() {
       };
       sl.oninput = upd; sc.oninput = upd;
     }
-    card.querySelector("#plan-cta").onclick = renderOrgRegister;
+    card.querySelector("#plan-cta").onclick = (calc.mode === "payg")
+      ? () => window.open(STRIPE_PAYG_LINK, "_blank", "noopener")
+      : renderOrgRegister;
   }
 
   wrap.querySelectorAll(".plan-toggle button").forEach(b => {
