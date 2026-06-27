@@ -107,7 +107,7 @@ function fmtMoney(pence) {
 }
 
 // Stripe payment link for pay-as-you-go checkout.
-const STRIPE_PAYG_LINK = "https://buy.stripe.com/00w8wO5cTeVm4N728adZ601";
+const STRIPE_PAYG_LINK = "https://buy.stripe.com/3cIfZg48PeVm93ncMOdZ602";
 
 // Build the interactive pricing calculator for the landing page.
 function buildCalculator() {
@@ -179,12 +179,12 @@ function buildCalculator() {
       card.innerHTML = `
         <div class="plan-left">
           <h3>Pay as you go</h3>
-          <p>No commitment — buy only the courses you need, when you need them. Each course is just ${cur}${PRICING.paygPerCourse} per learner, with instant access.</p>
+          <p>No commitment — buy only the courses you need, when you need them, for ${cur}${PRICING.paygPerCourse} per learner. And unlike other providers, your courses never expire.</p>
           <ul class="plan-list">
+            <li><strong>Your courses never expire — ever</strong></li>
             <li>No subscription or commitment</li>
             <li>${cur}${PRICING.paygPerCourse} per course, per learner</li>
             <li>Instant access, top up anytime</li>
-            <li>Switch to a subscription whenever you like</li>
           </ul>
         </div>
         <div class="plan-right">
