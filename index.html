@@ -59,8 +59,17 @@
   .dash-nav{display:flex;gap:2px;flex:1;justify-content:center;flex-wrap:wrap}
   .nav-btn{background:transparent;border:none;color:#94A3B8;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;transition:all .2s}
   .nav-btn.active,.nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
-  .logout{background:rgba(255,255,255,.1);border:none;color:#94A3B8;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600}
+  .logout{background:rgba(255,255,255,.1);border:none;color:#94A3B8;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;flex:0 0 auto}
   .logout:hover{color:#fff}
+  /* On narrow screens, stack the header: brand + Log Out on top, nav as its own scrollable row */
+  @media(max-width:760px){
+    .dash-hdr{height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px}
+    .dash-brand{order:1;flex:1 1 auto;min-width:0}
+    .dash-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .logout{order:2}
+    .dash-nav{order:3;flex-basis:100%;width:100%;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    .nav-btn{flex:0 0 auto;white-space:nowrap}
+  }
   .body{padding:24px;max-width:1200px;margin:0 auto}
   .hero h1{font-size:25px;font-weight:800;margin-bottom:4px}
   .hero p{color:#5A6474;font-size:14px;margin-bottom:22px}
