@@ -3,6 +3,7 @@
 //   node server.js   →   http://localhost:3000
 
 import http from "node:http";
+import https from "node:https";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,6 +111,76 @@ route("GET", "/api/courses", async (req, res) => {
 
 route("GET", "/api/health", async (req, res) => {
   send(res, 200, { ok: true, time: new Date().toISOString() });
+});
+
+// ── PUBLIC: pay-as-you-go Stripe checkout ──
+// Creates a Stripe Checkout Session for the exact amount the calculator shows:
+// £4 per course, per learner → quantity = learners × courses at £4 each.
+// Needs the STRIPE_SECRET_KEY environment variable set (e.g. on Render).
+const PAYG_PENCE_PER_COURSE_PER_LEARNER = 400; // £4 — keep in sync with PRICING.paygPerCourse in public/app.js
+
+function createStripeCheckout(form) {
+  return new Promise((resolve, reject) => {
+    const body = form.toString();
+    const sreq = https.request({
+      hostname: "api.stripe.com",
+      path: "/v1/checkout/sessions",
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + process.env.STRIPE_SECRET_KEY,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    }, (sres) => {
+      let data = "";
+      sres.on("data", (c) => (data += c));
+      sres.on("end", () => {
+        let json;
+        try { json = JSON.parse(data); } catch { return reject(new Error("Invalid response from Stripe")); }
+        if (sres.statusCode >= 200 && sres.statusCode < 300) resolve(json);
+        else reject(new Error((json.error && json.error.message) || ("Stripe error " + sres.statusCode)));
+      });
+    });
+    sreq.on("error", reject);
+    sreq.write(body);
+    sreq.end();
+  });
+}
+
+route("POST", "/api/checkout/payg", async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
+
+  const b = await readBody(req);
+  const learners = Math.floor(Number(b.learners));
+  const courses = Math.floor(Number(b.courses));
+  if (!Number.isFinite(learners) || !Number.isFinite(courses) ||
+      learners < 1 || courses < 1 || learners > 5000 || courses > COURSE_IDS.length) {
+    return send(res, 400, { error: "Please choose a valid number of learners and courses." });
+  }
+  const quantity = learners * courses;
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const base = proto + "://" + (req.headers["host"] || "localhost");
+
+  const form = new URLSearchParams();
+  form.set("mode", "payment");
+  form.set("success_url", base + "/?checkout=success");
+  form.set("cancel_url", base + "/?checkout=cancelled");
+  form.set("line_items[0][quantity]", String(quantity));
+  form.set("line_items[0][price_data][currency]", "gbp");
+  form.set("line_items[0][price_data][unit_amount]", String(PAYG_PENCE_PER_COURSE_PER_LEARNER));
+  form.set("line_items[0][price_data][product_data][name]", "Care2Learn — pay-as-you-go course access");
+  form.set("line_items[0][price_data][product_data][description]", learners + " learner(s) × " + courses + " course(s)");
+  form.set("metadata[learners]", String(learners));
+  form.set("metadata[courses]", String(courses));
+
+  try {
+    const session = await createStripeCheckout(form);
+    if (!session.url) return send(res, 502, { error: "Stripe did not return a checkout URL." });
+    send(res, 200, { url: session.url });
+  } catch (e) {
+    console.error("Stripe checkout error:", e.message);
+    send(res, 502, { error: "Could not start checkout. Please try again." });
+  }
 });
 
 // ── ORG: register ──

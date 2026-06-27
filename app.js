@@ -64,8 +64,18 @@ function logoMark(size, dark) {
     + '</svg>';
 }
 
+// ── Checkout return handling ──
+function checkCheckoutResult() {
+  const c = new URLSearchParams(location.search).get("checkout");
+  if (!c) return;
+  history.replaceState(null, "", location.pathname);
+  if (c === "success") toast("Payment received — thank you! We'll email you with access details shortly.");
+  else if (c === "cancelled") toast("Checkout cancelled — no payment was taken.");
+}
+
 // ── Boot ──
 async function boot() {
+  checkCheckoutResult();
   App.innerHTML = `<div class="spin">Loading Care2Learn…</div>`;
   try {
     const { courses } = await api("/courses");
@@ -106,8 +116,27 @@ function fmtMoney(pence) {
   return PRICING.currency + pounds.toLocaleString(undefined, opts);
 }
 
-// Stripe payment link for pay-as-you-go checkout.
+// Stripe payment link used as a fallback if server-side checkout is unavailable.
 const STRIPE_PAYG_LINK = "https://buy.stripe.com/3cIfZg48PeVm93ncMOdZ602";
+
+// Start pay-as-you-go checkout: ask the server to create a Stripe session for the
+// exact amount (learners × courses × £4). If the server can't (not reachable, or the
+// Stripe key isn't set yet), fall back to the fixed-price payment link.
+async function startPaygCheckout(learners, courses) {
+  toast("Setting up secure checkout…");
+  try {
+    const res = await fetch("/api/checkout/payg", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ learners, courses }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.url) { window.location.href = data.url; return; }
+    }
+  } catch (e) { /* fall through to the static link */ }
+  window.open(STRIPE_PAYG_LINK, "_blank", "noopener");
+}
 
 // Build the interactive pricing calculator for the landing page.
 function buildCalculator() {
@@ -213,7 +242,7 @@ function buildCalculator() {
       sl.oninput = upd; sc.oninput = upd;
     }
     card.querySelector("#plan-cta").onclick = (calc.mode === "payg")
-      ? () => window.open(STRIPE_PAYG_LINK, "_blank", "noopener")
+      ? () => startPaygCheckout(calc.learners, calc.courses)
       : renderOrgRegister;
   }
 
