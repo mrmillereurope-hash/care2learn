@@ -386,17 +386,26 @@ const MIME = {
   ".json": "application/json", ".svg": "image/svg+xml", ".ico": "image/x-icon",
 };
 
+// Work out where the front-end files (index.html, app.js) actually live.
+// Normally that's the /public folder, but if the files were uploaded loose
+// (a common mix-up when uploading to GitHub), fall back to the app's own folder
+// so the site still works.
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, "public", "index.html"))
+  ? path.join(__dirname, "public")
+  : __dirname;
+console.log("Serving front-end files from:", PUBLIC_DIR);
+
 function serveStatic(req, res, urlPath) {
-  let filePath = path.join(__dirname, "public", urlPath === "/" ? "index.html" : urlPath);
+  let filePath = path.join(PUBLIC_DIR, urlPath === "/" ? "index.html" : urlPath);
   // prevent path traversal
-  if (!filePath.startsWith(path.join(__dirname, "public"))) {
+  if (!filePath.startsWith(PUBLIC_DIR)) {
     return send(res, 403, { error: "Forbidden" });
   }
   fs.readFile(filePath, (err, data) => {
     if (err) {
       // SPA fallback to index.html
-      fs.readFile(path.join(__dirname, "public", "index.html"), (e2, html) => {
-        if (e2) return send(res, 404, { error: "Not found" });
+      fs.readFile(path.join(PUBLIC_DIR, "index.html"), (e2, html) => {
+        if (e2) return send(res, 404, { error: "index.html was not found on the server. Make sure index.html and app.js were uploaded (ideally inside a 'public' folder)." });
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end(html);
       });
