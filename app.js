@@ -334,7 +334,9 @@ async function paintOrgTab(org) {
   if (orgTab === "compliance") {
     const { staff } = await api("/org/staff");
     body.innerHTML = "";
-    body.appendChild(el(`<h2 style="margin-bottom:18px">Compliance Report</h2>`));
+    const ch = el(`<div class="sh"><h2>Compliance Report</h2><button class="btn-add" id="dlpdf">⬇ Download PDF</button></div>`);
+    body.appendChild(ch);
+    document.getElementById("dlpdf").onclick = () => downloadComplianceReport();
     const active = staff.filter(s => s.active);
     const matrix = el(`<div class="matrix"></div>`);
     const head = el(`<div class="mh"><span>Staff Member</span></div>`);
@@ -939,7 +941,11 @@ function printCertificate(enr, me) {
 '<div class="foot">Issued by Care2Learn · Verify with Certificate ID ' + esc(enr.certId) + '</div>' +
 '</body></html>';
 
-  // Remove any previous print frame
+  printViaIframe(doc);
+}
+
+// ── Shared: print/save any HTML document via a hidden iframe (no pop-up needed) ──
+function printViaIframe(html) {
   const old = document.getElementById("c2l-print-frame");
   if (old) old.remove();
 
@@ -949,8 +955,8 @@ function printCertificate(enr, me) {
   frame.style.position = "fixed";
   frame.style.left = "-9999px";
   frame.style.top = "0";
-  frame.style.width = "800px";
-  frame.style.height = "1100px";
+  frame.style.width = "900px";
+  frame.style.height = "1200px";
   frame.style.border = "0";
   document.body.appendChild(frame);
 
@@ -962,7 +968,6 @@ function printCertificate(enr, me) {
       frame.contentWindow.focus();
       frame.contentWindow.print();
     } catch (e) {
-      // Last-resort fallback: print the current page (CSS hides everything but the certificate)
       try { window.print(); } catch (e2) {}
     }
     setTimeout(function () { if (frame && frame.parentNode) frame.parentNode.removeChild(frame); }, 3000);
@@ -970,13 +975,111 @@ function printCertificate(enr, me) {
 
   const fdoc = frame.contentWindow.document;
   fdoc.open();
-  fdoc.write(doc);
+  fdoc.write(html);
   fdoc.close();
-
-  // Print once the iframe content has laid out
   frame.onload = function () { setTimeout(triggerPrint, 150); };
-  // Safety net in case onload doesn't fire after document.write
   setTimeout(triggerPrint, 500);
+}
+
+// ── Compliance status → printable label + colours ──
+function compStatusStyle(compliance) {
+  switch (compliance) {
+    case "valid":       return { label: "Valid",         fg: "#15803D", bg: "#16A34A1A" };
+    case "expiring":    return { label: "Expiring soon", fg: "#9A6700", bg: "#E67E221A" };
+    case "expired":     return { label: "Expired",       fg: "#B91C1C", bg: "#E74C3C1A" };
+    case "in_progress": return { label: "In progress",   fg: "#1D4E89", bg: "#2980B91A" };
+    case "failed":      return { label: "Failed",        fg: "#B91C1C", bg: "#E74C3C1A" };
+    default:            return { label: "Not started",   fg: "#4B5563", bg: "#9CA3AF1A" };
+  }
+}
+
+// ── Build + print the organisation's compliance report as a PDF ──
+async function downloadComplianceReport() {
+  toast("Preparing compliance report…");
+  let me, staffResp;
+  try {
+    me = await api("/org/me");
+    staffResp = await api("/org/staff");
+  } catch (e) {
+    toast("Could not build the report — please try again.");
+    return;
+  }
+  const org = me.org;
+  const sum = me.summary;
+  const active = staffResp.staff.filter(s => s.active);
+
+  const now = new Date();
+  const generated = now.toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+  const sumCard = (n, l) => '<div class="sum"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>';
+
+  const staffBlocks = active.map(s => {
+    const rows = (s.enrolments || []).map(e => {
+      const st = compStatusStyle(e.compliance);
+      return '<tr>'
+        + '<td>' + esc(e.courseTitle) + '</td>'
+        + '<td><span class="badge" style="color:' + st.fg + ';background:' + st.bg + '">' + st.label + '</span></td>'
+        + '<td>' + (e.score != null ? e.score + '%' : '—') + '</td>'
+        + '<td>' + (e.completedAt ? fmtDate(e.completedAt) : '—') + '</td>'
+        + '<td>' + (e.expiryDate ? fmtDate(e.expiryDate) : '—') + '</td>'
+        + '</tr>';
+    }).join("");
+    const overall = (s.assignedCount > 0 && s.compliant)
+      ? '<span class="badge" style="color:#15803D;background:#16A34A1A">Fully compliant</span>'
+      : (s.assignedCount === 0
+        ? '<span class="badge" style="color:#4B5563;background:#9CA3AF1A">No courses assigned</span>'
+        : '<span class="badge" style="color:#9A6700;background:#E67E221A">Action required</span>');
+    const table = (s.enrolments && s.enrolments.length)
+      ? '<table><thead><tr><th>Course</th><th>Status</th><th>Score</th><th>Completed</th><th>Expires</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<div class="none">No courses assigned.</div>';
+    return '<div class="staff">'
+      + '<div class="staff-h"><div><span class="staff-name">' + esc(s.name) + '</span> <span class="staff-role">· ' + esc(s.role) + '</span></div>' + overall + '</div>'
+      + table + '</div>';
+  }).join("");
+
+  const doc =
+'<!DOCTYPE html><html><head><meta charset="utf-8">'
++ '<title>Compliance Report — ' + esc(org.name) + '</title>'
++ '<style>'
++ '@page{size:A4 portrait;margin:14mm;}'
++ '*{box-sizing:border-box;margin:0;padding:0;}'
++ 'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1A1A2E;font-size:12px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
++ '.hd{background:#0D1B2A;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:8px;}'
++ '.hd .l{display:flex;align-items:center;gap:11px;}'
++ '.hd .ttl{font-size:18px;font-weight:700;}'
++ '.hd .sub{font-size:11px;color:#9FB0C4;}'
++ '.hd .org{font-size:13px;font-weight:700;text-align:right;}'
++ '.meta{display:flex;justify-content:space-between;margin:14px 2px;font-size:11px;color:#5A6474;}'
++ '.sumrow{display:flex;gap:10px;margin-bottom:18px;}'
++ '.sum{flex:1;border:1px solid #E5E7EB;border-radius:8px;padding:10px;text-align:center;}'
++ '.sum .n{font-size:22px;font-weight:800;}'
++ '.sum .l{font-size:9px;color:#7A8599;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}'
++ '.staff{margin-bottom:14px;page-break-inside:avoid;}'
++ '.staff-h{display:flex;justify-content:space-between;align-items:center;background:#F0F4F8;padding:8px 12px;border-radius:6px;margin-bottom:6px;}'
++ '.staff-name{font-weight:700;font-size:13px;}'
++ '.staff-role{color:#7A8599;font-size:11px;}'
++ 'table{width:100%;border-collapse:collapse;}'
++ 'th{text-align:left;color:#7A8599;font-weight:600;padding:5px 8px;border-bottom:1px solid #E5E7EB;text-transform:uppercase;font-size:9px;letter-spacing:.3px;}'
++ 'td{padding:6px 8px;border-bottom:1px solid #F0F2F5;font-size:11px;}'
++ '.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}'
++ '.none{padding:8px 12px;color:#7A8599;font-style:italic;font-size:11px;}'
++ '.legend{margin-top:6px;font-size:10px;color:#7A8599;line-height:1.6;}'
++ '.foot{margin-top:18px;padding-top:10px;border-top:1px solid #E5E7EB;text-align:center;font-size:10px;color:#9AA5B1;}'
++ '</style></head><body>'
++ '<div class="hd"><div class="l">' + logoMark(26, false) + '<div><div class="ttl">Care2Learn</div><div class="sub">Training Compliance Report</div></div></div><div class="org">' + esc(org.name) + (org.cqc_number ? '<br><span style="font-weight:400;color:#9FB0C4">CQC ' + esc(org.cqc_number) + '</span>' : '') + '</div></div>'
++ '<div class="meta"><span>Mandatory training compliance across all active staff</span><span>Generated: ' + esc(generated) + '</span></div>'
++ '<div class="sumrow">'
++ sumCard(sum.activeStaff, "Active staff")
++ sumCard(sum.fullyCompliant, "Fully compliant")
++ sumCard(sum.expiringSoon, "Expiring &le;30 days")
++ sumCard(sum.totalEnrolments, "Course assignments")
++ '</div>'
++ (active.length ? staffBlocks : '<div class="none">No active staff to report on.</div>')
++ '<div class="legend"><b>Status key:</b> Valid = completed and in date · Expiring soon = within 30 days of expiry · Expired = renewal overdue · In progress = started, assessment not yet passed · Not started = assigned but not begun.</div>'
++ '<div class="foot">Confidential · Generated by Care2Learn for ' + esc(org.name) + ' on ' + esc(generated) + '</div>'
++ '</body></html>';
+
+  printViaIframe(doc);
 }
 
 function showCertificate(enr, me) {
