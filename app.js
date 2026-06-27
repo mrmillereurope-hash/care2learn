@@ -54,6 +54,16 @@ function toast(msg) {
   setTimeout(() => t.remove(), 3500);
 }
 
+// ── Brand logo (shield + tick). dark=true gives a navy shield for light backgrounds. ──
+function logoMark(size, dark) {
+  const shield = dark ? "#1B2A4A" : "#ffffff";
+  const tick = dark ? "#22C55E" : "#16A34A";
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 100 100" style="display:inline-block;vertical-align:middle;flex:0 0 auto" aria-label="Care2Learn">'
+    + '<path d="M50 14 L80 24 L80 47 C80 65 67 77 50 83 C33 77 20 65 20 47 L20 24 Z" fill="' + shield + '"/>'
+    + '<path d="M37 49 L46 58 L64 37" fill="none" stroke="' + tick + '" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '</svg>';
+}
+
 // ── Boot ──
 async function boot() {
   App.innerHTML = `<div class="spin">Loading Care2Learn…</div>`;
@@ -80,7 +90,7 @@ function renderLanding() {
   App.appendChild(el(`
     <div>
       <div class="landing-hero">
-        <div class="landing-logo">🏥</div>
+        <div class="landing-logo">${logoMark(54, false)}</div>
         <div class="landing-title">Care2Learn</div>
         <div class="landing-tag">Skills for Care · Mandatory Training</div>
         <p class="landing-desc">The complete e-learning platform for social care. Register your organisation, assign mandatory courses to staff, and track every learner's progress and compliance in real time.</p>
@@ -120,7 +130,7 @@ function renderOrgRegister() {
   App.appendChild(el(`
     <div class="auth-page"><div class="auth-card">
       <button class="back-sm" id="back">← Back</button>
-      <div class="auth-logo">🏥 Care2Learn</div>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
       <div class="auth-title">Register Your Organisation</div>
       <div class="auth-sub">Create your account to start managing staff training.</div>
       <div id="err"></div>
@@ -155,7 +165,7 @@ function renderOrgLogin() {
   App.appendChild(el(`
     <div class="auth-page"><div class="auth-card">
       <button class="back-sm" id="back">← Back</button>
-      <div class="auth-logo">🏥 Care2Learn</div>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
       <div class="auth-title">Organisation Login</div>
       <div id="err"></div>
       <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="admin@yourorg.com"></div>
@@ -184,7 +194,7 @@ function renderStaffLogin() {
   App.appendChild(el(`
     <div class="auth-page"><div class="auth-card">
       <button class="back-sm" id="back">← Back</button>
-      <div class="auth-logo">🏥 Care2Learn</div>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
       <div class="auth-title">Staff Login</div>
       <div class="auth-sub">Use the email and PIN provided by your manager.</div>
       <div id="err"></div>
@@ -220,7 +230,7 @@ async function renderOrgDash() {
   App.appendChild(el(`
     <div>
       <div class="dash-hdr">
-        <div class="dash-brand"><span class="dash-logo">🏥</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
+        <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
         <nav class="dash-nav" id="nav"></nav>
         <button class="logout" id="logout">Log Out</button>
       </div>
@@ -896,7 +906,7 @@ function printCertificate(enr, me) {
 'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1A1A2E;padding:10px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
 '.sheet{border:3px solid ' + color + ';border-radius:14px;overflow:hidden;max-width:760px;margin:0 auto;}' +
 '.top{background:' + color + ';color:#fff;padding:24px 32px;display:flex;justify-content:space-between;align-items:center;}' +
-'.brand{font-size:22px;font-weight:900;}' +
+'.brand{font-size:22px;font-weight:900;display:flex;align-items:center;gap:8px;}' +
 '.badge{font-size:12px;opacity:.85;letter-spacing:1px;}' +
 '.bodyc{padding:40px 40px 30px;text-align:center;}' +
 '.icon{font-size:64px;margin-bottom:10px;}' +
@@ -910,7 +920,7 @@ function printCertificate(enr, me) {
 '.foot{text-align:center;font-size:11px;color:#9AA5B1;margin-top:16px;}' +
 '</style></head><body>' +
 '<div class="sheet">' +
-'<div class="top"><div class="brand">🏥 Care2Learn</div><div class="badge">Skills for Care · Mandatory Training</div></div>' +
+'<div class="top"><div class="brand">' + logoMark(22, false) + ' Care2Learn</div><div class="badge">Skills for Care · Mandatory Training</div></div>' +
 '<div class="bodyc">' +
 '<div class="icon">' + (c.icon || "📘") + '</div>' +
 '<div class="sm">This certifies that</div>' +
@@ -975,7 +985,7 @@ function showCertificate(enr, me) {
   const modal = el(`
     <div class="cert">
       <div class="cert-hdr" style="background:linear-gradient(135deg,${c.color},${c.color}cc)">
-        <div class="cert-logo">🏥 Care2Learn</div>
+        <div class="cert-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, false)}<span>Care2Learn</span></div>
         <div class="cert-badge">Skills for Care · Mandatory Training</div>
       </div>
       <div class="cert-body">
