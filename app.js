@@ -85,6 +85,138 @@ async function boot() {
 }
 
 // ─── LANDING ──────────────────────────────────────────────────────────────────
+// ── Pricing model for the cost calculator. EDIT THESE to change your prices. ──
+const PRICING = {
+  currency: "£",
+  subscriptionPerLearnerMonth: 1, // Subscription: £1 per learner per month (before discount)
+  subDiscountPerStep: 10,         // ...discounted 10%...
+  subDiscountStepUsers: 50,       // ...for every 50 learners...
+  subDiscountMax: 50,             // ...up to a maximum of 50% off.
+  paygPerCourse: 2,               // Pay as you go: £2 per course, per learner
+};
+// Subscription volume discount (%) for a given number of learners.
+function subDiscountPct(users) {
+  const steps = Math.floor(users / PRICING.subDiscountStepUsers);
+  return Math.min(PRICING.subDiscountMax, steps * PRICING.subDiscountPerStep);
+}
+// Format a value given in pence as £X or £X.XX.
+function fmtMoney(pence) {
+  const pounds = pence / 100;
+  const opts = Number.isInteger(pounds) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return PRICING.currency + pounds.toLocaleString(undefined, opts);
+}
+
+// Build the interactive pricing calculator for the landing page.
+function buildCalculator() {
+  const courseCount = state.courses.length;
+  const cur = PRICING.currency;
+  const calc = { mode: "sub", learners: 30, courses: Math.min(3, courseCount) };
+
+  const wrap = el(`
+    <div class="plan">
+      <div class="plan-head">
+        <h2>Flexible pricing that grows with you</h2>
+        <p>Subscriptions suit small to large organisations. Running a micro business or working solo? Pay as you go gives you total flexibility.</p>
+      </div>
+      <div class="plan-toggle">
+        <button data-mode="sub">Subscription <span>Most popular</span></button>
+        <button data-mode="payg">Pay as you go</button>
+      </div>
+      <div class="plan-card" id="plan-card"></div>
+    </div>
+  `);
+
+  function render() {
+    wrap.querySelectorAll(".plan-toggle button").forEach(b => b.classList.toggle("active", b.dataset.mode === calc.mode));
+    const card = wrap.querySelector("#plan-card");
+
+    if (calc.mode === "sub") {
+      const disc = subDiscountPct(calc.learners);
+      const perPence = Math.round(PRICING.subscriptionPerLearnerMonth * 100 * (1 - disc / 100));
+      const monthlyPence = calc.learners * perPence;
+      const yearlyPence = monthlyPence * 12;
+      card.innerHTML = `
+        <div class="plan-left">
+          <h3>Subscribe & save</h3>
+          <p>The most cost-effective way to keep your whole team compliant — one low monthly price per learner covers every mandatory course, with bigger discounts as your team grows.</p>
+          <ul class="plan-list">
+            <li>Just ${cur}${PRICING.subscriptionPerLearnerMonth} per learner / month</li>
+            <li>Volume discounts — up to ${PRICING.subDiscountMax}% off</li>
+            <li>All ${courseCount} mandatory courses included</li>
+            <li>Unlimited certificates, renewals and reporting</li>
+          </ul>
+        </div>
+        <div class="plan-right">
+          <div class="est">
+            <div class="est-title">Estimate your training costs</div>
+            <div class="est-row"><span>Number of learners</span><b id="v-learn">${calc.learners}</b></div>
+            <input type="range" id="s-learn" min="1" max="500" value="${calc.learners}">
+            <div class="est-disc" id="v-disc">${disc > 0 ? disc + "% volume discount applied" : ""}</div>
+            <div class="est-perlearner">Your estimated cost <span>(billed monthly)</span></div>
+            <div class="est-cost"><span class="est-cost-v" id="v-total">${fmtMoney(monthlyPence)}</span><span class="est-cost-u">/ month</span></div>
+            <div class="est-sub" id="v-sub">${fmtMoney(yearlyPence)} per year · ${fmtMoney(perPence)} per learner / month</div>
+            <button class="btn-primary plan-cta" id="plan-cta">Get started</button>
+          </div>
+        </div>`;
+      const sl = card.querySelector("#s-learn");
+      sl.oninput = () => {
+        calc.learners = +sl.value;
+        const d = subDiscountPct(calc.learners);
+        const pp = Math.round(PRICING.subscriptionPerLearnerMonth * 100 * (1 - d / 100));
+        const mp = calc.learners * pp, yp = mp * 12;
+        card.querySelector("#v-learn").textContent = calc.learners + (calc.learners >= 500 ? "+" : "");
+        card.querySelector("#v-disc").textContent = d > 0 ? d + "% volume discount applied" : "";
+        card.querySelector("#v-total").textContent = fmtMoney(mp);
+        card.querySelector("#v-sub").textContent = fmtMoney(yp) + " per year · " + fmtMoney(pp) + " per learner / month";
+      };
+    } else {
+      const total = calc.learners * calc.courses * PRICING.paygPerCourse;
+      card.innerHTML = `
+        <div class="plan-left">
+          <h3>Pay as you go</h3>
+          <p>No commitment — buy only the courses you need, when you need them. Each course is just ${cur}${PRICING.paygPerCourse} per learner, with instant access.</p>
+          <ul class="plan-list">
+            <li>No subscription or commitment</li>
+            <li>${cur}${PRICING.paygPerCourse} per course, per learner</li>
+            <li>Instant access, top up anytime</li>
+            <li>Switch to a subscription whenever you like</li>
+          </ul>
+        </div>
+        <div class="plan-right">
+          <div class="est">
+            <div class="est-title">Estimate your training costs</div>
+            <div class="est-row"><span>Number of learners</span><b id="v-learn">${calc.learners}</b></div>
+            <input type="range" id="s-learn" min="1" max="500" value="${calc.learners}">
+            <div class="est-row" style="margin-top:14px"><span>Number of courses</span><b id="v-course">${calc.courses}</b></div>
+            <input type="range" id="s-course" min="1" max="${courseCount}" value="${calc.courses}">
+            <div class="est-perlearner" style="margin-top:14px">Your estimated cost <span>(one-off)</span></div>
+            <div class="est-cost"><span class="est-cost-v" id="v-total">${cur}${total.toLocaleString()}</span></div>
+            <div class="est-sub" id="v-break">${calc.learners} learners × ${calc.courses} courses × ${cur}${PRICING.paygPerCourse}</div>
+            <button class="btn-primary plan-cta" id="plan-cta">Get started</button>
+          </div>
+        </div>`;
+      const sl = card.querySelector("#s-learn");
+      const sc = card.querySelector("#s-course");
+      const upd = () => {
+        calc.learners = +sl.value; calc.courses = +sc.value;
+        const t = calc.learners * calc.courses * PRICING.paygPerCourse;
+        card.querySelector("#v-learn").textContent = calc.learners + (calc.learners >= 500 ? "+" : "");
+        card.querySelector("#v-course").textContent = calc.courses;
+        card.querySelector("#v-total").textContent = cur + t.toLocaleString();
+        card.querySelector("#v-break").textContent = calc.learners + " learners × " + calc.courses + " courses × " + cur + PRICING.paygPerCourse;
+      };
+      sl.oninput = upd; sc.oninput = upd;
+    }
+    card.querySelector("#plan-cta").onclick = renderOrgRegister;
+  }
+
+  wrap.querySelectorAll(".plan-toggle button").forEach(b => {
+    b.onclick = () => { calc.mode = b.dataset.mode; render(); };
+  });
+  render();
+  return wrap;
+}
+
 function renderLanding() {
   App.innerHTML = "";
   App.appendChild(el(`
@@ -116,12 +248,14 @@ function renderLanding() {
           <button class="btn-primary green" id="go-staff-login">Staff Login</button>
         </div>
       </div>
+      <div id="calc-slot"></div>
       <div class="footer">Aligned to the Care Certificate 2026 · CQC Inspection Ready · Powered by Care2Learn</div>
     </div>
   `));
   document.getElementById("go-org-login").onclick = renderOrgLogin;
   document.getElementById("go-org-reg").onclick = renderOrgRegister;
   document.getElementById("go-staff-login").onclick = renderStaffLogin;
+  document.getElementById("calc-slot").appendChild(buildCalculator());
 }
 
 // ─── ORG REGISTER ─────────────────────────────────────────────────────────────
