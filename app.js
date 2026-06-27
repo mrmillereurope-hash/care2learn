@@ -106,7 +106,7 @@ function renderLanding() {
           <button class="btn-primary green" id="go-staff-login">Staff Login</button>
         </div>
       </div>
-      <div class="footer">Aligned to the Care Certificate 2024 · CQC Inspection Ready · Powered by Care2Learn</div>
+      <div class="footer">Aligned to the Care Certificate 2026 · CQC Inspection Ready · Powered by Care2Learn</div>
     </div>
   `));
   document.getElementById("go-org-login").onclick = renderOrgLogin;
@@ -924,7 +924,7 @@ function printCertificate(enr, me) {
 '<div><div class="ml">Valid Until</div><div class="mv">' + fmtDate(enr.expiryDate) + '</div></div>' +
 '<div><div class="ml">Certificate ID</div><div class="mv" style="font-family:monospace">' + esc(enr.certId) + '</div></div>' +
 '</div>' +
-'<div class="strip"><span>Aligned to the Care Certificate 2024</span><span>Pass mark: 70% · Achieved: ' + enr.score + '%</span></div>' +
+'<div class="strip"><span>Aligned to the Care Certificate 2026</span><span>Pass mark: 70% · Achieved: ' + enr.score + '%</span></div>' +
 '</div></div>' +
 '<div class="foot">Issued by Care2Learn · Verify with Certificate ID ' + esc(enr.certId) + '</div>' +
 '</body></html>';
@@ -991,7 +991,7 @@ function showCertificate(enr, me) {
           <div><div class="cm-l">Valid Until</div><div class="cm-v">${fmtDate(enr.expiryDate)}</div></div>
           <div><div class="cm-l">Cert ID</div><div class="cm-v mono">${esc(enr.certId)}</div></div>
         </div>
-        <div style="padding:12px;background:${c.color}18;border-radius:8px;display:flex;justify-content:space-between;font-size:11px;color:#5A6474"><span>Aligned to the Care Certificate 2024</span><span>Pass mark: 70% · Achieved: ${enr.score}%</span></div>
+        <div style="padding:12px;background:${c.color}18;border-radius:8px;display:flex;justify-content:space-between;font-size:11px;color:#5A6474"><span>Aligned to the Care Certificate 2026</span><span>Pass mark: 70% · Achieved: ${enr.score}%</span></div>
       </div>
       <div class="cert-actions">
         <button class="btn-cancel" style="flex:1" id="cert-close">Close</button>
