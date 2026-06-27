@@ -88,11 +88,11 @@ async function boot() {
 // ── Pricing model for the cost calculator. EDIT THESE to change your prices. ──
 const PRICING = {
   currency: "£",
-  subscriptionPerLearnerMonth: 1, // Subscription: £1 per learner per month (before discount)
+  subscriptionPerLearnerMonth: 2, // Subscription: £2 per learner per month (before discount)
   subDiscountPerStep: 10,         // ...discounted 10%...
   subDiscountStepUsers: 50,       // ...for every 50 learners...
   subDiscountMax: 50,             // ...up to a maximum of 50% off.
-  paygPerCourse: 2,               // Pay as you go: £2 per course, per learner
+  paygPerCourse: 4,               // Pay as you go: £4 per course, per learner
 };
 // Subscription volume discount (%) for a given number of learners.
 function subDiscountPct(users) {
@@ -116,16 +116,18 @@ function buildCalculator() {
   const calc = { mode: "sub", learners: 30, courses: Math.min(3, courseCount) };
 
   const wrap = el(`
-    <div class="plan">
-      <div class="plan-head">
-        <h2>Flexible pricing that grows with you</h2>
-        <p>Subscriptions suit small to large organisations. Running a micro business or working solo? Pay as you go gives you total flexibility.</p>
+    <div class="plan-band">
+      <div class="plan">
+        <div class="plan-head">
+          <h2>Flexible pricing that grows with you</h2>
+          <p>Subscriptions suit small to large organisations. Running a micro business or working solo? Pay as you go gives you total flexibility.</p>
+        </div>
+        <div class="plan-toggle">
+          <button data-mode="sub">Subscription <span>Most popular</span></button>
+          <button data-mode="payg">Pay as you go</button>
+        </div>
+        <div class="plan-card" id="plan-card"></div>
       </div>
-      <div class="plan-toggle">
-        <button data-mode="sub">Subscription <span>Most popular</span></button>
-        <button data-mode="payg">Pay as you go</button>
-      </div>
-      <div class="plan-card" id="plan-card"></div>
     </div>
   `);
 
