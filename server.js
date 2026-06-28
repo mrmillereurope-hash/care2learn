@@ -145,6 +145,149 @@ function shapeEnrolment(row) {
   };
 }
 
+// ─── AUTOMATED TRAINING REMINDERS ───────────────────────────────────────────
+// A lightweight daily scheduler (no external cron needed) emails learners whose
+// training is expired, expiring soon, or overdue, and sends managers a periodic
+// digest. Sends are throttled per-recipient so nobody is emailed more than once
+// per cooldown window, and the whole feature is opt-out per organisation.
+const REMINDER_HOUR = Number(process.env.REMINDER_HOUR || 8);   // hour (UTC on Render) to run the daily sweep
+const REMINDER_COOLDOWN_DAYS = 7;                               // minimum gap between reminders to the same recipient
+
+function appBase() {
+  return process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, "") : "https://care2learn.co.uk";
+}
+function todayStr() { return new Date().toISOString().split("T")[0]; }
+function daysSince(iso) { return iso ? (Date.now() - new Date(iso).getTime()) / 86400000 : Infinity; }
+
+// Record that a reminder was just sent (manual upsert — avoids ON CONFLICT for driver portability).
+function markReminded(subjectId, kind) {
+  const now = new Date().toISOString();
+  const u = db.prepare("UPDATE reminder_log SET last_sent_at = ? WHERE subject_id = ? AND kind = ?").run(now, subjectId, kind);
+  if (!u.changes) db.prepare("INSERT INTO reminder_log (subject_id, kind, last_sent_at) VALUES (?, ?, ?)").run(subjectId, kind, now);
+}
+function lastReminded(subjectId, kind) {
+  const row = db.prepare("SELECT last_sent_at FROM reminder_log WHERE subject_id = ? AND kind = ?").get(subjectId, kind);
+  return row ? row.last_sent_at : null;
+}
+
+// The courses that need a given learner's attention right now.
+function attentionItems(staffId) {
+  const today = todayStr();
+  const items = [];
+  for (const row of db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(staffId)) {
+    const e = shapeEnrolment(row);
+    if (e.compliance === "expired") items.push({ title: e.courseTitle, reason: "Expired" });
+    else if (e.compliance === "expiring") items.push({ title: e.courseTitle, reason: `Expires in ${e.daysUntilExpiry} day${e.daysUntilExpiry === 1 ? "" : "s"}` });
+    else if (row.status !== "completed" && row.due_date && row.due_date < today) items.push({ title: e.courseTitle, reason: "Overdue" });
+  }
+  return items;
+}
+
+// Summarise an org's active team for the manager digest.
+function managerDigest(org) {
+  const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? AND active = 1").all(org.id);
+  let compliant = 0;
+  const flagged = [];
+  for (const m of staff) {
+    const enr = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(m.id).map(shapeEnrolment);
+    if (enr.length && enr.every((e) => e.compliance === "valid")) compliant++;
+    const items = attentionItems(m.id);
+    if (items.length) flagged.push({ name: m.name, count: items.length });
+  }
+  return { total: staff.length, compliant, flagged };
+}
+
+async function sendStaffReminder(org, member, items) {
+  const link = appBase();
+  const lines = items.map((i) => `• ${i.title} — ${i.reason}`).join("\n");
+  const text = `Hi ${member.name},\n\nThis is a reminder from ${org.name} that the following training needs your attention:\n\n${lines}\n\nPlease log in to Care2Learn to complete it:\n${link}\n\nThank you,\n${org.name}`;
+  const li = items.map((i) => `<li><b>${escapeHtml(i.title)}</b> — ${escapeHtml(i.reason)}</li>`).join("");
+  const html = `<div style="font-family:'Segoe UI',system-ui,sans-serif;color:#1A1A2E;line-height:1.6;max-width:560px">
+    <p>Hi ${escapeHtml(member.name)},</p>
+    <p>This is a reminder from <b>${escapeHtml(org.name)}</b> that the following training needs your attention:</p>
+    <ul>${li}</ul>
+    <p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 22px;background:#1B2A4A;color:#fff;border-radius:10px;text-decoration:none;font-weight:700">Log in to Care2Learn</a></p>
+    <p style="color:#5A6474">Thank you,<br>${escapeHtml(org.name)}</p>
+  </div>`;
+  return sendEmail({ to: member.email, subject: "Training reminder — action needed", text, html });
+}
+
+async function sendManagerDigest(org, digest) {
+  const link = appBase();
+  const flaggedTxt = digest.flagged.length
+    ? digest.flagged.map((f) => `• ${f.name} — ${f.count} course${f.count === 1 ? "" : "s"} need attention`).join("\n")
+    : "• Everyone is up to date — nothing needs attention right now.";
+  const text = `Hi ${org.name},\n\nYour Care2Learn team training summary:\n\n• ${digest.compliant} of ${digest.total} active staff fully compliant\n• ${digest.flagged.length} staff need attention\n\n${flaggedTxt}\n\nOpen your compliance dashboard:\n${link}\n\nCare2Learn`;
+  const flaggedHtml = digest.flagged.length
+    ? `<ul>${digest.flagged.map((f) => `<li><b>${escapeHtml(f.name)}</b> — ${f.count} course${f.count === 1 ? "" : "s"} need attention</li>`).join("")}</ul>`
+    : `<p style="color:#1A5732">Everyone is up to date — nothing needs attention right now.</p>`;
+  const html = `<div style="font-family:'Segoe UI',system-ui,sans-serif;color:#1A1A2E;line-height:1.6;max-width:560px">
+    <p>Hi ${escapeHtml(org.name)},</p>
+    <p>Your Care2Learn team training summary:</p>
+    <ul>
+      <li><b>${digest.compliant}</b> of <b>${digest.total}</b> active staff fully compliant</li>
+      <li><b>${digest.flagged.length}</b> staff need attention</li>
+    </ul>
+    ${flaggedHtml}
+    <p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 22px;background:#1B2A4A;color:#fff;border-radius:10px;text-decoration:none;font-weight:700">Open compliance dashboard</a></p>
+    <p style="color:#5A6474">Care2Learn</p>
+  </div>`;
+  return sendEmail({ to: org.email, subject: "Your team training summary", text, html });
+}
+
+// Run the reminder sweep across every opted-in organisation.
+async function runReminderJob({ force = false } = {}) {
+  let staffSent = 0, mgrSent = 0;
+  try {
+    const orgs = db.prepare("SELECT * FROM organisations WHERE active = 1 AND reminders_enabled = 1").all();
+    for (const org of orgs) {
+      const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? AND active = 1").all(org.id);
+      for (const m of staff) {
+        if (!m.email) continue;
+        const items = attentionItems(m.id);
+        if (!items.length) continue;
+        if (!force && daysSince(lastReminded(m.id, "staff")) < REMINDER_COOLDOWN_DAYS) continue;
+        await sendStaffReminder(org, m, items);
+        markReminded(m.id, "staff");
+        staffSent++;
+      }
+      const digest = managerDigest(org);
+      if (org.email && digest.flagged.length) {
+        if (force || daysSince(lastReminded(org.id, "manager")) >= REMINDER_COOLDOWN_DAYS) {
+          await sendManagerDigest(org, digest);
+          markReminded(org.id, "manager");
+          mgrSent++;
+        }
+      }
+    }
+    console.log(`🔔 Reminder job complete — ${staffSent} learner reminder(s), ${mgrSent} manager digest(s).`);
+  } catch (e) {
+    console.error("🔔 Reminder job error: " + e.message);
+  }
+  return { staffSent, mgrSent };
+}
+
+// Hourly tick that fires the daily job once, after REMINDER_HOUR.
+function startReminderScheduler() {
+  const TICK_MS = 60 * 60 * 1000;
+  const tick = () => {
+    try {
+      if (new Date().getUTCHours() < REMINDER_HOUR) return;
+      const today = todayStr();
+      const last = db.prepare("SELECT value FROM system_state WHERE key = 'reminders_last_run'").get();
+      if (last && last.value === today) return;
+      // Claim today's run first so a restart mid-job can't double-send.
+      const u = db.prepare("UPDATE system_state SET value = ? WHERE key = 'reminders_last_run'").run(today);
+      if (!u.changes) db.prepare("INSERT INTO system_state (key, value) VALUES ('reminders_last_run', ?)").run(today);
+      runReminderJob();
+    } catch (e) {
+      console.error("🔔 Reminder scheduler tick error: " + e.message);
+    }
+  };
+  setInterval(tick, TICK_MS);
+  console.log(`🔔 Reminder scheduler started (daily after ${String(REMINDER_HOUR).padStart(2, "0")}:00 UTC).`);
+}
+
 // ─── ROUTE HANDLERS ───────────────────────────────────────────────────────────
 
 const routes = [];
@@ -491,7 +634,7 @@ route("POST", "/api/org/login", async (req, res) => {
 route("GET", "/api/org/me", async (req, res) => {
   const s = authSession(req);
   if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
-  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits FROM organisations WHERE id = ?").get(s.subject_id);
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,reminders_enabled FROM organisations WHERE id = ?").get(s.subject_id);
   if (!org) return send(res, 404, { error: "Organisation not found." });
 
   const staff = db.prepare("SELECT * FROM staff WHERE org_id = ?").all(org.id);
@@ -689,6 +832,59 @@ route("POST", "/api/org/staff/:id/enrol", async (req, res) => {
   }
   const enrolments = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
   send(res, 200, { added, enrolments });
+});
+
+// ── ORG: bulk / role-based course assignment ──
+// Assign one or more courses to every active staff member, or only those in the
+// selected roles. Existing enrolments are left untouched (INSERT OR IGNORE).
+route("POST", "/api/org/staff/assign-courses", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
+  const b = await readBody(req);
+  const courseIds = (Array.isArray(b.courseIds) ? b.courseIds : []).filter((c) => COURSE_IDS.includes(c));
+  if (!courseIds.length) return send(res, 400, { error: "Choose at least one course." });
+
+  let staff = db.prepare("SELECT * FROM staff WHERE org_id = ? AND active = 1").all(s.subject_id);
+  if (b.target === "roles") {
+    const roles = new Set((Array.isArray(b.roles) ? b.roles : []).map((r) => String(r)));
+    if (!roles.size) return send(res, 400, { error: "Choose at least one role." });
+    staff = staff.filter((m) => roles.has(m.role));
+  }
+  if (!staff.length) return send(res, 400, { error: "There are no matching staff to assign to." });
+
+  const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts) VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
+  let added = 0;
+  inTransaction(() => {
+    for (const m of staff) for (const cid of courseIds) {
+      const r = ins.run(genId("ENR"), m.id, cid, new Date().toISOString(), b.dueDate || null);
+      if (r.changes > 0) added++;
+    }
+  });
+  send(res, 200, { staffAffected: staff.length, enrolmentsAdded: added });
+});
+
+// ── ORG: notification settings (toggle automated reminders) ──
+route("POST", "/api/org/settings", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
+  const b = await readBody(req);
+  if (typeof b.remindersEnabled === "boolean") {
+    db.prepare("UPDATE organisations SET reminders_enabled = ? WHERE id = ?").run(b.remindersEnabled ? 1 : 0, s.subject_id);
+  }
+  const org = db.prepare("SELECT reminders_enabled FROM organisations WHERE id = ?").get(s.subject_id);
+  send(res, 200, { ok: true, remindersEnabled: !!org.reminders_enabled });
+});
+
+// ── ORG: send the manager a preview digest now (to their own inbox only) ──
+// Safe to call any time — emails the manager, never the staff.
+route("POST", "/api/org/reminders/preview", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
+  const org = db.prepare("SELECT * FROM organisations WHERE id = ?").get(s.subject_id);
+  if (!org) return send(res, 404, { error: "Organisation not found." });
+  const digest = managerDigest(org);
+  const r = await sendManagerDigest(org, digest);
+  send(res, 200, { ok: true, sentTo: org.email, delivered: !!(r && r.sent), flagged: digest.flagged.length });
 });
 
 // ── ORG: remove an enrolment ──
@@ -1506,4 +1702,5 @@ server.listen(PORT, () => {
   console.log(`  │   Demo org:  demo@care2learn.co.uk / demo123 │`);
   console.log(`  │   Demo staff: priya@demo.com / PIN 9012      │`);
   console.log(`  ╰──────────────────────────────────────────────╯\n`);
+  startReminderScheduler();
 });

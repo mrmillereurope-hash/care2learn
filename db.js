@@ -147,6 +147,21 @@ export function initSchema() {
       used_at    TEXT,
       FOREIGN KEY (org_id) REFERENCES organisations(id) ON DELETE CASCADE
     );
+
+    -- Tracks the last time an automated reminder was sent to a staff member or a manager,
+    -- so the scheduler never emails the same person more than once per cooldown window.
+    CREATE TABLE IF NOT EXISTS reminder_log (
+      subject_id   TEXT NOT NULL,   -- staff id (kind='staff') or org id (kind='manager')
+      kind         TEXT NOT NULL,   -- 'staff' | 'manager'
+      last_sent_at TEXT NOT NULL,
+      PRIMARY KEY (subject_id, kind)
+    );
+
+    -- Small key/value store for background-job bookkeeping (e.g. last reminder run date).
+    CREATE TABLE IF NOT EXISTS system_state (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   // Migrations on the organisations table (idempotent — safe to re-run).
@@ -169,6 +184,10 @@ export function initSchema() {
   // Manual approval state for a referred account: 'approved' | 'declined' | NULL (awaiting review).
   if (!orgCols.some((c) => c.name === "referral_status")) {
     db.exec("ALTER TABLE organisations ADD COLUMN referral_status TEXT");
+  }
+  // Whether automated training reminders are sent to this org's staff (and a weekly digest to the manager).
+  if (!orgCols.some((c) => c.name === "reminders_enabled")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN reminders_enabled INTEGER NOT NULL DEFAULT 1");
   }
   // Backfill a unique referral code for any account that doesn't have one yet.
   backfillReferralCodes();

@@ -842,13 +842,16 @@ async function paintOrgTab(org) {
   if (orgTab === "staff") {
     const { staff } = await api("/org/staff");
     body.innerHTML = "";
-    const sh = el(`<div class="sh"><h2>Staff &amp; Licences</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-add" id="import" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">⬆ Import CSV</button><button class="btn-add" id="add">+ Add Staff Member</button></div></div>`);
+    const assignBtn = staff.length ? `<button class="btn-add" id="assign" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">📚 Assign courses</button>` : "";
+    const sh = el(`<div class="sh"><h2>Staff &amp; Licences</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${assignBtn}<button class="btn-add" id="import" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">⬆ Import CSV</button><button class="btn-add" id="add">+ Add Staff Member</button></div></div>`);
     body.appendChild(sh);
     const formSlot = el(`<div id="formslot"></div>`);
     body.appendChild(formSlot);
 
     document.getElementById("add").onclick = () => showAddStaffForm(formSlot);
     document.getElementById("import").onclick = () => showBulkImportForm();
+    const assignEl = document.getElementById("assign");
+    if (assignEl) assignEl.onclick = () => showAssignCourses();
 
     if (staff.length === 0) {
       const empty = el(`<div class="table"><div class="empty">
@@ -964,10 +967,32 @@ async function paintOrgTab(org) {
         <h3>Subscription</h3>
         <div style="padding:0 20px 16px"><span class="pill" style="background:#2980B918;color:#1A5276">Standard Plan</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Unlimited staff licences · All ${state.courses.length} mandatory courses · Course assignment · Progress tracking · Certificate generation · CQC compliance report</p></div>
       </div>
+      <div class="scard" style="margin-top:16px"><h3>Notifications</h3>
+        <div style="padding:0 20px 16px">
+          <label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#2C3E50;cursor:pointer">
+            <input type="checkbox" id="remtoggle" ${o.reminders_enabled ? "checked" : ""} style="margin-top:3px">
+            <span>Automatically email staff when their training is due, expiring or overdue — and send me a summary of who needs attention.</span>
+          </label>
+          <div style="margin-top:12px"><button class="mini-btn" id="rempreview">✉️ Send me a preview</button></div>
+          <p style="font-size:12px;color:#7A8599;margin-top:10px">Each person is emailed at most once a week, and only when something needs attention. The preview goes to your inbox only (${esc(o.email)}).</p>
+        </div>
+      </div>
       <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the password you use to sign in.</p><button class="mini-btn" id="orgchgpw">🔒 Change password</button></div></div>
       </div>
     `));
     document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
+    const remToggle = document.getElementById("remtoggle");
+    if (remToggle) remToggle.onchange = async () => {
+      try { await api("/org/settings", "POST", { remindersEnabled: remToggle.checked }); toast(remToggle.checked ? "Reminders turned on." : "Reminders turned off."); }
+      catch (e) { remToggle.checked = !remToggle.checked; toast(e.message); }
+    };
+    const remPreview = document.getElementById("rempreview");
+    if (remPreview) remPreview.onclick = async () => {
+      remPreview.disabled = true; const t = remPreview.textContent; remPreview.textContent = "Sending…";
+      try { const r = await api("/org/reminders/preview", "POST"); toast(r.delivered ? `Preview sent to ${r.sentTo}.` : `Preview generated — email isn't set up yet, so it was logged on the server.`); }
+      catch (e) { toast(e.message); }
+      remPreview.disabled = false; remPreview.textContent = t;
+    };
   }
 }
 
@@ -1182,6 +1207,80 @@ async function showBulkImportForm() {
     if (dl) dl.onclick = () => csvDownload("care2learn-new-pins.csv", [["name", "email", "pin"], ...created.map(c => [c.name, c.email, c.pin])]);
     region.querySelector("#done").onclick = () => { overlay.remove(); paintOrgTab(null); };
   }
+}
+
+// ─── BULK / ROLE-BASED COURSE ASSIGNMENT (organisations only) ─────────────────
+async function showAssignCourses() {
+  let staff = [];
+  try { const r = await api("/org/staff"); staff = (r.staff || []).filter(s => s.active); }
+  catch (e) { toast("Couldn't load staff."); return; }
+  if (!staff.length) { toast("Add staff before assigning courses."); return; }
+
+  const roleCounts = {};
+  staff.forEach(s => { const r = s.role || "Care Assistant"; roleCounts[r] = (roleCounts[r] || 0) + 1; });
+  const roles = Object.keys(roleCounts).sort();
+
+  const courseChecks = state.courses.map(c =>
+    `<label class="chk" data-cid="${c.id}"><input type="checkbox" value="${c.id}"> ${c.icon} ${esc(c.title)}</label>`
+  ).join("");
+  const roleChecks = roles.map(r =>
+    `<label class="chk"><input type="checkbox" class="rolecb" value="${esc(r)}"> ${esc(r)} <span style="color:#7A8599;font-weight:600">(${roleCounts[r]})</span></label>`
+  ).join("");
+
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:680px">
+      <div class="modal-h"><div><h2>Assign courses</h2><p>Add courses to your whole team, or just certain roles. Anyone already assigned a course keeps their existing progress.</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:14px 22px 20px">
+        <div id="aerr"></div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Courses to assign</label>
+        <div class="chk-grid" id="coursegrid">${courseChecks}</div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin:14px 0 8px">Who should get them?</label>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#2C3E50;cursor:pointer"><input type="radio" name="target" value="all" checked> Everyone (${staff.length} active staff)</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#2C3E50;cursor:pointer"><input type="radio" name="target" value="roles"> Only certain roles</label>
+        </div>
+        <div id="roleg" class="hidden" style="margin-top:10px"><div class="chk-grid">${roleChecks}</div></div>
+        <div class="csv-sum" id="count" style="margin-top:14px"></div>
+        <div class="form-actions" style="margin-top:6px"><button class="btn-cancel" id="cancel">Cancel</button><button class="btn-save" id="assign">Assign</button></div>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const close = () => overlay.remove();
+  modal.querySelector("#close").onclick = close;
+  modal.querySelector("#cancel").onclick = close;
+  modal.querySelectorAll(".chk").forEach(lbl => { const cb = lbl.querySelector("input"); cb.onchange = () => lbl.classList.toggle("on", cb.checked); });
+
+  const roleg = modal.querySelector("#roleg");
+  const countEl = modal.querySelector("#count");
+  const targetVal = () => modal.querySelector("input[name=target]:checked").value;
+  const chosenCourses = () => [...modal.querySelectorAll("#coursegrid input:checked")].map(c => c.value);
+  const chosenRoles = () => [...modal.querySelectorAll(".rolecb:checked")].map(c => c.value);
+  const affected = () => { if (targetVal() === "all") return staff.length; const set = new Set(chosenRoles()); return staff.filter(s => set.has(s.role || "Care Assistant")).length; };
+  function refreshCount() {
+    const nC = chosenCourses().length, nS = affected();
+    countEl.textContent = (nC && nS) ? `Will assign ${nC} course${nC === 1 ? "" : "s"} to ${nS} staff member${nS === 1 ? "" : "s"}.` : "Choose courses and who should receive them.";
+  }
+  modal.querySelectorAll("input[name=target]").forEach(r => r.onchange = () => { roleg.classList.toggle("hidden", targetVal() !== "roles"); refreshCount(); });
+  modal.querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", refreshCount));
+  refreshCount();
+
+  modal.querySelector("#assign").onclick = async () => {
+    const courseIds = chosenCourses(), target = targetVal(), roles2 = chosenRoles();
+    const err = modal.querySelector("#aerr"); err.innerHTML = "";
+    if (!courseIds.length) { err.innerHTML = `<div class="err">Choose at least one course.</div>`; return; }
+    if (target === "roles" && !roles2.length) { err.innerHTML = `<div class="err">Choose at least one role.</div>`; return; }
+    const btn = modal.querySelector("#assign"); btn.disabled = true; btn.textContent = "Assigning…";
+    try {
+      const r = await api("/org/staff/assign-courses", "POST", { courseIds, target, roles: roles2 });
+      overlay.remove();
+      toast(`✓ Assigned to ${r.staffAffected} staff · ${r.enrolmentsAdded} new assignment${r.enrolmentsAdded === 1 ? "" : "s"}.`);
+      paintOrgTab(null);
+    } catch (e) { err.innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = "Assign"; }
+  };
 }
 
 // ── Staff management modal (assign/remove courses, view progress) ──
