@@ -229,7 +229,7 @@ route("POST", "/api/org/login", async (req, res) => {
 route("GET", "/api/org/me", async (req, res) => {
   const s = authSession(req);
   if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
-  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at FROM organisations WHERE id = ?").get(s.subject_id);
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits FROM organisations WHERE id = ?").get(s.subject_id);
   if (!org) return send(res, 404, { error: "Organisation not found." });
 
   const staff = db.prepare("SELECT * FROM staff WHERE org_id = ?").all(org.id);
@@ -526,13 +526,150 @@ route("POST", "/api/feedback", async (req, res) => {
   send(res, 200, { ok: true, id });
 });
 
-// ── Admin: export all feedback as JSON (guard with the ADMIN_KEY env var) ──
-//    Visit /api/admin/feedback?key=YOUR_ADMIN_KEY once ADMIN_KEY is set on the server.
+// ─── SUPER ADMIN ──────────────────────────────────────────────────────────────
+// A single super-admin. Credentials come from the ADMIN_EMAIL + ADMIN_PASSWORD
+// environment variables, so there is exactly one admin and no extra DB account.
+function authAdmin(req) {
+  const s = authSession(req);
+  return s && s.kind === "admin" ? s : null;
+}
+
+route("POST", "/api/admin/login", async (req, res) => {
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || "";
+  if (!adminEmail || !adminPassword)
+    return send(res, 503, { error: "Super admin is not set up yet. Set ADMIN_EMAIL and ADMIN_PASSWORD on the server, then redeploy." });
+  const b = await readBody(req);
+  if (!b.email || !b.password) return send(res, 400, { error: "Email and password are required." });
+  if (b.email.toLowerCase() !== adminEmail || b.password !== adminPassword)
+    return send(res, 401, { error: "Incorrect super admin email or password." });
+  const token = genToken();
+  db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)")
+    .run(token, "SUPERADMIN", "admin", new Date().toISOString());
+  send(res, 200, { token, admin: { email: adminEmail } });
+});
+
+// All companies + summary stats
+route("GET", "/api/admin/orgs", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const orgs = db.prepare("SELECT id,name,email,phone,cqc_number,created_at,credits FROM organisations ORDER BY created_at DESC").all();
+  const result = orgs.map((o) => {
+    const staff = db.prepare("SELECT id,active FROM staff WHERE org_id = ?").all(o.id);
+    const ids = staff.map((s) => s.id);
+    const allEnr = ids.length ? db.prepare(`SELECT * FROM enrolments WHERE staff_id IN (${ids.map(() => "?").join(",")})`).all(...ids) : [];
+    let fullyCompliant = 0;
+    for (const m of staff.filter((s) => s.active)) {
+      const mine = allEnr.filter((e) => e.staff_id === m.id).map(shapeEnrolment);
+      if (mine.length && mine.every((e) => e.compliance === "valid")) fullyCompliant++;
+    }
+    return { id: o.id, name: o.name, email: o.email, phone: o.phone, cqcNumber: o.cqc_number, createdAt: o.created_at,
+             staffCount: staff.length, activeStaff: staff.filter((s) => s.active).length, enrolments: allEnr.length, fullyCompliant, credits: o.credits || 0 };
+  });
+  const totals = { organisations: orgs.length, staff: result.reduce((a, r) => a + r.staffCount, 0), enrolments: result.reduce((a, r) => a + r.enrolments, 0), credits: result.reduce((a, r) => a + r.credits, 0) };
+  send(res, 200, { totals, orgs: result });
+});
+
+// One company + its staff (full detail)
+route("GET", "/api/admin/orgs/:id", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits FROM organisations WHERE id = ?").get(req.params.id);
+  if (!org) return send(res, 404, { error: "Company not found." });
+  const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? ORDER BY created_at DESC").all(org.id).map((member) => {
+    const enr = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
+    return { id: member.id, name: member.name, email: member.email, role: member.role, pin: member.pin,
+             startDate: member.start_date, active: !!member.active,
+             assignedCount: enr.length, completedCount: enr.filter((e) => e.compliance === "valid").length,
+             compliant: enr.length > 0 && enr.every((e) => e.compliance === "valid"), enrolments: enr };
+  });
+  const transactions = db.prepare("SELECT id,amount,balance_after,note,created_at FROM credit_transactions WHERE org_id = ? ORDER BY created_at DESC LIMIT 12").all(org.id);
+  send(res, 200, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits || 0 }, staff, transactions });
+});
+
+// Add credits (prepaid course assignments) to a company's balance
+route("POST", "/api/admin/orgs/:id/credits", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const org = db.prepare("SELECT id, credits FROM organisations WHERE id = ?").get(req.params.id);
+  if (!org) return send(res, 404, { error: "Company not found." });
+  const b = await readBody(req);
+  const amount = Math.trunc(Number(b.amount));
+  if (!Number.isFinite(amount) || amount === 0) return send(res, 400, { error: "Enter a non-zero whole number of credits." });
+  const current = org.credits || 0;
+  const newBalance = current + amount;
+  if (newBalance < 0) return send(res, 400, { error: `That would take the balance below zero (current balance is ${current}).` });
+  const note = ((typeof b.note === "string" ? b.note.trim() : "") || null);
+  const now = new Date().toISOString();
+  const tx = { id: genId("CR"), org_id: org.id, amount, balance_after: newBalance, note: note ? note.slice(0, 200) : null, created_at: now };
+  db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(newBalance, org.id);
+  db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+    .run(tx.id, tx.org_id, tx.amount, tx.balance_after, tx.note, tx.created_at);
+  console.log(`💳 CREDITS ${amount > 0 ? "+" + amount : amount} to org ${org.id} → balance ${newBalance}${tx.note ? " (" + tx.note + ")" : ""}`);
+  send(res, 200, { ok: true, credits: newBalance, transaction: tx });
+});
+
+// Add a staff member to a company on its behalf
+route("POST", "/api/admin/orgs/:id/staff", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const org = db.prepare("SELECT id FROM organisations WHERE id = ?").get(req.params.id);
+  if (!org) return send(res, 404, { error: "Company not found." });
+  const b = await readBody(req);
+  if (!b.name || !b.email) return send(res, 400, { error: "Name and email are required." });
+  const id = genId("STF"); const pin = genPin();
+  db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at) VALUES (?,?,?,?,?,?,?,1,?)`)
+    .run(id, org.id, b.name, b.email, b.role || "Care Assistant", pin, b.startDate || new Date().toISOString().split("T")[0], new Date().toISOString());
+  if (Array.isArray(b.courseIds)) {
+    const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts) VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
+    for (const cid of b.courseIds) if (COURSE_IDS.includes(cid)) ins.run(genId("ENR"), id, cid, new Date().toISOString(), b.dueDate || null);
+  }
+  const member = db.prepare("SELECT * FROM staff WHERE id = ?").get(id);
+  send(res, 201, { staff: { ...member, active: !!member.active }, pin });
+});
+
+// Update a staff member (active toggle / edit) on a company's behalf
+route("PATCH", "/api/admin/orgs/:id/staff/:sid", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ? AND org_id = ?").get(req.params.sid, req.params.id);
+  if (!member) return send(res, 404, { error: "Staff member not found." });
+  const b = await readBody(req);
+  const name = b.name ?? member.name, role = b.role ?? member.role;
+  const active = b.active === undefined ? member.active : (b.active ? 1 : 0);
+  db.prepare("UPDATE staff SET name=?, role=?, active=? WHERE id=?").run(name, role, active, member.id);
+  const u = db.prepare("SELECT * FROM staff WHERE id=?").get(member.id);
+  send(res, 200, { staff: { ...u, active: !!u.active } });
+});
+
+// Assign course(s) to a staff member on a company's behalf
+route("POST", "/api/admin/orgs/:id/staff/:sid/enrol", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ? AND org_id = ?").get(req.params.sid, req.params.id);
+  if (!member) return send(res, 404, { error: "Staff member not found." });
+  const b = await readBody(req);
+  const courseIds = Array.isArray(b.courseIds) ? b.courseIds : (b.courseId ? [b.courseId] : []);
+  if (!courseIds.length) return send(res, 400, { error: "Provide courseId or courseIds." });
+  const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts) VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
+  let added = 0;
+  for (const cid of courseIds) { if (!COURSE_IDS.includes(cid)) continue; const r = ins.run(genId("ENR"), member.id, cid, new Date().toISOString(), b.dueDate || null); if (r.changes > 0) added++; }
+  const enr = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
+  send(res, 200, { added, enrolments: enr });
+});
+
+// Remove an enrolment on a company's behalf
+route("DELETE", "/api/admin/orgs/:id/staff/:sid/enrol/:courseId", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ? AND org_id = ?").get(req.params.sid, req.params.id);
+  if (!member) return send(res, 404, { error: "Staff member not found." });
+  db.prepare("DELETE FROM enrolments WHERE staff_id = ? AND course_id = ?").run(member.id, req.params.courseId);
+  send(res, 200, { ok: true });
+});
+
+// ── Feedback inbox: all feedback. Open to the super admin session, or via ?key=ADMIN_KEY. ──
 route("GET", "/api/admin/feedback", async (req, res) => {
-  const adminKey = process.env.ADMIN_KEY;
-  if (!adminKey) return send(res, 503, { error: "Feedback export is disabled. Set an ADMIN_KEY environment variable to enable it." });
-  const provided = new URL(req.url, `http://${req.headers.host}`).searchParams.get("key");
-  if (provided !== adminKey) return send(res, 401, { error: "Invalid or missing key." });
+  const isAdmin = !!authAdmin(req);
+  if (!isAdmin) {
+    const adminKey = process.env.ADMIN_KEY;
+    const provided = new URL(req.url, `http://${req.headers.host}`).searchParams.get("key");
+    if (!adminKey) return send(res, 503, { error: "Sign in to the super admin portal, or set ADMIN_KEY to use the export URL." });
+    if (provided !== adminKey) return send(res, 401, { error: "Invalid or missing key." });
+  }
   const rows = db.prepare("SELECT * FROM feedback ORDER BY created_at DESC").all();
   const counts = rows.reduce((a, r) => { a[r.kind] = (a[r.kind] || 0) + 1; return a; }, {});
   send(res, 200, { total: rows.length, counts, feedback: rows });

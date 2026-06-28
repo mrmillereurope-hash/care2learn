@@ -108,7 +108,24 @@ export function initSchema() {
       org_id         TEXT,
       context        TEXT
     );
+
+    -- Prepaid course-credit top-ups (a ledger of every adjustment to a company's balance)
+    CREATE TABLE IF NOT EXISTS credit_transactions (
+      id            TEXT PRIMARY KEY,
+      org_id        TEXT NOT NULL,
+      amount        INTEGER NOT NULL,   -- positive = credits added, negative = adjustment/spend
+      balance_after INTEGER NOT NULL,
+      note          TEXT,
+      created_at    TEXT NOT NULL,
+      FOREIGN KEY (org_id) REFERENCES organisations(id) ON DELETE CASCADE
+    );
   `);
+
+  // Migration: give organisations a prepaid course-credit balance (idempotent — safe to re-run).
+  const orgCols = db.prepare("PRAGMA table_info(organisations)").all();
+  if (!orgCols.some((c) => c.name === "credits")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN credits INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 // ─── PASSWORD HASHING (pbkdf2, built-in) ──────────────────────────────────────

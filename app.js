@@ -84,6 +84,11 @@ async function boot() {
     App.innerHTML = `<div class="spin">Could not reach the server.<br>Make sure it is running: <code>node server.js</code></div>`;
     return;
   }
+  // Super admin lives at a hidden route: /#admin
+  if (location.hash === "#admin" && state.kind !== "admin") { renderAdminLogin(); return; }
+  if (state.token && state.kind === "admin") {
+    try { await renderAdminDash(); return; } catch (e) { clearAuth(); }
+  }
   // Resume session if token present
   if (state.token && state.kind === "org") {
     try { await renderOrgDash(); return; } catch (e) { clearAuth(); }
@@ -435,6 +440,12 @@ async function paintOrgTab(org) {
     body.innerHTML = "";
     const hour = new Date().getHours();
     body.appendChild(el(`<div class="hero"><h1>Good ${hour<12?"morning":hour<18?"afternoon":"evening"}! 👋</h1><p>Training compliance overview for ${esc(me.org.name)}.</p></div>`));
+    if (me.org && me.org.credits > 0) {
+      body.appendChild(el(`<div style="background:#7C3AED10;border:1px solid #7C3AED25;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">💳</span>
+        <span style="font-size:14px;color:#4A3A6B"><b style="color:#7C3AED">${me.org.credits}</b> course credit${me.org.credits === 1 ? "" : "s"} available — each one covers one course for one staff member.</span>
+      </div>`));
+    }
     const m = me.summary;
     body.appendChild(el(`
       <div class="metrics">
@@ -757,6 +768,343 @@ function openFeedbackModal(context) {
     modal.querySelector("#fbdone").onclick = () => overlay.remove();
   };
   setTimeout(() => modal.querySelector("#fbmsg")?.focus(), 50);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SUPER ADMIN PORTAL  (hidden — reached at /#admin)
+// ═══════════════════════════════════════════════════════════════════════════
+let adminTab = "companies";
+
+function renderAdminLogin(errMsg) {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back to site</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div style="margin:6px 0 12px"><span class="admin-badge">Super Admin</span></div>
+      <div class="auth-title">Super Admin Login</div>
+      <div id="err">${errMsg ? `<div class="err">${esc(errMsg)}</div>` : ""}</div>
+      <div class="fg"><label>Email</label><input class="inp" id="ae" type="email" placeholder="you@care2learn.co.uk"></div>
+      <div class="fg"><label>Password</label><input class="inp" id="ap" type="password" placeholder="Your password"></div>
+      <button class="btn-auth" id="asubmit" style="background:#7C3AED">Sign In</button>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = () => { location.hash = ""; renderLanding(); };
+  document.getElementById("asubmit").onclick = () => doAdminLogin(val("ae"), val("ap"));
+  document.getElementById("ap").onkeydown = (e) => { if (e.key === "Enter") doAdminLogin(val("ae"), val("ap")); };
+}
+
+async function doAdminLogin(email, password) {
+  const errBox = document.getElementById("err");
+  if (errBox) errBox.innerHTML = "";
+  try {
+    const { token } = await api("/admin/login", "POST", { email, password });
+    setAuth(token, "admin");
+    location.hash = "#admin";
+    await renderAdminDash();
+  } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+function adminHeader() {
+  const hdr = el(`
+    <div class="dash-hdr">
+      <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">Care2Learn <span class="admin-badge">Super Admin</span></div><div class="dash-sub">Platform administration</div></div></div>
+      <nav class="dash-nav" id="anav"></nav>
+      <button class="logout" id="alogout">Log Out</button>
+    </div>`);
+  return hdr;
+}
+function wireAdminLogout() {
+  document.getElementById("alogout").onclick = async () => { await api("/logout", "POST").catch(() => {}); clearAuth(); location.hash = ""; renderLanding(); };
+}
+
+async function renderAdminDash() {
+  App.innerHTML = `<div class="spin">Loading…</div>`;
+  let data;
+  try { data = await api("/admin/orgs"); }
+  catch (e) { clearAuth(); renderAdminLogin(e.message); return; }
+  App.innerHTML = "";
+  const wrap = el(`<div></div>`);
+  wrap.appendChild(adminHeader());
+  wrap.appendChild(el(`<div class="body" id="abody"></div>`));
+  App.appendChild(wrap);
+  const nav = document.getElementById("anav");
+  [["companies", "🏢 Companies"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
+    const b = el(`<button class="nav-btn ${adminTab === k ? "active" : ""}">${label}</button>`);
+    b.onclick = () => { adminTab = k; paintAdminTab(data); };
+    nav.appendChild(b);
+  });
+  wireAdminLogout();
+  paintAdminTab(data);
+}
+
+function paintAdminTab(data) {
+  const tabs = ["companies", "feedback"];
+  document.querySelectorAll("#anav .nav-btn").forEach((b, i) => b.classList.toggle("active", tabs[i] === adminTab));
+  const body = document.getElementById("abody");
+  body.innerHTML = "";
+  if (adminTab === "companies") return paintAdminCompanies(body, data);
+  return paintAdminFeedback(body);
+}
+
+function paintAdminCompanies(body, data) {
+  const t = data.totals;
+  body.appendChild(el(`
+    <div>
+      <h1 style="margin-bottom:4px">All Companies</h1>
+      <p style="color:#5A6474;margin-bottom:18px">Every organisation registered on Care2Learn. Tap one to view and support it.</p>
+      <div class="astats">
+        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${t.organisations}</div><div class="metric-l">Companies</div></div>
+        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${t.staff}</div><div class="metric-l">Staff Licences</div></div>
+        <div class="metric"><div class="metric-i">📋</div><div class="metric-v" style="color:#9B59B6">${t.enrolments}</div><div class="metric-l">Course Assignments</div></div>
+        <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#16A34A">${t.credits || 0}</div><div class="metric-l">Total Credits</div></div>
+      </div>
+    </div>`));
+  if (!data.orgs.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`)); return; }
+  const grid = el(`<div class="org-grid"></div>`);
+  data.orgs.forEach(o => {
+    const initials = (o.name || "?").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+    const row = el(`
+      <button class="org-row">
+        <span class="org-ava">${esc(initials)}</span>
+        <span class="org-row-body">
+          <span class="org-row-name">${esc(o.name)}</span>
+          <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
+        </span>
+        <span class="org-row-stats">
+          <span class="org-stat"><span class="org-stat-n">${o.activeStaff}</span><span class="org-stat-l">Staff</span></span>
+          <span class="org-stat"><span class="org-stat-n">${o.fullyCompliant}</span><span class="org-stat-l">Compliant</span></span>
+          <span class="org-stat"><span class="org-stat-n">${o.enrolments}</span><span class="org-stat-l">Courses</span></span>
+          <span class="org-stat"><span class="org-stat-n" style="color:#7C3AED">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
+        </span>
+      </button>`);
+    row.onclick = () => renderAdminOrg(o.id);
+    grid.appendChild(row);
+  });
+  body.appendChild(grid);
+}
+
+async function paintAdminFeedback(body) {
+  body.appendChild(el(`<div><h1 style="margin-bottom:4px">Feedback</h1><p style="color:#5A6474;margin-bottom:16px">Compliments, bugs and feature requests from companies and their staff.</p></div>`));
+  let data;
+  try { data = await api("/admin/feedback"); } catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
+  const c = data.counts || {};
+  body.appendChild(el(`<div class="astats">
+    <div class="metric"><div class="metric-i">👍</div><div class="metric-v" style="color:#16A34A">${c.compliment || 0}</div><div class="metric-l">Compliments</div></div>
+    <div class="metric"><div class="metric-i">🐞</div><div class="metric-v" style="color:#E74C3C">${c.bug || 0}</div><div class="metric-l">Bugs</div></div>
+    <div class="metric"><div class="metric-i">💡</div><div class="metric-v" style="color:#2980B9">${c.feature || 0}</div><div class="metric-l">Feature Requests</div></div>
+  </div>`));
+  if (!data.feedback.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No feedback yet.</div>`)); return; }
+  const list = el(`<div></div>`);
+  const label = { compliment: "👍 Compliment", bug: "🐞 Bug", feature: "💡 Feature" };
+  data.feedback.forEach(f => {
+    const who = f.submitter_name ? `${esc(f.submitter_name)} (${esc(f.submitter_kind || "—")})` : "Anonymous";
+    list.appendChild(el(`
+      <div class="fb-item ${esc(f.kind)}">
+        <div class="fb-item-h"><span class="fb-item-kind">${label[f.kind] || esc(f.kind)}</span><span>${fmtDate(f.created_at)}</span></div>
+        <div style="font-size:14px;color:#2C3E50;line-height:1.5;margin-bottom:6px">${esc(f.message)}</div>
+        <div style="font-size:12px;color:#9AA5B1">From ${who}${f.context ? " · " + esc(f.context) : ""}</div>
+      </div>`));
+  });
+  body.appendChild(list);
+}
+
+async function renderAdminOrg(orgId) {
+  App.innerHTML = `<div class="spin">Loading…</div>`;
+  let data;
+  try { data = await api(`/admin/orgs/${orgId}`); }
+  catch (e) { toast(e.message); return renderAdminDash(); }
+  const { org, staff } = data;
+  const transactions = data.transactions || [];
+  App.innerHTML = "";
+  const wrap = el(`<div></div>`);
+  wrap.appendChild(adminHeader());
+  const body = el(`<div class="body"></div>`);
+  const back = el(`<button class="feedback-btn" style="margin-bottom:14px">← All companies</button>`);
+  back.onclick = () => renderAdminDash();
+  body.appendChild(back);
+  body.appendChild(el(`
+    <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:20px;margin-bottom:18px">
+      <h1 style="margin-bottom:8px">${esc(org.name)}</h1>
+      <div class="info-row" style="border:none;border-radius:0;padding:0;background:none">
+        <span>📧 ${esc(org.email)}</span>
+        ${org.phone ? `<span>📞 ${esc(org.phone)}</span>` : ""}
+        ${org.cqcNumber ? `<span>🏥 CQC ${esc(org.cqcNumber)}</span>` : ""}
+        <span>📅 Joined ${fmtDate(org.createdAt)}</span>
+      </div>
+      ${org.address ? `<div style="font-size:13px;color:#7A8599;margin-top:8px">${esc(org.address)}</div>` : ""}
+    </div>`));
+  const creditsCard = el(`
+    <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:12px;font-weight:700;color:#7A8599;text-transform:uppercase;letter-spacing:.5px">Course credits</div>
+        <div style="font-size:34px;font-weight:900;color:#7C3AED;line-height:1.1;margin-top:2px">${org.credits}</div>
+        <div style="font-size:12px;color:#9AA5B1;margin-top:2px">1 credit = 1 course assigned to 1 learner</div>
+      </div>
+      <button class="btn-primary" id="addcredits" style="width:auto;padding:10px 18px;background:#7C3AED">+ Add credits</button>
+    </div>`);
+  body.appendChild(creditsCard);
+  creditsCard.querySelector("#addcredits").onclick = () => openAdminCredits(orgId, org.credits, () => renderAdminOrg(orgId));
+  if (transactions.length) {
+    const hist = el(`<div style="background:#fff;border:1px solid #E8ECF0;border-radius:12px;padding:14px 16px;margin-bottom:18px"></div>`);
+    hist.appendChild(el(`<div style="font-size:12px;font-weight:700;color:#7A8599;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Recent top-ups</div>`));
+    transactions.slice(0, 5).forEach(t => {
+      hist.appendChild(el(`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:6px 0;border-bottom:1px solid #F4F6F8">
+        <span style="color:#2C3E50">${t.amount > 0 ? "+" : ""}${t.amount} credits${t.note ? " · " + esc(t.note) : ""}</span>
+        <span style="color:#9AA5B1;white-space:nowrap">${fmtDate(t.created_at)} · bal ${t.balance_after}</span>
+      </div>`));
+    });
+    body.appendChild(hist);
+  }
+  const sh = el(`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Staff (${staff.length})</h2></div>`);
+  const addBtn = el(`<button class="btn-primary" style="width:auto;padding:9px 16px">+ Add Staff</button>`);
+  addBtn.onclick = () => openAdminAddStaff(orgId, () => renderAdminOrg(orgId));
+  sh.appendChild(addBtn);
+  body.appendChild(sh);
+  if (!staff.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No staff yet. Use “Add Staff” to create the first licence.</div>`));
+  else {
+    const grid = el(`<div class="sc-grid"></div>`);
+    staff.forEach(s => {
+      const statusColor = !s.active ? "#94A3B8" : s.compliant ? "#16A34A" : "#E67E22";
+      const statusText = !s.active ? "Inactive" : s.compliant ? "Compliant" : "In progress";
+      const card = el(`
+        <div class="sc" style="cursor:pointer">
+          <div class="sc-top" style="background:#1B2A4A"><span style="font-size:28px">👤</span><span class="sc-badge" style="background:${statusColor}66">${statusText}</span></div>
+          <div class="sc-body">
+            <div class="sc-title">${esc(s.name)}</div>
+            <div class="sc-meta">${esc(s.role)} · PIN ${esc(s.pin)}</div>
+            <div class="sc-meta" style="margin-top:4px">${s.completedCount}/${s.assignedCount} courses complete</div>
+          </div>
+        </div>`);
+      card.onclick = () => openAdminStaffModal(orgId, s, () => renderAdminOrg(orgId));
+      grid.appendChild(card);
+    });
+    body.appendChild(grid);
+  }
+  wrap.appendChild(body);
+  App.appendChild(wrap);
+  wireAdminLogout();
+}
+
+function openAdminAddStaff(orgId, onAdded) {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:480px">
+      <div class="modal-h"><div><h2>Add Staff</h2><p>Create a new staff licence for this company</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="aserr"></div>
+        <div class="fg"><label>Full name *</label><input class="inp" id="asn" placeholder="Jane Smith"></div>
+        <div class="fg"><label>Email *</label><input class="inp" id="ase" type="email" placeholder="jane@email.com"></div>
+        <div class="fg"><label>Role</label><input class="inp" id="asr" placeholder="Care Assistant"></div>
+        <button class="btn-auth" id="asadd">Create licence</button>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#asadd").onclick = async () => {
+    const name = val("asn"), email = val("ase"), role = val("asr") || "Care Assistant";
+    const errBox = modal.querySelector("#aserr"); errBox.innerHTML = "";
+    if (!name || !email) { errBox.innerHTML = `<div class="err">Name and email are required.</div>`; return; }
+    try {
+      const { pin } = await api(`/admin/orgs/${orgId}/staff`, "POST", { name, email, role });
+      modal.innerHTML = `<div style="padding:40px 28px;text-align:center">
+        <div style="font-size:50px;margin-bottom:8px">✅</div>
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:6px">${esc(name)} added</h2>
+        <p style="color:#5A6474;font-size:14px;margin-bottom:6px">Their login PIN is</p>
+        <div style="font-size:30px;font-weight:900;letter-spacing:4px;color:#2980B9;margin-bottom:18px">${esc(pin)}</div>
+        <button class="btn-auth" id="asdone" style="max-width:200px;margin:0 auto">Done</button></div>`;
+      modal.querySelector("#asdone").onclick = () => { overlay.remove(); onAdded && onAdded(); };
+    } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  setTimeout(() => modal.querySelector("#asn")?.focus(), 50);
+}
+
+function openAdminCredits(orgId, currentBalance, onChange) {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:460px">
+      <div class="modal-h"><div><h2>Add credits</h2><p>Top up this company's course-credit balance</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div style="background:#7C3AED10;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:#5A6474">Current balance: <b style="color:#7C3AED;font-size:18px">${currentBalance}</b> credits</div>
+        <div id="acerr"></div>
+        <div class="fg"><label>Credits to add</label><input class="inp" id="acamt" type="number" inputmode="numeric" placeholder="e.g. 50"></div>
+        <div class="fg"><label>Note (optional)</label><input class="inp" id="acnote" placeholder="e.g. Invoice #1024 paid"></div>
+        <button class="btn-auth" id="acadd" style="background:#7C3AED">Add credits</button>
+        <p class="fb-note">Enter a negative number to make a correction. Every change is recorded.</p>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#acadd").onclick = async () => {
+    const amount = parseInt(val("acamt"), 10);
+    const errBox = modal.querySelector("#acerr"); errBox.innerHTML = "";
+    if (!Number.isFinite(amount) || amount === 0) { errBox.innerHTML = `<div class="err">Enter a non-zero whole number.</div>`; return; }
+    try {
+      const r = await api(`/admin/orgs/${orgId}/credits`, "POST", { amount, note: val("acnote") });
+      toast(`Balance updated to ${r.credits} credits.`);
+      overlay.remove(); onChange && onChange();
+    } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  setTimeout(() => modal.querySelector("#acamt")?.focus(), 50);
+}
+
+function openAdminStaffModal(orgId, staff, onChange) {
+  const assignedIds = staff.enrolments.map(e => e.courseId);
+  const available = state.courses.filter(c => !assignedIds.includes(c.id));
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal">
+      <div class="modal-h">
+        <div><h2>${esc(staff.name)}</h2><p>${esc(staff.role)} · PIN ${esc(staff.pin)} · ${esc(staff.email)}</p></div>
+        <button class="x" id="close">✕</button>
+      </div>
+      <div style="padding:14px 22px"><span class="pill" style="background:${staff.active ? "#16A34A18" : "#94A3B818"};color:${staff.active ? "#15803D" : "#64748B"}">${staff.active ? "Active licence" : "Inactive licence"}</span>
+        <button class="mini-btn" id="toggle" style="margin-left:8px">${staff.active ? "Deactivate" : "Reactivate"}</button></div>
+      <div style="padding:6px 22px 4px"><b style="font-size:15px">Assigned Courses (${staff.enrolments.length})</b></div>
+      <div id="assigned" style="padding:0 22px"></div>
+      <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5;margin-top:8px"><b style="font-size:15px">Assign a Course</b></div>
+      <div style="padding:0 22px 20px" id="assign-slot"></div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+
+  const assignedBox = modal.querySelector("#assigned");
+  if (!staff.enrolments.length) assignedBox.appendChild(el(`<div style="color:#94A3B8;font-size:13px;padding:8px 0">No courses assigned yet.</div>`));
+  staff.enrolments.forEach(e => {
+    const status = e.compliance === "valid" ? "✓ Complete" : e.compliance === "expiring" ? "Expiring" : e.compliance === "expired" ? "Expired" : e.compliance === "failed" ? "Failed" : e.progress ? e.progress + "%" : "Not started";
+    const row = el(`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #F4F6F8">
+      <span style="flex:1;font-size:14px;color:#2C3E50">${esc(e.courseTitle)}</span>
+      <span class="pill" style="background:#EEF2F6;color:#5A6474;font-size:11px">${status}</span>
+      <button class="mini-btn danger">Remove</button></div>`);
+    row.querySelector("button").onclick = async () => {
+      await api(`/admin/orgs/${orgId}/staff/${staff.id}/enrol/${e.courseId}`, "DELETE").catch(() => {});
+      toast(`Removed ${e.courseTitle}.`); overlay.remove(); onChange && onChange();
+    };
+    assignedBox.appendChild(row);
+  });
+
+  const slot = modal.querySelector("#assign-slot");
+  if (!available.length) slot.appendChild(el(`<div style="color:#94A3B8;font-size:13px">All courses are already assigned.</div>`));
+  else {
+    const grid = el(`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>`);
+    available.forEach(c => {
+      const b = el(`<button class="mini-btn" style="border-color:${c.color};color:${c.color}">+ ${esc(c.title)}</button>`);
+      b.onclick = async () => {
+        await api(`/admin/orgs/${orgId}/staff/${staff.id}/enrol`, "POST", { courseId: c.id }).catch(() => {});
+        toast(`Assigned ${c.title}.`); overlay.remove(); onChange && onChange();
+      };
+      grid.appendChild(b);
+    });
+    slot.appendChild(grid);
+  }
+
+  modal.querySelector("#toggle").onclick = async () => {
+    await api(`/admin/orgs/${orgId}/staff/${staff.id}`, "PATCH", { active: !staff.active }).catch(() => {});
+    toast(staff.active ? "Licence deactivated." : "Licence reactivated."); overlay.remove(); onChange && onChange();
+  };
 }
 
 async function renderStaffPortal() {
