@@ -129,6 +129,9 @@ export function initSchema() {
   if (!orgCols.some((c) => c.name === "active")) {
     db.exec("ALTER TABLE organisations ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
   }
+  if (!orgCols.some((c) => c.name === "account_type")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN account_type TEXT NOT NULL DEFAULT 'company'");
+  }
 }
 
 // ─── PASSWORD HASHING (pbkdf2, built-in) ──────────────────────────────────────

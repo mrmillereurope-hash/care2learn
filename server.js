@@ -217,6 +217,8 @@ route("POST", "/api/org/login", async (req, res) => {
     return send(res, 401, { error: "Incorrect password." });
   if (org.active === 0)
     return send(res, 403, { error: "This account has been deactivated. Please contact Care2Learn support." });
+  if (org.account_type === "individual")
+    return send(res, 403, { error: "This is a self-employed account — please use the carer login below." });
 
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)")
@@ -381,6 +383,90 @@ route("DELETE", "/api/org/staff/:id/enrol/:courseId", async (req, res) => {
 });
 
 // ── STAFF: login (email + PIN) ──
+// ─── SELF-EMPLOYED INDIVIDUALS ────────────────────────────────────────────────
+// A self-employed carer registers as an "individual": internally an organisation
+// flagged account_type='individual' with one staff record (themselves), so all the
+// learner machinery (courses, certificates) and credits/admin tooling work unchanged.
+// They log in with email+password and receive a STAFF session (so /api/staff/* works).
+
+route("POST", "/api/individual/register", async (req, res) => {
+  const b = await readBody(req);
+  if (!b.name || !b.email || !b.password) return send(res, 400, { error: "Name, email and password are required." });
+  if (b.password.length < 6) return send(res, 400, { error: "Password must be at least 6 characters." });
+  const email = b.email.toLowerCase();
+  if (db.prepare("SELECT id FROM organisations WHERE email = ?").get(email)) return send(res, 409, { error: "An account with this email already exists." });
+  const orgId = genId("ORG");
+  const { hash, salt } = hashPassword(b.password);
+  db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,created_at,account_type)
+              VALUES (?,?,?,?,?,?, 'individual')`)
+    .run(orgId, b.name, email, hash, salt, new Date().toISOString());
+  const staffId = genId("STF");
+  db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at)
+              VALUES (?,?,?,?,?,?,?,1,?)`)
+    .run(staffId, orgId, b.name, email, "Self-employed carer", genPin(), new Date().toISOString().split("T")[0], new Date().toISOString());
+  const token = genToken();
+  db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)").run(token, staffId, "staff", new Date().toISOString());
+  console.log(`🧑‍⚕️ INDIVIDUAL REGISTERED: ${b.name} (${email})`);
+  send(res, 201, { token, accountType: "individual", staff: { id: staffId, name: b.name, email }, org: { id: orgId, name: b.name, credits: 0 } });
+});
+
+route("POST", "/api/individual/login", async (req, res) => {
+  const b = await readBody(req);
+  if (!b.email || !b.password) return send(res, 400, { error: "Email and password are required." });
+  const org = db.prepare("SELECT * FROM organisations WHERE email = ? AND account_type = 'individual'").get((b.email || "").toLowerCase());
+  if (!org) return send(res, 401, { error: "No self-employed account found with this email." });
+  if (!verifyPassword(b.password, org.password_salt, org.password_hash)) return send(res, 401, { error: "Incorrect password." });
+  if (org.active === 0) return send(res, 403, { error: "This account has been deactivated. Please contact Care2Learn support." });
+  const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? ORDER BY created_at ASC").get(org.id);
+  if (!staff) return send(res, 500, { error: "Account is missing its learner record." });
+  const token = genToken();
+  db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)").run(token, staff.id, "staff", new Date().toISOString());
+  send(res, 200, { token, accountType: "individual", staff: { id: staff.id, name: staff.name, email: staff.email }, org: { id: org.id, name: org.name, credits: org.credits || 0 } });
+});
+
+// Individual's own profile: learner record + courses + credit balance
+route("GET", "/api/individual/me", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "staff") return send(res, 401, { error: "Not authenticated." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ?").get(s.subject_id);
+  if (!member) return send(res, 404, { error: "Account not found." });
+  const org = db.prepare("SELECT id,name,credits,account_type FROM organisations WHERE id = ?").get(member.org_id);
+  if (!org || org.account_type !== "individual") return send(res, 403, { error: "Not an individual account." });
+  const enrolments = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
+  for (const e of enrolments) {
+    const course = COURSE_MAP[e.courseId];
+    if (course && course.modular) {
+      e.modulesCompleted = db.prepare("SELECT module_id FROM module_progress WHERE staff_id = ? AND course_id = ?").all(member.id, e.courseId).map(r => r.module_id);
+    }
+  }
+  send(res, 200, { staff: { id: member.id, name: member.name, email: member.email, role: member.role },
+                   org: { id: org.id, name: org.name, credits: org.credits || 0, accountType: org.account_type }, enrolments });
+});
+
+// Individual self-enrols in a course — pay-as-you-go: requires (and spends) one credit
+route("POST", "/api/individual/enrol", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "staff") return send(res, 401, { error: "Not authenticated." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ?").get(s.subject_id);
+  if (!member) return send(res, 404, { error: "Account not found." });
+  const org = db.prepare("SELECT * FROM organisations WHERE id = ?").get(member.org_id);
+  if (!org || org.account_type !== "individual") return send(res, 403, { error: "Not an individual account." });
+  const b = await readBody(req);
+  if (!COURSE_IDS.includes(b.courseId)) return send(res, 400, { error: "Unknown course." });
+  if (db.prepare("SELECT id FROM enrolments WHERE staff_id = ? AND course_id = ?").get(member.id, b.courseId))
+    return send(res, 200, { ok: true, already: true, credits: org.credits || 0 });
+  if ((org.credits || 0) < 1)
+    return send(res, 402, { error: "You need a credit to add this course. Please buy credits first." });
+  const newBal = org.credits - 1;
+  db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(newBal, org.id);
+  db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+    .run(genId("CR"), org.id, -1, newBal, "Course enrolment: " + (COURSE_MAP[b.courseId]?.title || b.courseId), new Date().toISOString());
+  db.prepare(`INSERT INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts)
+              VALUES (?,?,?,?,?, 'assigned', 0, 0)`)
+    .run(genId("ENR"), member.id, b.courseId, new Date().toISOString(), null);
+  send(res, 201, { ok: true, creditUsed: true, credits: newBal });
+});
+
 route("POST", "/api/staff/login", async (req, res) => {
   const b = await readBody(req);
   if (!b.email || !b.pin) return send(res, 400, { error: "Email and PIN are required." });
@@ -568,7 +654,7 @@ route("POST", "/api/admin/login", async (req, res) => {
 // All companies + summary stats
 route("GET", "/api/admin/orgs", async (req, res) => {
   if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
-  const orgs = db.prepare("SELECT id,name,email,phone,cqc_number,created_at,credits,active FROM organisations ORDER BY created_at DESC").all();
+  const orgs = db.prepare("SELECT id,name,email,phone,cqc_number,created_at,credits,active,account_type FROM organisations ORDER BY created_at DESC").all();
   const result = orgs.map((o) => {
     const staff = db.prepare("SELECT id,active FROM staff WHERE org_id = ?").all(o.id);
     const ids = staff.map((s) => s.id);
@@ -579,7 +665,7 @@ route("GET", "/api/admin/orgs", async (req, res) => {
       if (mine.length && mine.every((e) => e.compliance === "valid")) fullyCompliant++;
     }
     return { id: o.id, name: o.name, email: o.email, phone: o.phone, cqcNumber: o.cqc_number, createdAt: o.created_at,
-             staffCount: staff.length, activeStaff: staff.filter((s) => s.active).length, enrolments: allEnr.length, fullyCompliant, credits: o.credits || 0, active: o.active !== 0 };
+             staffCount: staff.length, activeStaff: staff.filter((s) => s.active).length, enrolments: allEnr.length, fullyCompliant, credits: o.credits || 0, active: o.active !== 0, accountType: o.account_type || 'company' };
   });
   const totals = { organisations: orgs.length, staff: result.reduce((a, r) => a + r.staffCount, 0), enrolments: result.reduce((a, r) => a + r.enrolments, 0), credits: result.reduce((a, r) => a + r.credits, 0) };
   send(res, 200, { totals, orgs: result });
@@ -588,7 +674,7 @@ route("GET", "/api/admin/orgs", async (req, res) => {
 // One company + its staff (full detail)
 route("GET", "/api/admin/orgs/:id", async (req, res) => {
   if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
-  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,active FROM organisations WHERE id = ?").get(req.params.id);
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,active,account_type FROM organisations WHERE id = ?").get(req.params.id);
   if (!org) return send(res, 404, { error: "Company not found." });
   const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? ORDER BY created_at DESC").all(org.id).map((member) => {
     const enr = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
@@ -598,7 +684,7 @@ route("GET", "/api/admin/orgs/:id", async (req, res) => {
              compliant: enr.length > 0 && enr.every((e) => e.compliance === "valid"), enrolments: enr };
   });
   const transactions = db.prepare("SELECT id,amount,balance_after,note,created_at FROM credit_transactions WHERE org_id = ? ORDER BY created_at DESC LIMIT 12").all(org.id);
-  send(res, 200, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits || 0, active: org.active !== 0 }, staff, transactions });
+  send(res, 200, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits || 0, active: org.active !== 0, accountType: org.account_type || 'company' }, staff, transactions });
 });
 
 // Add credits (prepaid course assignments) to a company's balance

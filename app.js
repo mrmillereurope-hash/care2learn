@@ -39,6 +39,8 @@ function clearAuth() {
 let c2lOrgName = "";
 // Remembered for PIN-reminder emails the super admin sends on a company's behalf.
 let c2lAdminOrgName = "";
+// Where the course player / certificate "back" button returns to (staff vs individual).
+let learnerReturn = renderStaffPortal;
 
 // Opens the user's own email app with a pre-filled PIN reminder for a staff member.
 function pinReminderMailto(name, email, pin, fromLabel) {
@@ -117,6 +119,9 @@ async function boot() {
   // Resume session if token present
   if (state.token && state.kind === "org") {
     try { await renderOrgDash(); return; } catch (e) { clearAuth(); }
+  }
+  if (state.token && state.kind === "individual") {
+    try { await renderIndividualPortal(); return; } catch (e) { clearAuth(); }
   }
   if (state.token && state.kind === "staff") {
     try { await renderStaffPortal(); return; } catch (e) { clearAuth(); }
@@ -365,6 +370,8 @@ function renderLanding() {
           <h2>For Care Professionals</h2>
           <p>Access the courses your manager has assigned, complete assessments, and download your certificates.</p>
           <button class="btn-primary green" id="go-staff-login">Staff Login</button>
+          <div class="lcard-or">Self-employed carer?</div>
+          <button class="btn-secondary" id="go-ind-reg">Register as an individual</button>
         </div>
       </div>
       <div id="calc-slot"></div>
@@ -375,6 +382,7 @@ function renderLanding() {
   document.getElementById("go-org-login").onclick = renderOrgLogin;
   document.getElementById("go-org-reg").onclick = renderOrgRegister;
   document.getElementById("go-staff-login").onclick = renderStaffLogin;
+  document.getElementById("go-ind-reg").onclick = renderIndividualRegister;
   document.getElementById("calc-slot").appendChild(buildCalculator());
   document.getElementById("faq-slot").appendChild(buildFAQ());
 }
@@ -972,7 +980,7 @@ function paintAdminCompanies(body, data) {
       <button class="org-row${o.active ? "" : " inactive"}">
         <span class="org-ava">${esc(initials)}</span>
         <span class="org-row-body">
-          <span class="org-row-name">${esc(o.name)}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
+          <span class="org-row-name">${esc(o.name)}${o.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
           <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
         </span>
         <span class="org-row-stats">
@@ -1032,7 +1040,7 @@ async function renderAdminOrg(orgId) {
     <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:20px;margin-bottom:14px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="min-width:0">
-          <h1 style="margin-bottom:8px">${esc(org.name)} ${org.active ? `<span class="on-badge">Active</span>` : `<span class="off-badge">Inactive</span>`}</h1>
+          <h1 style="margin-bottom:8px">${esc(org.name)} ${org.accountType === "individual" ? `<span class="ind-badge">Individual</span> ` : ""}${org.active ? `<span class="on-badge">Active</span>` : `<span class="off-badge">Inactive</span>`}</h1>
           <div class="info-row" style="border:none;border-radius:0;padding:0;background:none">
             <span>📧 ${esc(org.email)}</span>
             ${org.phone ? `<span>📞 ${esc(org.phone)}</span>` : ""}
@@ -1293,7 +1301,223 @@ function openAdminStaffModal(orgId, staff, onChange) {
   };
 }
 
+// ─── SELF-EMPLOYED INDIVIDUAL: register / login / portal ──────────────────────
+function renderIndividualRegister() {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Register as an individual</div>
+      <div class="auth-sub">For self-employed carers. Buy credits, take your mandatory courses and re-validate each year — then download your certificates.</div>
+      <div id="err"></div>
+      <div class="fg"><label>Your Name</label><input class="inp" id="name" placeholder="Jane Smith"></div>
+      <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="you@email.com"></div>
+      <div class="fg"><label>Password</label><input class="inp" id="pw" type="password" placeholder="At least 6 characters"></div>
+      <button class="btn-auth" id="submit">Create my account</button>
+      <div class="auth-alt">Already registered? <button class="linkbtn" id="tologin">Log in</button></div>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = renderLanding;
+  document.getElementById("tologin").onclick = renderIndividualLogin;
+  document.getElementById("submit").onclick = doIndividualRegister;
+}
+async function doIndividualRegister() {
+  const errBox = document.getElementById("err"); if (errBox) errBox.innerHTML = "";
+  const name = val("name"), email = val("email"), password = val("pw");
+  if (!name || !email || !password) { if (errBox) errBox.innerHTML = `<div class="err">Name, email and password are required.</div>`; return; }
+  if (password.length < 6) { if (errBox) errBox.innerHTML = `<div class="err">Password must be at least 6 characters.</div>`; return; }
+  try {
+    const { token } = await api("/individual/register", "POST", { name, email, password });
+    setAuth(token, "individual");
+    await renderIndividualPortal();
+  } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+function renderIndividualLogin() {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Self-employed carer login</div>
+      <div class="auth-sub">Log in with the email and password you registered with.</div>
+      <div id="err"></div>
+      <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="you@email.com"></div>
+      <div class="fg"><label>Password</label><input class="inp" id="pw" type="password" placeholder="Your password"></div>
+      <button class="btn-auth" id="submit">Sign In</button>
+      <div class="auth-alt">New here? <button class="linkbtn" id="toreg">Register as an individual</button></div>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = renderLanding;
+  document.getElementById("toreg").onclick = renderIndividualRegister;
+  document.getElementById("submit").onclick = doIndividualLogin;
+}
+async function doIndividualLogin() {
+  const errBox = document.getElementById("err"); if (errBox) errBox.innerHTML = "";
+  try {
+    const { token } = await api("/individual/login", "POST", { email: val("email"), password: val("pw") });
+    setAuth(token, "individual");
+    await renderIndividualPortal();
+  } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+async function renderIndividualPortal() {
+  learnerReturn = renderIndividualPortal;
+  let me;
+  try { me = await api("/individual/me"); } catch (e) { clearAuth(); return renderLanding(); }
+  const enrolments = me.enrolments;
+  const credits = me.org.credits || 0;
+  const valid = enrolments.filter(e => e.compliance === "valid" || e.compliance === "expiring").length;
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div>
+      <div class="dash-hdr">
+        <div class="dash-brand"><span class="dash-logo">👤</span><div><div class="dash-org">${esc(me.staff.name)}</div><div class="dash-sub">Self-employed carer · Care2Learn</div></div></div>
+        <button class="feedback-btn" id="feedback">💬 Feedback</button>
+        <button class="logout" id="logout">Log Out</button>
+      </div>
+      <div class="body" id="ibody"></div>
+    </div>
+  `));
+  document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+  document.getElementById("feedback").onclick = () => openFeedbackModal("Individual portal");
+  const body = document.getElementById("ibody");
+
+  const creditCard = el(`
+    <div class="ind-credits">
+      <div>
+        <div class="ind-credits-l">Course credits</div>
+        <div class="ind-credits-n">${credits}</div>
+        <div class="ind-credits-sub">1 credit = 1 course · credits never expire</div>
+      </div>
+      <button class="btn-buy" id="buy">＋ Buy credits</button>
+    </div>`);
+  body.appendChild(creditCard);
+  creditCard.querySelector("#buy").onclick = () => openBuyCredits();
+
+  body.appendChild(el(`<div class="ind-row"><h2 style="margin:0">My courses</h2><button class="mini-btn" id="addcourse">＋ Add a course</button></div>`));
+  body.querySelector("#addcourse").onclick = () => openAddIndividualCourse(me, credits);
+
+  if (!enrolments.length) {
+    body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">You haven't added any courses yet. Buy a credit, then tap “Add a course” to begin your training.</div>`));
+  } else {
+    body.appendChild(el(`<div class="obar-wrap"><div class="obar-l"><span>Overall Progress</span><span>${Math.round((valid/enrolments.length)*100)}%</span></div><div class="obar"><div class="obar-f" style="width:${(valid/enrolments.length)*100}%"></div></div></div>`));
+    const grid = el(`<div class="sc-grid"></div>`);
+    enrolments.forEach(e => {
+      const c = state.courses.find(x => x.id === e.courseId) || {};
+      let badge = "", cta = "Start Course →";
+      if (e.compliance === "valid") { badge = `<span class="sc-badge" style="background:rgba(255,255,255,.25)">✓ Valid</span>`; }
+      else if (e.compliance === "expiring") { badge = `<span class="sc-badge" style="background:rgba(230,126,34,.4)">⚠ Expiring</span>`; }
+      else if (e.compliance === "expired") { badge = `<span class="sc-badge" style="background:rgba(231,76,60,.4)">Expired</span>`; cta = "Renew Now"; }
+      else if (e.compliance === "in_progress") { badge = `<span class="sc-badge" style="background:rgba(255,255,255,.25)">◐ ${e.progress}%</span>`; cta = "Continue →"; }
+      else if (e.compliance === "failed") { badge = `<span class="sc-badge" style="background:rgba(231,76,60,.4)">Retake</span>`; cta = "Retake →"; }
+      const card = el(`
+        <div class="sc">
+          <div class="sc-top" style="background:${c.color||"#1B2A4A"}"><span style="font-size:32px">${c.icon||"📘"}</span>${badge}</div>
+          <div class="sc-body">
+            <div style="font-size:10px;font-weight:700;color:#2980B9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
+            <div class="sc-title">${esc(e.courseTitle)}</div>
+            <div class="sc-meta">⏱ ${c.duration||""} · ${c.modules ? c.modules.length + " modules" : (c.quiz||[]).length + " questions"}</div>
+            ${e.compliance==="in_progress" ? `<div class="obar-mini" style="margin-bottom:11px"><div class="obar-mini-f" style="width:${e.progress}%;background:${c.color}"></div></div>` : ""}
+            ${(e.compliance==="valid"||e.compliance==="expiring")
+              ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#2980B9"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
+              : `<button class="sc-cta" style="background:${c.color||"#2980B9"}">${cta}</button>`}
+          </div>
+        </div>`);
+      card.onclick = () => (c.modules ? openCareCertificate(e.courseId, me) : openCoursePlayer(e.courseId, me));
+      grid.appendChild(card);
+    });
+    body.appendChild(grid);
+  }
+
+  const certs = enrolments.filter(e => e.certId && (e.compliance==="valid"||e.compliance==="expiring"||e.compliance==="expired"));
+  if (certs.length) {
+    body.appendChild(el(`<h2 style="margin:26px 0 14px">My certificates</h2>`));
+    const cgrid = el(`<div class="sc-grid"></div>`);
+    certs.forEach(e => {
+      const c = state.courses.find(x => x.id === e.courseId) || {};
+      const item = el(`
+        <div class="sc" style="cursor:pointer">
+          <div class="sc-top" style="background:${c.color||"#1B2A4A"}"><span style="font-size:32px">🏆</span></div>
+          <div class="sc-body">
+            <div class="sc-title">${esc(e.courseTitle)}</div>
+            <div class="sc-meta">Passed ${e.score}% · expires ${fmtDate(e.expiryDate)}</div>
+            <button class="sc-cta" style="background:${c.color||"#2980B9"}">View certificate →</button>
+          </div>
+        </div>`);
+      item.onclick = () => printCertificate(e, me);
+      cgrid.appendChild(item);
+    });
+    body.appendChild(cgrid);
+  }
+}
+
+function openBuyCredits() {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:440px">
+      <div class="modal-h"><div><h2>Buy credits</h2><p>1 credit = 1 course · £${PRICING.paygPerCourse} each</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div class="fg"><label>How many credits?</label><input class="inp" id="qty" type="number" inputmode="numeric" value="1" min="1"></div>
+        <div id="qtysum" style="font-size:14px;color:#5A6474;margin:-4px 0 14px"></div>
+        <button class="btn-auth" id="checkout">Continue to secure payment</button>
+        <p class="fb-note">You'll be taken to our secure Stripe checkout. Credits are added to your account once payment is confirmed.</p>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  const sum = modal.querySelector("#qtysum");
+  const upd = () => { const n = Math.max(1, parseInt(val("qty")||"1",10)||1); sum.textContent = `${n} credit${n>1?"s":""} · £${n*PRICING.paygPerCourse} total`; };
+  modal.querySelector("#qty").oninput = upd; upd();
+  modal.querySelector("#checkout").onclick = () => {
+    const n = Math.max(1, parseInt(val("qty")||"1",10)||1);
+    overlay.remove();
+    startPaygCheckout(1, n); // 1 learner × n courses = n credits
+  };
+}
+
+async function openAddIndividualCourse(me, credits) {
+  const taken = me.enrolments.map(e => e.courseId);
+  const available = state.courses.filter(c => !taken.includes(c.id));
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:540px">
+      <div class="modal-h"><div><h2>Add a course</h2><p>You have <b>${credits}</b> credit${credits===1?"":"s"} · each course uses 1 credit</p></div><button class="x" id="close">✕</button></div>
+      <div id="addlist" style="padding:8px 14px 18px;max-height:60vh;overflow:auto"></div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  const list = modal.querySelector("#addlist");
+  if (!available.length) { list.appendChild(el(`<div style="padding:14px;color:#7A8599">You've already added every available course.</div>`)); return; }
+  available.forEach(c => {
+    const row = el(`
+      <div class="addrow">
+        <div class="addrow-ic" style="background:${c.color||"#1B2A4A"}">${c.icon||"📘"}</div>
+        <div style="flex:1;min-width:0"><div class="addrow-t">${esc(c.title)}</div><div class="addrow-m">⏱ ${c.duration||""} · ${c.modules ? c.modules.length+" modules" : (c.quiz||[]).length+" questions"}</div></div>
+        <button class="mini-btn">Add</button>
+      </div>`);
+    row.querySelector("button").onclick = async () => {
+      try {
+        await api("/individual/enrol", "POST", { courseId: c.id });
+        overlay.remove();
+        toast(`“${c.title}” added.`);
+        renderIndividualPortal();
+      } catch (e) {
+        if (/credit/i.test(e.message)) {
+          overlay.remove();
+          if (confirm(`${e.message}\n\nBuy credits now?`)) openBuyCredits();
+        } else { toast(e.message); }
+      }
+    };
+    list.appendChild(row);
+  });
+}
+
 async function renderStaffPortal() {
+  learnerReturn = renderStaffPortal;
   const me = await api("/staff/me");
   App.innerHTML = "";
   App.appendChild(el(`
@@ -1520,7 +1744,7 @@ async function openCoursePlayer(courseId, me, opts) {
       intro.appendChild(card);
       wrap.appendChild(intro);
       App.appendChild(wrap);
-      document.getElementById("pback").onclick = () => renderStaffPortal();
+      document.getElementById("pback").onclick = () => learnerReturn();
       document.getElementById("startbtn").onclick = () => { stage = "slides"; slideIdx = 0; render(); };
       return;
     }
@@ -1567,7 +1791,7 @@ async function openCoursePlayer(courseId, me, opts) {
     }
 
     App.appendChild(wrap);
-    document.getElementById("pback").onclick = () => renderStaffPortal();
+    document.getElementById("pback").onclick = () => learnerReturn();
   }
 
   async function saveProgress(force) {
@@ -1629,7 +1853,7 @@ async function openCareCertificate(courseId, me) {
     menu.appendChild(list);
     wrap.appendChild(menu);
     App.appendChild(wrap);
-    document.getElementById("pback").onclick = () => renderStaffPortal();
+    document.getElementById("pback").onclick = () => learnerReturn();
   }
 
   function openModule(idx) {
@@ -1812,7 +2036,7 @@ function renderQuiz(course, me, onRestart) {
         done.appendChild(vc);
       }
       const bb = el(`<button class="btn-retry" style="border-color:${course.color};color:${course.color}">Back to My Courses</button>`);
-      bb.onclick = () => renderStaffPortal();
+      bb.onclick = () => learnerReturn();
       done.appendChild(bb);
     }
     wrap.appendChild(done);
