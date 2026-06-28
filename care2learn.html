@@ -441,6 +441,30 @@
     .cert { box-shadow:none !important; max-width:100% !important; border-radius:0 !important; }
     .cert-actions { display:none !important; }
   }
+
+  /* Referral — "Refer & earn" */
+  .refer-hero{background:linear-gradient(135deg,#7C3AED 0%,#2980B9 100%);color:#fff;border-radius:16px;padding:24px 26px;margin-bottom:16px}
+  .refer-hero-badge{display:inline-block;background:rgba(255,255,255,.18);padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.3px;margin-bottom:12px}
+  .refer-hero-title{font-size:22px;font-weight:800;line-height:1.25;margin-bottom:8px}
+  .refer-hero-sub{font-size:14px;line-height:1.55;color:rgba(255,255,255,.92);max-width:620px}
+  .refer-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  .refer-box{background:#fff;border:1px solid #E0E6ED;border-radius:14px;padding:18px}
+  .refer-box-l{font-size:12px;font-weight:700;color:#7A8694;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+  .refer-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;font-weight:800;letter-spacing:3px;color:#1B2A4A;margin-bottom:14px}
+  .refer-link{font-size:13px;color:#2980B9;word-break:break-all;background:#F4F8FB;border-radius:8px;padding:10px 12px;margin-bottom:12px}
+  .refer-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+  .refer-stat{background:#fff;border:1px solid #E0E6ED;border-radius:14px;padding:18px;text-align:center}
+  .refer-stat-n{font-size:30px;font-weight:800;line-height:1;margin-bottom:6px}
+  .refer-stat-l{font-size:12px;color:#7A8694;font-weight:600}
+  .refer-how{background:#F8FAFC;border:1px solid #EEF2F6;border-radius:14px;padding:18px 22px}
+  .refer-how-t{font-size:14px;font-weight:800;color:#1B2A4A;margin-bottom:10px}
+  .refer-how-list{margin:0;padding-left:20px;color:#48515E;font-size:14px;line-height:1.7}
+  @media(max-width:680px){
+    .refer-grid{grid-template-columns:1fr}
+    .refer-stats{grid-template-columns:1fr}
+    .refer-hero-title{font-size:19px}
+    .refer-code{font-size:26px}
+  }
 </style></head><body><div id="app"></div>
 <script>
 // ─── COURSE CATALOGUE ─────────────────────────────────────────────────────────
@@ -1316,12 +1340,16 @@ const DB = {
   staff: _load("c2l_staff", []),
   enrolments: _load("c2l_enrolments", []),
   sessions: _load("c2l_sessions", []),
+  credit_transactions: _load("c2l_credit_tx", []),
+  referrals: _load("c2l_referrals", []),
 };
 function persist() {
   _save("c2l_orgs", DB.organisations);
   _save("c2l_staff", DB.staff);
   _save("c2l_enrolments", DB.enrolments);
   _save("c2l_sessions", DB.sessions);
+  _save("c2l_credit_tx", DB.credit_transactions);
+  _save("c2l_referrals", DB.referrals);
 }
 
 // ── ID helpers ──
@@ -1334,6 +1362,30 @@ function genId(prefix) { return (prefix ? prefix + "-" : "") + rndHex(10); }
 function genToken() { return rndHex(48); }
 function genPin() { return String(Math.floor(1000 + Math.random() * 9000)); }
 function genPassword() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 8; i++) s += a[Math.floor(Math.random() * a.length)]; return s.slice(0, 4) + "-" + s.slice(4); }
+function genReferralCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 6; i++) s += a[Math.floor(Math.random() * a.length)]; return s; }
+const REFERRAL_CREDITS = { company: 50, individual: 14 };
+function rewardForType(t) { return REFERRAL_CREDITS[t === "individual" ? "individual" : "company"]; }
+function newReferralCode() { let code; do { code = genReferralCode(); } while (DB.organisations.some(o => o.referral_code === code)); return code; }
+function applyReferral(code, newOrgId, newOrgName) {
+  if (!code) return { applied: false };
+  const norm = String(code).trim().toUpperCase();
+  if (!norm) return { applied: false };
+  const referrer = DB.organisations.find(o => o.referral_code === norm);
+  if (!referrer || referrer.id === newOrgId || referrer.active === 0) return { applied: false };
+  if ((DB.referrals = DB.referrals || []).some(r => r.referred_org_id === newOrgId)) return { applied: false };
+  const reward = rewardForType(referrer.account_type);
+  referrer.credits = (referrer.credits || 0) + reward;
+  (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: referrer.id, amount: reward, balance_after: referrer.credits, note: "Referral bonus — " + newOrgName + " joined", created_at: new Date().toISOString() });
+  DB.referrals.push({ id: genId("REF"), referrer_org_id: referrer.id, referred_org_id: newOrgId, code: norm, credits: reward, created_at: new Date().toISOString() });
+  const newOrg = DB.organisations.find(o => o.id === newOrgId); if (newOrg) newOrg.referred_by_code = norm;
+  persist();
+  return { applied: true, reward };
+}
+function referralSummary(orgId) {
+  const org = DB.organisations.find(o => o.id === orgId);
+  const rows = (DB.referrals || []).filter(r => r.referrer_org_id === orgId);
+  return { code: org ? org.referral_code : null, rewardPerReferral: rewardForType(org ? org.account_type : "company"), count: rows.length, creditsEarned: rows.reduce((s, r) => s + r.credits, 0) };
+}
 
 function addYear(dateStr) {
   const d = new Date(dateStr);
@@ -1456,12 +1508,14 @@ async function api(path, method = "GET", body) {
       id, name: body.name, email: body.email.toLowerCase(), password: body.password,
       phone: body.phone || null, address: body.address || null,
       cqc_number: body.cqcNumber || null, created_at: new Date().toISOString(),
+      referral_code: newReferralCode(),
     });
+    const referral = applyReferral(body.referralCode, id, body.name);
     const tok = genToken();
     DB.sessions.push({ token: tok, subject_id: id, kind: "org", created_at: new Date().toISOString() });
     persist();
     const org = DB.organisations.find(o => o.id === id);
-    return { token: tok, org: pubOrg(org) };
+    return { token: tok, org: pubOrg(org), referralApplied: referral.applied };
   }
 
   // ── Org login ──
@@ -1503,6 +1557,7 @@ async function api(path, method = "GET", body) {
     });
     return {
       org: pubOrg(org),
+      referral: referralSummary(org.id),
       summary: { activeStaff: activeStaff.length, totalStaff: orgStaff.length, totalEnrolments: allEnr.length, fullyCompliant, expiringSoon },
       byCourse,
     };
@@ -1619,13 +1674,14 @@ async function api(path, method = "GET", body) {
     const email = body.email.toLowerCase();
     if (DB.organisations.some(o => o.email === email)) err("An account with this email already exists.");
     const orgId = genId("ORG");
-    DB.organisations.push({ id: orgId, name: body.name, email, password: body.password, phone: null, address: null, cqc_number: null, created_at: new Date().toISOString(), credits: 0, active: 1, account_type: "individual" });
+    DB.organisations.push({ id: orgId, name: body.name, email, password: body.password, phone: null, address: null, cqc_number: null, created_at: new Date().toISOString(), credits: 0, active: 1, account_type: "individual", referral_code: newReferralCode() });
     const staffId = genId("STF");
     DB.staff.push({ id: staffId, org_id: orgId, name: body.name, email, role: "Self-employed carer", pin: genPin(), start_date: new Date().toISOString().split("T")[0], active: 1, created_at: new Date().toISOString() });
+    const referral = applyReferral(body.referralCode, orgId, body.name);
     const tok = genToken();
     DB.sessions.push({ token: tok, subject_id: staffId, kind: "staff", created_at: new Date().toISOString() });
     persist();
-    return { token: tok, accountType: "individual", staff: { id: staffId, name: body.name, email }, org: { id: orgId, name: body.name, credits: 0 } };
+    return { token: tok, accountType: "individual", staff: { id: staffId, name: body.name, email }, org: { id: orgId, name: body.name, credits: 0 }, referralApplied: referral.applied };
   }
 
   // ── Individual login ──
@@ -1653,7 +1709,8 @@ async function api(path, method = "GET", body) {
     if (!org || org.account_type !== "individual") err("Not an individual account.");
     const enrolments = DB.enrolments.filter(e => e.staff_id === member.id).map(shapeEnrolment);
     return { staff: { id: member.id, name: member.name, email: member.email, role: member.role },
-             org: { id: org.id, name: org.name, credits: org.credits || 0, accountType: org.account_type }, enrolments };
+             org: { id: org.id, name: org.name, credits: org.credits || 0, accountType: org.account_type }, enrolments,
+             referral: referralSummary(org.id) };
   }
 
   // ── Individual: self-enrol (spends a credit) ──
@@ -1858,7 +1915,7 @@ async function api(path, method = "GET", body) {
     const id = genId("ORG");
     const startCredits = Math.trunc(Number(body.credits));
     const credits = (Number.isFinite(startCredits) && startCredits > 0) ? startCredits : 0;
-    DB.organisations.push({ id, name: body.name, email, password: body.password, phone: body.phone || null, address: body.address || null, cqc_number: body.cqcNumber || null, created_at: new Date().toISOString(), credits, active: 1 });
+    DB.organisations.push({ id, name: body.name, email, password: body.password, phone: body.phone || null, address: body.address || null, cqc_number: body.cqcNumber || null, created_at: new Date().toISOString(), credits, active: 1, referral_code: newReferralCode() });
     if (credits > 0) (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: id, amount: credits, balance_after: credits, note: "Opening balance", created_at: new Date().toISOString() });
     persist();
     const o = DB.organisations.find(x => x.id === id);
@@ -1873,7 +1930,7 @@ async function api(path, method = "GET", body) {
     const orgId = genId("ORG");
     const startCredits = Math.trunc(Number(body.credits));
     const credits = (Number.isFinite(startCredits) && startCredits > 0) ? startCredits : 0;
-    DB.organisations.push({ id: orgId, name: body.name, email, password: body.password, phone: null, address: null, cqc_number: null, created_at: new Date().toISOString(), credits, active: 1, account_type: "individual" });
+    DB.organisations.push({ id: orgId, name: body.name, email, password: body.password, phone: null, address: null, cqc_number: null, created_at: new Date().toISOString(), credits, active: 1, account_type: "individual", referral_code: newReferralCode() });
     DB.staff.push({ id: genId("STF"), org_id: orgId, name: body.name, email, role: "Self-employed carer", pin: genPin(), start_date: new Date().toISOString().split("T")[0], active: 1, created_at: new Date().toISOString() });
     if (credits > 0) (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: orgId, amount: credits, balance_after: credits, note: "Opening balance", created_at: new Date().toISOString() });
     persist();
@@ -2007,6 +2064,9 @@ function newEnrolment(staff_id, course_id, dueDate) {
 
 // Seed on first load
 seedDemo();
+// Backfill a referral code for any account that doesn't have one yet
+DB.organisations.forEach(o => { if (!o.referral_code) o.referral_code = newReferralCode(); });
+persist();
 
 </script>
 <script>
@@ -2020,6 +2080,13 @@ const state = {
   courses: [],
   view: "landing",
 };
+
+// Referral link support: a ?ref=CODE param prefills the registration forms.
+let referralFromUrl = "";
+try {
+  const _ref = new URLSearchParams(location.search).get("ref");
+  if (_ref) referralFromUrl = _ref.trim().toUpperCase().slice(0, 12);
+} catch {}
 
 // ── API helper ──
 
@@ -2402,16 +2469,19 @@ function renderOrgRegister() {
       <div class="fg"><label>Phone Number</label><input class="inp" id="phone" placeholder="01234 567890"></div>
       <div class="fg"><label>CQC Registration Number</label><input class="inp" id="cqc" placeholder="1-XXXXXXXXX"></div>
       <div class="fg"><label>Address</label><input class="inp" id="address" placeholder="123 High Street, Town"></div>
+      <div class="fg"><label>Referral code <span style="color:#9AA5B1;font-weight:400">(optional)</span></label><input class="inp" id="refcode" placeholder="e.g. K7Q2MP" style="text-transform:uppercase"></div>
       <button class="btn-auth" id="submit">Register Organisation</button>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
+  if (referralFromUrl) document.getElementById("refcode").value = referralFromUrl;
   document.getElementById("submit").onclick = async () => {
     const errBox = document.getElementById("err");
     errBox.innerHTML = "";
     const payload = {
       name: val("name"), email: val("email"), password: val("password"),
       phone: val("phone"), cqcNumber: val("cqc"), address: val("address"),
+      referralCode: val("refcode"),
     };
     try {
       const { token } = await api("/org/register", "POST", payload);
@@ -2484,6 +2554,61 @@ function val(id) { const e = document.getElementById(id); return e ? e.value.tri
 
 // ─── ORG DASHBOARD ────────────────────────────────────────────────────────────
 let orgTab = "overview";
+// Shared "Refer & earn" card — used by both the organisation dashboard and the individual portal.
+function referralCard(referral, opts) {
+  opts = opts || {};
+  const reward = referral.rewardPerReferral || 0;
+  const code = referral.code || "—";
+  const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
+  const who = opts.audience || "people you know";
+  const singular = opts.singular || "person";
+  const wrap = el(`
+    <div>
+      <div class="refer-hero">
+        <div class="refer-hero-badge">🎁 Refer &amp; earn</div>
+        <div class="refer-hero-title">Earn ${reward} free credits for every ${esc(singular)} you refer</div>
+        <div class="refer-hero-sub">Share your code with ${esc(who)}. The moment they create their Care2Learn account, ${reward} course credits land in your balance — automatically, with no limit on how many you can earn.</div>
+      </div>
+      <div class="refer-grid">
+        <div class="refer-box">
+          <div class="refer-box-l">Your referral code</div>
+          <div class="refer-code">${esc(code)}</div>
+          <button class="mini-btn" id="copycode">📋 Copy code</button>
+        </div>
+        <div class="refer-box">
+          <div class="refer-box-l">Your invite link</div>
+          <div class="refer-link">${esc(link)}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="mini-btn" id="copylink">🔗 Copy link</button>
+            <button class="mini-btn" id="emaillink">✉️ Share by email</button>
+          </div>
+        </div>
+      </div>
+      <div class="refer-stats">
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Successful referrals</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#16A34A">${referral.creditsEarned || 0}</div><div class="refer-stat-l">Credits earned</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#7C3AED">${reward}</div><div class="refer-stat-l">Credits per referral</div></div>
+      </div>
+      <div class="refer-how">
+        <div class="refer-how-t">How it works</div>
+        <ol class="refer-how-list">
+          <li>Share your code or invite link with ${esc(who)}.</li>
+          <li>They enter your code when they sign up for Care2Learn.</li>
+          <li>You instantly receive ${reward} course credits to spend on any training.</li>
+        </ol>
+      </div>
+    </div>`);
+  const copy = (text, msg) => { try { navigator.clipboard.writeText(text); toast(msg); } catch { toast(text); } };
+  wrap.querySelector("#copycode").onclick = () => copy(code, "Referral code copied.");
+  wrap.querySelector("#copylink").onclick = () => copy(link, "Invite link copied.");
+  wrap.querySelector("#emaillink").onclick = () => {
+    const subject = encodeURIComponent("Join me on Care2Learn");
+    const bodyTxt = encodeURIComponent(`Hi,\n\nI use Care2Learn for care training and thought you'd find it useful too.\n\nUse my referral code ${code} when you sign up, or just follow this link:\n${link}\n\nThanks!`);
+    window.location.href = `mailto:?subject=${subject}&body=${bodyTxt}`;
+  };
+  return wrap;
+}
+
 async function renderOrgDash() {
   const me = await api("/org/me");
   const org = me.org;
@@ -2505,7 +2630,7 @@ async function renderOrgDash() {
   `));
 
   const nav = document.getElementById("nav");
-  [["overview","📊 Overview"],["staff","👥 Staff & Licences"],["compliance","✅ Compliance"],["settings","⚙️ Settings"]].forEach(([k,label]) => {
+  [["overview","📊 Overview"],["staff","👥 Staff & Licences"],["compliance","✅ Compliance"],["refer","🎁 Refer & Earn"],["settings","⚙️ Settings"]].forEach(([k,label]) => {
     const b = el(`<button class="nav-btn ${orgTab===k?"active":""}">${label}</button>`);
     b.onclick = () => { orgTab = k; paintOrgTab(org); };
     nav.appendChild(b);
@@ -2519,7 +2644,7 @@ async function renderOrgDash() {
 async function paintOrgTab(org) {
   // refresh active nav
   const navs = document.querySelectorAll("#nav .nav-btn");
-  const keys = ["overview","staff","compliance","settings"];
+  const keys = ["overview","staff","compliance","refer","settings"];
   navs.forEach((b,i)=> b.classList.toggle("active", keys[i]===orgTab));
 
   const body = document.getElementById("dashbody");
@@ -2641,6 +2766,14 @@ async function paintOrgTab(org) {
     if (active.length === 0) matrix.appendChild(el(`<div class="empty">No active staff to report on.</div>`));
     body.appendChild(matrix);
     body.appendChild(el(`<div class="legend"><span class="cell ok">✓</span>Valid <span class="cell amber">⚠</span>Expiring <span class="cell prog">◐</span>In progress <span class="cell red">✗</span>Expired/Failed <span class="cell none">○</span>Assigned <span class="cell none">—</span>Not assigned</div>`));
+  }
+
+  if (orgTab === "refer") {
+    const me = await api("/org/me");
+    body.innerHTML = "";
+    body.appendChild(el(`<h2 style="margin-bottom:18px">Refer &amp; earn</h2>`));
+    body.appendChild(referralCard(me.referral || {}, { audience: "other care businesses", singular: "care business" }));
+    return;
   }
 
   if (orgTab === "settings") {
@@ -3492,21 +3625,23 @@ function renderIndividualRegister() {
       <div class="fg"><label>Your Name</label><input class="inp" id="name" placeholder="Jane Smith"></div>
       <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="you@email.com"></div>
       <div class="fg"><label>Password</label><input class="inp" id="pw" type="password" placeholder="At least 6 characters"></div>
+      <div class="fg"><label>Referral code <span style="color:#9AA5B1;font-weight:400">(optional)</span></label><input class="inp" id="refcode" placeholder="e.g. K7Q2MP" style="text-transform:uppercase"></div>
       <button class="btn-auth" id="submit">Create my account</button>
       <div class="auth-alt">Already registered? <button class="linkbtn" id="tologin">Log in</button></div>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
+  if (referralFromUrl) document.getElementById("refcode").value = referralFromUrl;
   document.getElementById("tologin").onclick = renderIndividualLogin;
   document.getElementById("submit").onclick = doIndividualRegister;
 }
 async function doIndividualRegister() {
   const errBox = document.getElementById("err"); if (errBox) errBox.innerHTML = "";
-  const name = val("name"), email = val("email"), password = val("pw");
+  const name = val("name"), email = val("email"), password = val("pw"), referralCode = val("refcode");
   if (!name || !email || !password) { if (errBox) errBox.innerHTML = `<div class="err">Name, email and password are required.</div>`; return; }
   if (password.length < 6) { if (errBox) errBox.innerHTML = `<div class="err">Password must be at least 6 characters.</div>`; return; }
   try {
-    const { token } = await api("/individual/register", "POST", { name, email, password });
+    const { token } = await api("/individual/register", "POST", { name, email, password, referralCode });
     setAuth(token, "individual");
     await renderIndividualPortal();
   } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -3631,6 +3766,9 @@ async function renderIndividualPortal() {
     });
     body.appendChild(cgrid);
   }
+
+  body.appendChild(el(`<h2 style="margin:26px 0 14px">🎁 Refer &amp; earn</h2>`));
+  body.appendChild(referralCard(me.referral || {}, { audience: "other self-employed carers", singular: "self-employed carer" }));
 
   body.appendChild(el(`<h2 style="margin:26px 0 12px">Account</h2>`));
   const acct = el(`

@@ -9,6 +9,13 @@ const state = {
   view: "landing",
 };
 
+// Referral link support: a ?ref=CODE param prefills the registration forms.
+let referralFromUrl = "";
+try {
+  const _ref = new URLSearchParams(location.search).get("ref");
+  if (_ref) referralFromUrl = _ref.trim().toUpperCase().slice(0, 12);
+} catch {}
+
 // ── API helper ──
 async function api(path, method = "GET", body) {
   const headers = { "Content-Type": "application/json" };
@@ -403,16 +410,19 @@ function renderOrgRegister() {
       <div class="fg"><label>Phone Number</label><input class="inp" id="phone" placeholder="01234 567890"></div>
       <div class="fg"><label>CQC Registration Number</label><input class="inp" id="cqc" placeholder="1-XXXXXXXXX"></div>
       <div class="fg"><label>Address</label><input class="inp" id="address" placeholder="123 High Street, Town"></div>
+      <div class="fg"><label>Referral code <span style="color:#9AA5B1;font-weight:400">(optional)</span></label><input class="inp" id="refcode" placeholder="e.g. K7Q2MP" style="text-transform:uppercase"></div>
       <button class="btn-auth" id="submit">Register Organisation</button>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
+  if (referralFromUrl) document.getElementById("refcode").value = referralFromUrl;
   document.getElementById("submit").onclick = async () => {
     const errBox = document.getElementById("err");
     errBox.innerHTML = "";
     const payload = {
       name: val("name"), email: val("email"), password: val("password"),
       phone: val("phone"), cqcNumber: val("cqc"), address: val("address"),
+      referralCode: val("refcode"),
     };
     try {
       const { token } = await api("/org/register", "POST", payload);
@@ -485,6 +495,61 @@ function val(id) { const e = document.getElementById(id); return e ? e.value.tri
 
 // ─── ORG DASHBOARD ────────────────────────────────────────────────────────────
 let orgTab = "overview";
+// Shared "Refer & earn" card — used by both the organisation dashboard and the individual portal.
+function referralCard(referral, opts) {
+  opts = opts || {};
+  const reward = referral.rewardPerReferral || 0;
+  const code = referral.code || "—";
+  const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
+  const who = opts.audience || "people you know";
+  const singular = opts.singular || "person";
+  const wrap = el(`
+    <div>
+      <div class="refer-hero">
+        <div class="refer-hero-badge">🎁 Refer &amp; earn</div>
+        <div class="refer-hero-title">Earn ${reward} free credits for every ${esc(singular)} you refer</div>
+        <div class="refer-hero-sub">Share your code with ${esc(who)}. The moment they create their Care2Learn account, ${reward} course credits land in your balance — automatically, with no limit on how many you can earn.</div>
+      </div>
+      <div class="refer-grid">
+        <div class="refer-box">
+          <div class="refer-box-l">Your referral code</div>
+          <div class="refer-code">${esc(code)}</div>
+          <button class="mini-btn" id="copycode">📋 Copy code</button>
+        </div>
+        <div class="refer-box">
+          <div class="refer-box-l">Your invite link</div>
+          <div class="refer-link">${esc(link)}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="mini-btn" id="copylink">🔗 Copy link</button>
+            <button class="mini-btn" id="emaillink">✉️ Share by email</button>
+          </div>
+        </div>
+      </div>
+      <div class="refer-stats">
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Successful referrals</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#16A34A">${referral.creditsEarned || 0}</div><div class="refer-stat-l">Credits earned</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#7C3AED">${reward}</div><div class="refer-stat-l">Credits per referral</div></div>
+      </div>
+      <div class="refer-how">
+        <div class="refer-how-t">How it works</div>
+        <ol class="refer-how-list">
+          <li>Share your code or invite link with ${esc(who)}.</li>
+          <li>They enter your code when they sign up for Care2Learn.</li>
+          <li>You instantly receive ${reward} course credits to spend on any training.</li>
+        </ol>
+      </div>
+    </div>`);
+  const copy = (text, msg) => { try { navigator.clipboard.writeText(text); toast(msg); } catch { toast(text); } };
+  wrap.querySelector("#copycode").onclick = () => copy(code, "Referral code copied.");
+  wrap.querySelector("#copylink").onclick = () => copy(link, "Invite link copied.");
+  wrap.querySelector("#emaillink").onclick = () => {
+    const subject = encodeURIComponent("Join me on Care2Learn");
+    const bodyTxt = encodeURIComponent(`Hi,\n\nI use Care2Learn for care training and thought you'd find it useful too.\n\nUse my referral code ${code} when you sign up, or just follow this link:\n${link}\n\nThanks!`);
+    window.location.href = `mailto:?subject=${subject}&body=${bodyTxt}`;
+  };
+  return wrap;
+}
+
 async function renderOrgDash() {
   const me = await api("/org/me");
   const org = me.org;
@@ -506,7 +571,7 @@ async function renderOrgDash() {
   `));
 
   const nav = document.getElementById("nav");
-  [["overview","📊 Overview"],["staff","👥 Staff & Licences"],["compliance","✅ Compliance"],["settings","⚙️ Settings"]].forEach(([k,label]) => {
+  [["overview","📊 Overview"],["staff","👥 Staff & Licences"],["compliance","✅ Compliance"],["refer","🎁 Refer & Earn"],["settings","⚙️ Settings"]].forEach(([k,label]) => {
     const b = el(`<button class="nav-btn ${orgTab===k?"active":""}">${label}</button>`);
     b.onclick = () => { orgTab = k; paintOrgTab(org); };
     nav.appendChild(b);
@@ -520,7 +585,7 @@ async function renderOrgDash() {
 async function paintOrgTab(org) {
   // refresh active nav
   const navs = document.querySelectorAll("#nav .nav-btn");
-  const keys = ["overview","staff","compliance","settings"];
+  const keys = ["overview","staff","compliance","refer","settings"];
   navs.forEach((b,i)=> b.classList.toggle("active", keys[i]===orgTab));
 
   const body = document.getElementById("dashbody");
@@ -642,6 +707,14 @@ async function paintOrgTab(org) {
     if (active.length === 0) matrix.appendChild(el(`<div class="empty">No active staff to report on.</div>`));
     body.appendChild(matrix);
     body.appendChild(el(`<div class="legend"><span class="cell ok">✓</span>Valid <span class="cell amber">⚠</span>Expiring <span class="cell prog">◐</span>In progress <span class="cell red">✗</span>Expired/Failed <span class="cell none">○</span>Assigned <span class="cell none">—</span>Not assigned</div>`));
+  }
+
+  if (orgTab === "refer") {
+    const me = await api("/org/me");
+    body.innerHTML = "";
+    body.appendChild(el(`<h2 style="margin-bottom:18px">Refer &amp; earn</h2>`));
+    body.appendChild(referralCard(me.referral || {}, { audience: "other care businesses", singular: "care business" }));
+    return;
   }
 
   if (orgTab === "settings") {
@@ -1493,21 +1566,23 @@ function renderIndividualRegister() {
       <div class="fg"><label>Your Name</label><input class="inp" id="name" placeholder="Jane Smith"></div>
       <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="you@email.com"></div>
       <div class="fg"><label>Password</label><input class="inp" id="pw" type="password" placeholder="At least 6 characters"></div>
+      <div class="fg"><label>Referral code <span style="color:#9AA5B1;font-weight:400">(optional)</span></label><input class="inp" id="refcode" placeholder="e.g. K7Q2MP" style="text-transform:uppercase"></div>
       <button class="btn-auth" id="submit">Create my account</button>
       <div class="auth-alt">Already registered? <button class="linkbtn" id="tologin">Log in</button></div>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
+  if (referralFromUrl) document.getElementById("refcode").value = referralFromUrl;
   document.getElementById("tologin").onclick = renderIndividualLogin;
   document.getElementById("submit").onclick = doIndividualRegister;
 }
 async function doIndividualRegister() {
   const errBox = document.getElementById("err"); if (errBox) errBox.innerHTML = "";
-  const name = val("name"), email = val("email"), password = val("pw");
+  const name = val("name"), email = val("email"), password = val("pw"), referralCode = val("refcode");
   if (!name || !email || !password) { if (errBox) errBox.innerHTML = `<div class="err">Name, email and password are required.</div>`; return; }
   if (password.length < 6) { if (errBox) errBox.innerHTML = `<div class="err">Password must be at least 6 characters.</div>`; return; }
   try {
-    const { token } = await api("/individual/register", "POST", { name, email, password });
+    const { token } = await api("/individual/register", "POST", { name, email, password, referralCode });
     setAuth(token, "individual");
     await renderIndividualPortal();
   } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -1632,6 +1707,9 @@ async function renderIndividualPortal() {
     });
     body.appendChild(cgrid);
   }
+
+  body.appendChild(el(`<h2 style="margin:26px 0 14px">🎁 Refer &amp; earn</h2>`));
+  body.appendChild(referralCard(me.referral || {}, { audience: "other self-employed carers", singular: "self-employed carer" }));
 
   body.appendChild(el(`<h2 style="margin:26px 0 12px">Account</h2>`));
   const acct = el(`

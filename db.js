@@ -127,6 +127,16 @@ export function initSchema() {
       credits     INTEGER,
       created_at  TEXT NOT NULL
     );
+
+    -- Referral program: one reward per referred account (referred_org_id is unique)
+    CREATE TABLE IF NOT EXISTS referrals (
+      id              TEXT PRIMARY KEY,
+      referrer_org_id TEXT NOT NULL,
+      referred_org_id TEXT NOT NULL UNIQUE,
+      code            TEXT,
+      credits         INTEGER NOT NULL,
+      created_at      TEXT NOT NULL
+    );
   `);
 
   // Migrations on the organisations table (idempotent — safe to re-run).
@@ -139,6 +149,23 @@ export function initSchema() {
   }
   if (!orgCols.some((c) => c.name === "account_type")) {
     db.exec("ALTER TABLE organisations ADD COLUMN account_type TEXT NOT NULL DEFAULT 'company'");
+  }
+  if (!orgCols.some((c) => c.name === "referral_code")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN referral_code TEXT");
+  }
+  if (!orgCols.some((c) => c.name === "referred_by_code")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN referred_by_code TEXT");
+  }
+  // Backfill a unique referral code for any account that doesn't have one yet.
+  backfillReferralCodes();
+}
+
+// Assign a unique referral code to any account missing one (idempotent — safe to re-run).
+export function backfillReferralCodes() {
+  const needCode = db.prepare("SELECT id FROM organisations WHERE referral_code IS NULL OR referral_code = ''").all();
+  for (const row of needCode) {
+    let code; do { code = genReferralCode(); } while (db.prepare("SELECT 1 FROM organisations WHERE referral_code = ?").get(code));
+    db.prepare("UPDATE organisations SET referral_code = ? WHERE id = ?").run(code, row.id);
   }
 }
 
@@ -171,6 +198,14 @@ export function genPassword() {
   let s = "";
   for (let i = 0; i < 8; i++) s += alphabet[bytes[i] % alphabet.length];
   return s.slice(0, 4) + "-" + s.slice(4);
+}
+// A short, shareable referral code (no ambiguous characters), e.g. "K7Q2MP".
+export function genReferralCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.randomBytes(6);
+  let s = "";
+  for (let i = 0; i < 6; i++) s += alphabet[bytes[i] % alphabet.length];
+  return s;
 }
 
 // ─── SEED DEMO DATA ───────────────────────────────────────────────────────────

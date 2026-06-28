@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   db, initSchema, seedDemo, hashPassword, verifyPassword,
-  genId, genToken, genPin, genPassword,
+  genId, genToken, genPin, genPassword, genReferralCode, backfillReferralCodes,
 } from "./db.js";
 import { COURSES, COURSE_IDS, COURSE_MAP } from "./courses.js";
 
@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 3000;
 
 initSchema();
 seedDemo();
+backfillReferralCodes(); // ensure freshly-seeded accounts also have referral codes
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function send(res, status, data, headers = {}) {
@@ -246,6 +247,48 @@ function inTransaction(fn) {
   catch (e) { try { db.exec("ROLLBACK"); } catch {} throw e; }
 }
 
+// ─── REFERRAL PROGRAM ─────────────────────────────────────────────────────────
+const REFERRAL_CREDITS = { company: 50, individual: 14 };
+function rewardForType(accountType) { return REFERRAL_CREDITS[accountType === "individual" ? "individual" : "company"]; }
+function newReferralCode() {
+  let code; do { code = genReferralCode(); } while (db.prepare("SELECT 1 FROM organisations WHERE referral_code = ?").get(code));
+  return code;
+}
+// Credit the owner of `code` for referring a freshly-created account. One reward per referred account.
+function applyReferral(code, newOrgId, newOrgName) {
+  if (!code) return { applied: false };
+  const norm = String(code).trim().toUpperCase();
+  if (!norm) return { applied: false };
+  const referrer = db.prepare("SELECT * FROM organisations WHERE referral_code = ?").get(norm);
+  if (!referrer) return { applied: false, reason: "unknown" };
+  if (referrer.id === newOrgId) return { applied: false, reason: "self" };
+  if (referrer.active === 0) return { applied: false, reason: "inactive" };
+  if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(newOrgId)) return { applied: false, reason: "duplicate" };
+  const reward = rewardForType(referrer.account_type);
+  inTransaction(() => {
+    const cur = (db.prepare("SELECT credits FROM organisations WHERE id = ?").get(referrer.id).credits) || 0;
+    const bal = cur + reward;
+    db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(bal, referrer.id);
+    db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+      .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — ${newOrgName} joined`, new Date().toISOString());
+    db.prepare("INSERT INTO referrals (id,referrer_org_id,referred_org_id,code,credits,created_at) VALUES (?,?,?,?,?,?)")
+      .run(genId("REF"), referrer.id, newOrgId, norm, reward, new Date().toISOString());
+    db.prepare("UPDATE organisations SET referred_by_code = ? WHERE id = ?").run(norm, newOrgId);
+  });
+  console.log(`🎁 REFERRAL: ${referrer.name} earned ${reward} credits for referring ${newOrgName}`);
+  return { applied: true, reward };
+}
+function referralSummary(orgId) {
+  const org = db.prepare("SELECT referral_code, account_type FROM organisations WHERE id = ?").get(orgId);
+  const rows = db.prepare("SELECT credits FROM referrals WHERE referrer_org_id = ?").all(orgId);
+  return {
+    code: org ? org.referral_code : null,
+    rewardPerReferral: rewardForType(org ? org.account_type : "company"),
+    count: rows.length,
+    creditsEarned: rows.reduce((s, r) => s + r.credits, 0),
+  };
+}
+
 // Grant credits for a completed checkout session — idempotent (one grant per session id).
 function grantStripeCredits(sessionId, orgId, credits) {
   if (db.prepare("SELECT id FROM stripe_events WHERE id = ?").get(sessionId)) {
@@ -313,13 +356,15 @@ route("POST", "/api/org/register", async (req, res) => {
   db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,phone,address,cqc_number,created_at)
               VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(id, b.name, b.email.toLowerCase(), hash, salt, b.phone || null, b.address || null, b.cqcNumber || null, new Date().toISOString());
+  db.prepare("UPDATE organisations SET referral_code = ? WHERE id = ?").run(newReferralCode(), id);
+  const referral = applyReferral(b.referralCode, id, b.name);
 
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)")
     .run(token, id, "org", new Date().toISOString());
 
   const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at FROM organisations WHERE id = ?").get(id);
-  send(res, 201, { token, org });
+  send(res, 201, { token, org, referralApplied: referral.applied });
 });
 
 // ── ORG: login ──
@@ -380,6 +425,7 @@ route("GET", "/api/org/me", async (req, res) => {
 
   send(res, 200, {
     org,
+    referral: referralSummary(org.id),
     summary: {
       activeStaff: activeStaff.length,
       totalStaff: staff.length,
@@ -515,14 +561,16 @@ route("POST", "/api/individual/register", async (req, res) => {
   db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,created_at,account_type)
               VALUES (?,?,?,?,?,?, 'individual')`)
     .run(orgId, b.name, email, hash, salt, new Date().toISOString());
+  db.prepare("UPDATE organisations SET referral_code = ? WHERE id = ?").run(newReferralCode(), orgId);
   const staffId = genId("STF");
   db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at)
               VALUES (?,?,?,?,?,?,?,1,?)`)
     .run(staffId, orgId, b.name, email, "Self-employed carer", genPin(), new Date().toISOString().split("T")[0], new Date().toISOString());
+  const referral = applyReferral(b.referralCode, orgId, b.name);
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)").run(token, staffId, "staff", new Date().toISOString());
   console.log(`🧑‍⚕️ INDIVIDUAL REGISTERED: ${b.name} (${email})`);
-  send(res, 201, { token, accountType: "individual", staff: { id: staffId, name: b.name, email }, org: { id: orgId, name: b.name, credits: 0 } });
+  send(res, 201, { token, accountType: "individual", staff: { id: staffId, name: b.name, email }, org: { id: orgId, name: b.name, credits: 0 }, referralApplied: referral.applied });
 });
 
 route("POST", "/api/individual/login", async (req, res) => {
@@ -555,7 +603,8 @@ route("GET", "/api/individual/me", async (req, res) => {
     }
   }
   send(res, 200, { staff: { id: member.id, name: member.name, email: member.email, role: member.role },
-                   org: { id: org.id, name: org.name, credits: org.credits || 0, accountType: org.account_type }, enrolments });
+                   org: { id: org.id, name: org.name, credits: org.credits || 0, accountType: org.account_type }, enrolments,
+                   referral: referralSummary(org.id) });
 });
 
 // Individual self-enrols in a course — pay-as-you-go: requires (and spends) one credit
@@ -923,6 +972,7 @@ route("POST", "/api/admin/orgs", async (req, res) => {
   db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,phone,address,cqc_number,created_at)
               VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(id, b.name, email, hash, salt, b.phone || null, b.address || null, b.cqcNumber || null, new Date().toISOString());
+  db.prepare("UPDATE organisations SET referral_code = ? WHERE id = ?").run(newReferralCode(), id);
   const startCredits = Math.trunc(Number(b.credits));
   if (Number.isFinite(startCredits) && startCredits > 0) {
     db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(startCredits, id);
@@ -947,6 +997,7 @@ route("POST", "/api/admin/individuals", async (req, res) => {
   db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,created_at,account_type)
               VALUES (?,?,?,?,?,?, 'individual')`)
     .run(orgId, b.name, email, hash, salt, new Date().toISOString());
+  db.prepare("UPDATE organisations SET referral_code = ? WHERE id = ?").run(newReferralCode(), orgId);
   const staffId = genId("STF");
   db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at)
               VALUES (?,?,?,?,?,?,?,1,?)`)
