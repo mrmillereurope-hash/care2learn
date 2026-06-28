@@ -496,8 +496,10 @@ async function renderOrgDash() {
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
         <nav class="dash-nav" id="nav"></nav>
-        <button class="feedback-btn" id="feedback">💬 Feedback</button>
-        <button class="logout" id="logout">Log Out</button>
+        <div class="dash-actions">
+          <button class="feedback-btn" id="feedback">💬 Feedback</button>
+          <button class="logout" id="logout">Log Out</button>
+        </div>
       </div>
       <div class="body" id="dashbody"></div>
     </div>
@@ -921,7 +923,9 @@ function adminHeader() {
     <div class="dash-hdr">
       <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">Care2Learn <span class="admin-badge">Super Admin</span></div><div class="dash-sub">Platform administration</div></div></div>
       <nav class="dash-nav" id="anav"></nav>
-      <button class="logout" id="alogout">Log Out</button>
+      <div class="dash-actions">
+        <button class="logout" id="alogout">Log Out</button>
+      </div>
     </div>`);
   return hdr;
 }
@@ -1549,8 +1553,10 @@ async function renderIndividualPortal() {
     <div>
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">👤</span><div><div class="dash-org">${esc(me.staff.name)}</div><div class="dash-sub">Self-employed carer · Care2Learn</div></div></div>
-        <button class="feedback-btn" id="feedback">💬 Feedback</button>
-        <button class="logout" id="logout">Log Out</button>
+        <div class="dash-actions">
+          <button class="feedback-btn" id="feedback">💬 Feedback</button>
+          <button class="logout" id="logout">Log Out</button>
+        </div>
       </div>
       <div class="body" id="ibody"></div>
     </div>
@@ -1710,8 +1716,10 @@ async function renderStaffPortal() {
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">👤</span><div><div class="dash-org">${esc(me.staff.name)}</div><div class="dash-sub">${esc(me.staff.role)} · ${esc(me.org.name)}</div></div></div>
         <nav class="dash-nav" id="snav"></nav>
-        <button class="feedback-btn" id="feedback">💬 Feedback</button>
-        <button class="logout" id="logout">Log Out</button>
+        <div class="dash-actions">
+          <button class="feedback-btn" id="feedback">💬 Feedback</button>
+          <button class="logout" id="logout">Log Out</button>
+        </div>
       </div>
       <div class="body" id="sbody"></div>
     </div>

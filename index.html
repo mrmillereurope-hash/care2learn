@@ -123,17 +123,17 @@
   .dash-org{font-size:15px;font-weight:800}
   .dash-sub{font-size:10px;color:#94A3B8}
   .dash-nav{display:flex;gap:2px;flex:1;justify-content:center;flex-wrap:wrap}
+  .dash-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
   .nav-btn{background:transparent;border:none;color:#94A3B8;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;transition:all .2s}
   .nav-btn.active,.nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
   .logout{background:rgba(255,255,255,.1);border:none;color:#94A3B8;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;flex:0 0 auto}
   .logout:hover{color:#fff}
-  /* On narrow screens, stack the header: brand + Log Out on top, nav as its own scrollable row */
+  /* On narrow screens, stack the header: brand on top, Feedback + Log Out grouped at the right, nav as its own scrollable row */
   @media(max-width:760px){
     .dash-hdr{height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px}
     .dash-brand{order:1;flex:1 1 auto;min-width:0}
     .dash-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .logout{order:2}
-    .feedback-btn{order:2}
+    .dash-actions{order:2;margin-left:auto}
     .dash-nav{order:3;flex-basis:100%;width:100%;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
     .nav-btn{flex:0 0 auto;white-space:nowrap}
   }
