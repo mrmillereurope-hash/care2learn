@@ -359,7 +359,7 @@ function renderLanding() {
       <div class="landing-hero">
         <div class="landing-logo">${logoMark(54, false)}</div>
         <div class="landing-title">Care2Learn</div>
-        <div class="landing-tag">Skills for Care · Mandatory Training</div>
+        <div class="landing-tag">Training sorted, so you can care.</div>
         <p class="landing-desc">The complete e-learning platform for social care. Register your organisation, assign mandatory courses to staff, and track every learner's progress and compliance in real time.</p>
         <div class="landing-stats">
           <div><span class="lstat-n">${state.courses.length}</span><span class="lstat-l">Courses</span></div>
