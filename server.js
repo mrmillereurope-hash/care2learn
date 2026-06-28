@@ -215,6 +215,8 @@ route("POST", "/api/org/login", async (req, res) => {
   if (!org) return send(res, 401, { error: "No organisation found with this email." });
   if (!verifyPassword(b.password, org.password_salt, org.password_hash))
     return send(res, 401, { error: "Incorrect password." });
+  if (org.active === 0)
+    return send(res, 403, { error: "This account has been deactivated. Please contact Care2Learn support." });
 
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)")
@@ -335,6 +337,17 @@ route("PATCH", "/api/org/staff/:id", async (req, res) => {
   send(res, 200, { staff: { ...updated, active: !!updated.active } });
 });
 
+// ── ORG: reset a staff member's PIN ──
+route("POST", "/api/org/staff/:id/reset-pin", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ? AND org_id = ?").get(req.params.id, s.subject_id);
+  if (!member) return send(res, 404, { error: "Staff member not found." });
+  const pin = genPin();
+  db.prepare("UPDATE staff SET pin = ? WHERE id = ?").run(pin, member.id);
+  send(res, 200, { ok: true, pin, staff: { id: member.id, name: member.name, email: member.email } });
+});
+
 // ── ORG: assign a course to a staff member (enrol) ──
 route("POST", "/api/org/staff/:id/enrol", async (req, res) => {
   const s = authSession(req);
@@ -373,6 +386,9 @@ route("POST", "/api/staff/login", async (req, res) => {
   if (!b.email || !b.pin) return send(res, 400, { error: "Email and PIN are required." });
   const member = db.prepare("SELECT * FROM staff WHERE email = ? AND pin = ? AND active = 1").get(b.email, String(b.pin));
   if (!member) return send(res, 401, { error: "Incorrect email or PIN, or your licence is inactive." });
+  const memberOrg = db.prepare("SELECT active FROM organisations WHERE id = ?").get(member.org_id);
+  if (!memberOrg || memberOrg.active === 0)
+    return send(res, 403, { error: "This account has been deactivated. Please contact your organisation." });
 
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)")
@@ -552,7 +568,7 @@ route("POST", "/api/admin/login", async (req, res) => {
 // All companies + summary stats
 route("GET", "/api/admin/orgs", async (req, res) => {
   if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
-  const orgs = db.prepare("SELECT id,name,email,phone,cqc_number,created_at,credits FROM organisations ORDER BY created_at DESC").all();
+  const orgs = db.prepare("SELECT id,name,email,phone,cqc_number,created_at,credits,active FROM organisations ORDER BY created_at DESC").all();
   const result = orgs.map((o) => {
     const staff = db.prepare("SELECT id,active FROM staff WHERE org_id = ?").all(o.id);
     const ids = staff.map((s) => s.id);
@@ -563,7 +579,7 @@ route("GET", "/api/admin/orgs", async (req, res) => {
       if (mine.length && mine.every((e) => e.compliance === "valid")) fullyCompliant++;
     }
     return { id: o.id, name: o.name, email: o.email, phone: o.phone, cqcNumber: o.cqc_number, createdAt: o.created_at,
-             staffCount: staff.length, activeStaff: staff.filter((s) => s.active).length, enrolments: allEnr.length, fullyCompliant, credits: o.credits || 0 };
+             staffCount: staff.length, activeStaff: staff.filter((s) => s.active).length, enrolments: allEnr.length, fullyCompliant, credits: o.credits || 0, active: o.active !== 0 };
   });
   const totals = { organisations: orgs.length, staff: result.reduce((a, r) => a + r.staffCount, 0), enrolments: result.reduce((a, r) => a + r.enrolments, 0), credits: result.reduce((a, r) => a + r.credits, 0) };
   send(res, 200, { totals, orgs: result });
@@ -572,7 +588,7 @@ route("GET", "/api/admin/orgs", async (req, res) => {
 // One company + its staff (full detail)
 route("GET", "/api/admin/orgs/:id", async (req, res) => {
   if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
-  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits FROM organisations WHERE id = ?").get(req.params.id);
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,active FROM organisations WHERE id = ?").get(req.params.id);
   if (!org) return send(res, 404, { error: "Company not found." });
   const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? ORDER BY created_at DESC").all(org.id).map((member) => {
     const enr = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
@@ -582,7 +598,7 @@ route("GET", "/api/admin/orgs/:id", async (req, res) => {
              compliant: enr.length > 0 && enr.every((e) => e.compliance === "valid"), enrolments: enr };
   });
   const transactions = db.prepare("SELECT id,amount,balance_after,note,created_at FROM credit_transactions WHERE org_id = ? ORDER BY created_at DESC LIMIT 12").all(org.id);
-  send(res, 200, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits || 0 }, staff, transactions });
+  send(res, 200, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits || 0, active: org.active !== 0 }, staff, transactions });
 });
 
 // Add credits (prepaid course assignments) to a company's balance
@@ -604,6 +620,58 @@ route("POST", "/api/admin/orgs/:id/credits", async (req, res) => {
     .run(tx.id, tx.org_id, tx.amount, tx.balance_after, tx.note, tx.created_at);
   console.log(`💳 CREDITS ${amount > 0 ? "+" + amount : amount} to org ${org.id} → balance ${newBalance}${tx.note ? " (" + tx.note + ")" : ""}`);
   send(res, 200, { ok: true, credits: newBalance, transaction: tx });
+});
+
+// Create a new company (organisation) from the admin portal
+route("POST", "/api/admin/orgs", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const b = await readBody(req);
+  if (!b.name || !b.email || !b.password) return send(res, 400, { error: "Company name, email and password are required." });
+  if (b.password.length < 6) return send(res, 400, { error: "Password must be at least 6 characters." });
+  const email = b.email.toLowerCase();
+  if (db.prepare("SELECT id FROM organisations WHERE email = ?").get(email)) return send(res, 409, { error: "A company with this email already exists." });
+  const id = genId("ORG");
+  const { hash, salt } = hashPassword(b.password);
+  db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,phone,address,cqc_number,created_at)
+              VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(id, b.name, email, hash, salt, b.phone || null, b.address || null, b.cqcNumber || null, new Date().toISOString());
+  const startCredits = Math.trunc(Number(b.credits));
+  if (Number.isFinite(startCredits) && startCredits > 0) {
+    db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(startCredits, id);
+    db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+      .run(genId("CR"), id, startCredits, startCredits, "Opening balance", new Date().toISOString());
+  }
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,active FROM organisations WHERE id = ?").get(id);
+  console.log(`🏢 COMPANY CREATED: ${b.name} (${email}) by super admin`);
+  send(res, 201, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits, active: org.active !== 0 } });
+});
+
+// Update a company — deactivate/reactivate or edit details
+route("PATCH", "/api/admin/orgs/:id", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const org = db.prepare("SELECT * FROM organisations WHERE id = ?").get(req.params.id);
+  if (!org) return send(res, 404, { error: "Company not found." });
+  const b = await readBody(req);
+  const name = b.name ?? org.name;
+  const phone = b.phone ?? org.phone;
+  const address = b.address ?? org.address;
+  const cqc = b.cqcNumber ?? org.cqc_number;
+  const active = b.active === undefined ? org.active : (b.active ? 1 : 0);
+  db.prepare("UPDATE organisations SET name=?, phone=?, address=?, cqc_number=?, active=? WHERE id=?").run(name, phone, address, cqc, active, org.id);
+  if (b.active !== undefined && (active === 0) !== (org.active === 0))
+    console.log(`🏢 COMPANY ${active ? "REACTIVATED" : "DEACTIVATED"}: ${org.name} (${org.id})`);
+  const u = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,active FROM organisations WHERE id = ?").get(org.id);
+  send(res, 200, { org: { id: u.id, name: u.name, email: u.email, phone: u.phone, address: u.address, cqcNumber: u.cqc_number, createdAt: u.created_at, credits: u.credits, active: u.active !== 0 } });
+});
+
+// Reset a staff member's PIN on a company's behalf
+route("POST", "/api/admin/orgs/:id/staff/:sid/reset-pin", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ? AND org_id = ?").get(req.params.sid, req.params.id);
+  if (!member) return send(res, 404, { error: "Staff member not found." });
+  const pin = genPin();
+  db.prepare("UPDATE staff SET pin = ? WHERE id = ?").run(pin, member.id);
+  send(res, 200, { ok: true, pin, staff: { id: member.id, name: member.name, email: member.email } });
 });
 
 // Add a staff member to a company on its behalf

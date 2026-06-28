@@ -121,10 +121,13 @@ export function initSchema() {
     );
   `);
 
-  // Migration: give organisations a prepaid course-credit balance (idempotent — safe to re-run).
+  // Migrations on the organisations table (idempotent — safe to re-run).
   const orgCols = db.prepare("PRAGMA table_info(organisations)").all();
   if (!orgCols.some((c) => c.name === "credits")) {
     db.exec("ALTER TABLE organisations ADD COLUMN credits INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!orgCols.some((c) => c.name === "active")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
   }
 }
 

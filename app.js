@@ -35,6 +35,31 @@ function clearAuth() {
   localStorage.removeItem("c2l_kind");
 }
 
+// Remembered for PIN-reminder emails sent from the company portal.
+let c2lOrgName = "";
+// Remembered for PIN-reminder emails the super admin sends on a company's behalf.
+let c2lAdminOrgName = "";
+
+// Opens the user's own email app with a pre-filled PIN reminder for a staff member.
+function pinReminderMailto(name, email, pin, fromLabel) {
+  const origin = window.location.origin;
+  const subject = "Your Care2Learn login PIN";
+  const body =
+    `Hi ${name},\n\n` +
+    `Here is your Care2Learn login PIN: ${pin}\n\n` +
+    `How to log in:\n` +
+    `1. Go to ${origin}\n` +
+    `2. Choose "Staff Login"\n` +
+    `3. Enter your email (${email}) and your PIN\n\n` +
+    `Please keep this PIN private.\n\n` +
+    (fromLabel ? `Thanks,\n${fromLabel}` : `Thanks`);
+  const a = document.createElement("a");
+  a.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function el(html) {
   const t = document.createElement("template");
   t.innerHTML = html.trim();
@@ -400,6 +425,7 @@ let orgTab = "overview";
 async function renderOrgDash() {
   const me = await api("/org/me");
   const org = me.org;
+  c2lOrgName = org.name;
 
   App.innerHTML = "";
   App.appendChild(el(`
@@ -647,7 +673,14 @@ async function openStaffModal(staffId) {
       </div>
       <div class="info-row"><span>📧 ${esc(s.email)}</span><span>📅 Since ${fmtDate(s.startDate)}</span><span>${s.completedCount}/${s.assignedCount} completed</span></div>
 
-      <div style="padding:18px 22px 6px"><b style="font-size:15px">Assigned Courses</b></div>
+      <div style="padding:14px 22px 4px"><b style="font-size:15px">Login PIN</b></div>
+      <div style="padding:2px 22px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="pin-chip">PIN <b id="pinval">${esc(s.pin)}</b></span>
+        <button class="mini-btn" id="resetpin">🔑 Reset PIN</button>
+        <button class="mini-btn" id="remindpin">✉️ Email reminder</button>
+      </div>
+
+      <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5"><b style="font-size:15px">Assigned Courses</b></div>
       <div id="assigned"></div>
 
       <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5;margin-top:8px"><b style="font-size:15px">Assign a New Course</b></div>
@@ -659,6 +692,17 @@ async function openStaffModal(staffId) {
 
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   modal.querySelector("#close").onclick = () => overlay.remove();
+
+  modal.querySelector("#remindpin").onclick = () => pinReminderMailto(s.name, s.email, s.pin, c2lOrgName);
+  modal.querySelector("#resetpin").onclick = async () => {
+    if (!confirm(`Reset ${s.name}'s PIN? Their current PIN will stop working immediately.`)) return;
+    let r; try { r = await api(`/org/staff/${s.id}/reset-pin`, "POST"); } catch (e) { toast(e.message); return; }
+    s.pin = r.pin;
+    const pv = modal.querySelector("#pinval"); if (pv) pv.textContent = r.pin;
+    const hdrPin = modal.querySelector(".modal-h p"); if (hdrPin) hdrPin.innerHTML = `${esc(s.role)} · PIN ${esc(r.pin)}`;
+    toast(`New PIN for ${s.name}: ${r.pin}`);
+    if (confirm(`New PIN is ${r.pin}. Email it to ${s.name} now?`)) pinReminderMailto(s.name, s.email, r.pin, c2lOrgName);
+  };
 
   const assignedBox = modal.querySelector("#assigned");
   if (s.enrolments.length === 0) {
@@ -849,9 +893,12 @@ function paintAdminTab(data) {
 
 function paintAdminCompanies(body, data) {
   const t = data.totals;
-  body.appendChild(el(`
+  const intro = el(`
     <div>
-      <h1 style="margin-bottom:4px">All Companies</h1>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+        <h1 style="margin:0">All Companies</h1>
+        <button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#7C3AED">+ New Company</button>
+      </div>
       <p style="color:#5A6474;margin-bottom:18px">Every organisation registered on Care2Learn. Tap one to view and support it.</p>
       <div class="astats">
         <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${t.organisations}</div><div class="metric-l">Companies</div></div>
@@ -859,16 +906,18 @@ function paintAdminCompanies(body, data) {
         <div class="metric"><div class="metric-i">📋</div><div class="metric-v" style="color:#9B59B6">${t.enrolments}</div><div class="metric-l">Course Assignments</div></div>
         <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#16A34A">${t.credits || 0}</div><div class="metric-l">Total Credits</div></div>
       </div>
-    </div>`));
+    </div>`);
+  body.appendChild(intro);
+  intro.querySelector("#newco").onclick = () => openAdminNewCompany(() => renderAdminDash());
   if (!data.orgs.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`)); return; }
   const grid = el(`<div class="org-grid"></div>`);
   data.orgs.forEach(o => {
     const initials = (o.name || "?").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
     const row = el(`
-      <button class="org-row">
+      <button class="org-row${o.active ? "" : " inactive"}">
         <span class="org-ava">${esc(initials)}</span>
         <span class="org-row-body">
-          <span class="org-row-name">${esc(o.name)}</span>
+          <span class="org-row-name">${esc(o.name)}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
           <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
         </span>
         <span class="org-row-stats">
@@ -916,6 +965,7 @@ async function renderAdminOrg(orgId) {
   catch (e) { toast(e.message); return renderAdminDash(); }
   const { org, staff } = data;
   const transactions = data.transactions || [];
+  c2lAdminOrgName = org.name;
   App.innerHTML = "";
   const wrap = el(`<div></div>`);
   wrap.appendChild(adminHeader());
@@ -923,17 +973,31 @@ async function renderAdminOrg(orgId) {
   const back = el(`<button class="feedback-btn" style="margin-bottom:14px">← All companies</button>`);
   back.onclick = () => renderAdminDash();
   body.appendChild(back);
-  body.appendChild(el(`
-    <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:20px;margin-bottom:18px">
-      <h1 style="margin-bottom:8px">${esc(org.name)}</h1>
-      <div class="info-row" style="border:none;border-radius:0;padding:0;background:none">
-        <span>📧 ${esc(org.email)}</span>
-        ${org.phone ? `<span>📞 ${esc(org.phone)}</span>` : ""}
-        ${org.cqcNumber ? `<span>🏥 CQC ${esc(org.cqcNumber)}</span>` : ""}
-        <span>📅 Joined ${fmtDate(org.createdAt)}</span>
+  const infoCard = el(`
+    <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:20px;margin-bottom:14px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <h1 style="margin-bottom:8px">${esc(org.name)} ${org.active ? `<span class="on-badge">Active</span>` : `<span class="off-badge">Inactive</span>`}</h1>
+          <div class="info-row" style="border:none;border-radius:0;padding:0;background:none">
+            <span>📧 ${esc(org.email)}</span>
+            ${org.phone ? `<span>📞 ${esc(org.phone)}</span>` : ""}
+            ${org.cqcNumber ? `<span>🏥 CQC ${esc(org.cqcNumber)}</span>` : ""}
+            <span>📅 Joined ${fmtDate(org.createdAt)}</span>
+          </div>
+          ${org.address ? `<div style="font-size:13px;color:#7A8599;margin-top:8px">${esc(org.address)}</div>` : ""}
+        </div>
+        <button class="mini-btn ${org.active ? "danger" : ""}" id="togglecompany">${org.active ? "Deactivate company" : "Reactivate company"}</button>
       </div>
-      ${org.address ? `<div style="font-size:13px;color:#7A8599;margin-top:8px">${esc(org.address)}</div>` : ""}
-    </div>`));
+      ${org.active ? "" : `<div style="margin-top:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 12px;font-size:12px;color:#B91C1C">This company is deactivated — it and its staff cannot log in.</div>`}
+    </div>`);
+  body.appendChild(infoCard);
+  infoCard.querySelector("#togglecompany").onclick = async () => {
+    const deact = org.active;
+    if (deact && !confirm(`Deactivate ${org.name}? They and their staff will be unable to log in until you reactivate them.`)) return;
+    try { await api(`/admin/orgs/${orgId}`, "PATCH", { active: !org.active }); } catch (e) { toast(e.message); return; }
+    toast(deact ? `${org.name} deactivated.` : `${org.name} reactivated.`);
+    renderAdminOrg(orgId);
+  };
   const creditsCard = el(`
     <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
@@ -1050,6 +1114,58 @@ function openAdminCredits(orgId, currentBalance, onChange) {
   setTimeout(() => modal.querySelector("#acamt")?.focus(), 50);
 }
 
+function openAdminNewCompany(onCreated) {
+  const genPw = () => Math.random().toString(36).slice(2, 6) + "-" + Math.random().toString(36).slice(2, 6);
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-h"><div><h2>New Company</h2><p>Create an organisation account on Care2Learn</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="ncerr"></div>
+        <div class="fg"><label>Company name *</label><input class="inp" id="ncname" placeholder="Sunrise Care Ltd"></div>
+        <div class="fg"><label>Login email *</label><input class="inp" id="ncemail" type="email" placeholder="manager@sunrisecare.co.uk"></div>
+        <div class="fg"><label>Temporary password *</label>
+          <div style="display:flex;gap:8px">
+            <input class="inp" id="ncpw" placeholder="At least 6 characters" style="flex:1">
+            <button class="mini-btn" id="ncgen" type="button">Generate</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="fg" style="flex:1;min-width:140px"><label>Phone</label><input class="inp" id="ncphone" placeholder="Optional"></div>
+          <div class="fg" style="flex:1;min-width:140px"><label>CQC number</label><input class="inp" id="nccqc" placeholder="Optional"></div>
+        </div>
+        <div class="fg"><label>Address</label><input class="inp" id="ncaddr" placeholder="Optional"></div>
+        <div class="fg"><label>Opening course credits</label><input class="inp" id="nccredits" type="number" inputmode="numeric" placeholder="0"></div>
+        <button class="btn-auth" id="nccreate" style="background:#7C3AED">Create company</button>
+        <p class="fb-note">You'll see the login details next so you can share them with the company.</p>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#ncgen").onclick = () => { modal.querySelector("#ncpw").value = genPw(); };
+  modal.querySelector("#nccreate").onclick = async () => {
+    const name = val("ncname"), email = val("ncemail"), password = val("ncpw");
+    const errBox = modal.querySelector("#ncerr"); errBox.innerHTML = "";
+    if (!name || !email || !password) { errBox.innerHTML = `<div class="err">Name, email and password are required.</div>`; return; }
+    if (password.length < 6) { errBox.innerHTML = `<div class="err">Password must be at least 6 characters.</div>`; return; }
+    const payload = { name, email, password, phone: val("ncphone"), address: val("ncaddr"), cqcNumber: val("nccqc") };
+    const credits = parseInt(val("nccredits"), 10); if (Number.isFinite(credits) && credits > 0) payload.credits = credits;
+    let r; try { r = await api("/admin/orgs", "POST", payload); } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+    modal.innerHTML = `<div style="padding:34px 28px;text-align:center">
+      <div style="font-size:50px;margin-bottom:8px">🎉</div>
+      <h2 style="font-size:20px;font-weight:800;margin-bottom:10px">${esc(name)} created</h2>
+      <div style="background:#F6F8FB;border-radius:12px;padding:16px;text-align:left;font-size:14px;max-width:360px;margin:0 auto 18px">
+        <div style="margin-bottom:6px"><b>Login email:</b> ${esc(email)}</div>
+        <div><b>Password:</b> ${esc(password)}</div>
+      </div>
+      <p style="color:#7A8599;font-size:13px;max-width:340px;margin:0 auto 18px">Share these with the company. They can change the password after logging in.</p>
+      <button class="btn-auth" id="ncdone" style="max-width:200px;margin:0 auto;background:#7C3AED">Done</button></div>`;
+    modal.querySelector("#ncdone").onclick = () => { overlay.remove(); onCreated && onCreated(); };
+  };
+  setTimeout(() => modal.querySelector("#ncname")?.focus(), 50);
+}
+
 function openAdminStaffModal(orgId, staff, onChange) {
   const assignedIds = staff.enrolments.map(e => e.courseId);
   const available = state.courses.filter(c => !assignedIds.includes(c.id));
@@ -1062,7 +1178,12 @@ function openAdminStaffModal(orgId, staff, onChange) {
       </div>
       <div style="padding:14px 22px"><span class="pill" style="background:${staff.active ? "#16A34A18" : "#94A3B818"};color:${staff.active ? "#15803D" : "#64748B"}">${staff.active ? "Active licence" : "Inactive licence"}</span>
         <button class="mini-btn" id="toggle" style="margin-left:8px">${staff.active ? "Deactivate" : "Reactivate"}</button></div>
-      <div style="padding:6px 22px 4px"><b style="font-size:15px">Assigned Courses (${staff.enrolments.length})</b></div>
+      <div style="padding:0 22px 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="pin-chip">PIN <b id="apinval">${esc(staff.pin)}</b></span>
+        <button class="mini-btn" id="aresetpin">🔑 Reset PIN</button>
+        <button class="mini-btn" id="aremindpin">✉️ Email reminder</button>
+      </div>
+      <div style="padding:6px 22px 4px;border-top:1px solid #F0F2F5"><b style="font-size:15px">Assigned Courses (${staff.enrolments.length})</b></div>
       <div id="assigned" style="padding:0 22px"></div>
       <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5;margin-top:8px"><b style="font-size:15px">Assign a Course</b></div>
       <div style="padding:0 22px 20px" id="assign-slot"></div>
@@ -1070,6 +1191,16 @@ function openAdminStaffModal(orgId, staff, onChange) {
   overlay.appendChild(modal); document.body.appendChild(overlay);
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   modal.querySelector("#close").onclick = () => overlay.remove();
+
+  modal.querySelector("#aremindpin").onclick = () => pinReminderMailto(staff.name, staff.email, staff.pin, c2lAdminOrgName);
+  modal.querySelector("#aresetpin").onclick = async () => {
+    if (!confirm(`Reset ${staff.name}'s PIN? Their current PIN will stop working immediately.`)) return;
+    let r; try { r = await api(`/admin/orgs/${orgId}/staff/${staff.id}/reset-pin`, "POST"); } catch (e) { toast(e.message); return; }
+    staff.pin = r.pin;
+    const pv = modal.querySelector("#apinval"); if (pv) pv.textContent = r.pin;
+    toast(`New PIN for ${staff.name}: ${r.pin}`);
+    if (confirm(`New PIN is ${r.pin}. Email it to ${staff.name} now?`)) pinReminderMailto(staff.name, staff.email, r.pin, c2lAdminOrgName);
+  };
 
   const assignedBox = modal.querySelector("#assigned");
   if (!staff.enrolments.length) assignedBox.appendChild(el(`<div style="color:#94A3B8;font-size:13px;padding:8px 0">No courses assigned yet.</div>`));
