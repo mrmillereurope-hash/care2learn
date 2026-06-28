@@ -537,17 +537,118 @@ function referralCard(referral, opts) {
           <li>They enter your code when they sign up for Care2Learn.</li>
           <li>When they make their first credit purchase, you receive ${reward} credits — automatically.</li>
         </ol>
+        <div class="refer-terms-line">By taking part you agree to the <button class="linkbtn" id="refterms">Referral Programme Terms &amp; Conditions</button>.</div>
       </div>
     </div>`);
   const copy = (text, msg) => { try { navigator.clipboard.writeText(text); toast(msg); } catch { toast(text); } };
   wrap.querySelector("#copycode").onclick = () => copy(code, "Referral code copied.");
   wrap.querySelector("#copylink").onclick = () => copy(link, "Invite link copied.");
+  wrap.querySelector("#refterms").onclick = () => showReferralTerms();
   wrap.querySelector("#emaillink").onclick = () => {
     const subject = encodeURIComponent("Join me on Care2Learn");
     const bodyTxt = encodeURIComponent(`Hi,\n\nI use Care2Learn for care training and thought you'd find it useful too.\n\nUse my referral code ${code} when you sign up, or just follow this link:\n${link}\n\nThanks!`);
     window.location.href = `mailto:?subject=${subject}&body=${bodyTxt}`;
   };
   return wrap;
+}
+
+// Referral Programme Terms & Conditions — shown in a modal from the Refer & earn card
+// (used by both organisation accounts and individual/self-employed carer accounts).
+function showReferralTerms() {
+  const updated = "28 June 2026";
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal terms-modal">
+      <div class="modal-h">
+        <div><h2>Referral Programme Terms &amp; Conditions</h2><p>Care2Learn “Refer &amp; Earn” · Last updated ${updated}</p></div>
+        <button class="x" id="close">✕</button>
+      </div>
+      <div class="terms-doc">
+        <p class="terms-intro">These terms govern the Care2Learn “Refer &amp; Earn” referral programme (the “Programme”). They apply to everyone who takes part, whether you hold an <b>organisation account</b> (a care business or other company) or an <b>individual account</b> (a self-employed carer). By sharing your referral code or invite link, or otherwise taking part, you agree to these terms.</p>
+
+        <h3>1. Who can take part</h3>
+        <ul>
+          <li>You must hold an active Care2Learn account in good standing.</li>
+          <li>Each account has one unique referral code, issued automatically.</li>
+          <li>You may not refer yourself, and you may not use the Programme to obtain credits on your own account through additional or duplicate sign-ups.</li>
+          <li>The person or organisation you refer (the “Referred Account”) must be <b>new</b> to Care2Learn and must not already hold, or previously have held, a Care2Learn account.</li>
+        </ul>
+
+        <h3>2. How to refer someone</h3>
+        <ul>
+          <li>Share your referral code or personal invite link with care businesses or carers you know who would genuinely benefit from Care2Learn.</li>
+          <li>The Referred Account must enter your referral code <b>when they register</b>. A code cannot be added to an account after sign-up, and only one referral code may be applied per Referred Account.</li>
+          <li>Only the first valid referral code entered by a Referred Account will be recognised.</li>
+        </ul>
+
+        <h3>3. How you earn a reward</h3>
+        <ul>
+          <li>A referral becomes eligible for a reward only once the Referred Account makes its <b>first credit purchase</b>. Signing up alone does not earn a reward — this protects the Programme against misuse.</li>
+          <li>When that first purchase is made, the reward is added to your credit balance automatically, subject to these terms and to the checks in section 5.</li>
+          <li>You earn <b>one reward per Referred Account</b>. You cannot earn more than once for the same account, even if it makes further purchases.</li>
+          <li>There is <b>no limit</b> on the number of different people or organisations you can refer, or on the total number of credits you can earn.</li>
+        </ul>
+
+        <h3>4. Reward amounts</h3>
+        <p>The reward is paid in Care2Learn course credits and is based on the account type of the person making the referral (you):</p>
+        <ul>
+          <li><b>Organisation accounts (care businesses / companies):</b> 50 course credits per successful referral.</li>
+          <li><b>Individual accounts (self-employed carers):</b> 14 course credits per successful referral.</li>
+        </ul>
+        <p>The current reward rate that applies to your account is always shown on your “Refer &amp; Earn” page. Care2Learn may change the reward rate at any time; the rate shown on your dashboard at the time the Referred Account makes its first purchase is the rate that applies.</p>
+
+        <h3>5. Reviews, fair use and anti-abuse</h3>
+        <ul>
+          <li>Care2Learn may review any referral before or after a reward is credited and may decline, withhold, or reverse a reward where these terms are not met.</li>
+          <li>We may decline rewards and/or suspend or remove a participant from the Programme if we reasonably suspect abuse. This includes (without limitation): self-referral; creating fake, duplicate or automated accounts; sign-ups that are not genuine; spam or unsolicited bulk messaging; impersonating Care2Learn; or any attempt to manipulate the Programme.</li>
+          <li>Where a referral is declined, no reward will be credited for that Referred Account.</li>
+          <li>Care2Learn’s decision on the eligibility of any referral is final.</li>
+        </ul>
+
+        <h3>6. About course credits</h3>
+        <ul>
+          <li>One course credit covers one course for one learner.</li>
+          <li>Credits earned through the Programme do not expire.</li>
+          <li>Credits have no cash value. They cannot be exchanged for money, transferred to another account, or refunded, and they may only be used within Care2Learn.</li>
+        </ul>
+
+        <h3>7. Closed, suspended or inactive accounts</h3>
+        <ul>
+          <li>If your account is closed, suspended or made inactive, you may stop being eligible to earn or use referral rewards, and unused credits may be forfeited.</li>
+          <li>If a Referred Account is closed, suspended, or found to be ineligible, any related reward may be withheld or reversed.</li>
+        </ul>
+
+        <h3>8. How you may share your code</h3>
+        <ul>
+          <li>You may only share your code and link with people who would reasonably expect to hear from you and who may have a genuine interest in Care2Learn.</li>
+          <li>You must not send spam or unsolicited bulk communications, post your code on unrelated or misleading channels, bid on or advertise against Care2Learn brand terms, or suggest that you represent or speak for Care2Learn.</li>
+        </ul>
+
+        <h3>9. Tax</h3>
+        <p>You are responsible for determining and meeting any tax or reporting obligations that may arise from taking part in the Programme or receiving rewards. This is particularly relevant for businesses and self-employed individuals. Care2Learn does not provide tax advice.</p>
+
+        <h3>10. Changes to or withdrawal of the Programme</h3>
+        <p>Care2Learn may change these terms, change the rewards, or suspend or end the Programme at any time. Where changes are material, we will take reasonable steps to make participants aware. Continuing to take part after a change takes effect means you accept the updated terms. Rewards already validly credited to your balance before a change will not be removed solely because the Programme changes.</p>
+
+        <h3>11. General</h3>
+        <p>The Programme is provided on an “as is” basis. Nothing in these terms limits or excludes any rights you have under applicable law, including your statutory rights as a consumer, or any liability that cannot lawfully be limited or excluded. To the extent permitted by law, Care2Learn is not liable for any indirect or unforeseeable loss arising from the Programme.</p>
+
+        <h3>12. Governing law</h3>
+        <p>These terms and any dispute relating to the Programme are governed by the laws of England and Wales, and are subject to the non-exclusive jurisdiction of the courts of England and Wales.</p>
+
+        <h3>13. Contact</h3>
+        <p>If you have any questions about the Programme or these terms, please contact us via the in-app <b>Feedback</b> option or at <a href="mailto:support@care2learn.co.uk">support@care2learn.co.uk</a>.</p>
+      </div>
+      <div class="terms-foot">
+        <button class="btn-save" id="termsok" style="background:#1B2A4A">Got it</button>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#termsok").onclick = () => overlay.remove();
 }
 
 async function renderOrgDash() {
