@@ -256,46 +256,66 @@ function newReferralCode() {
 }
 // At signup: validate the code and record who referred this account — but DON'T pay out yet.
 // The reward is held until the referred account makes its first purchase (anti-abuse).
+// Wrapped so a referral problem can never block account creation — it just quietly no-ops.
 function recordReferralIntent(code, newOrgId) {
-  if (!code) return { recorded: false };
-  const norm = String(code).trim().toUpperCase();
-  if (!norm) return { recorded: false };
-  const referrer = db.prepare("SELECT id, active FROM organisations WHERE referral_code = ?").get(norm);
-  if (!referrer || referrer.id === newOrgId || referrer.active === 0) return { recorded: false };
-  db.prepare("UPDATE organisations SET referred_by_code = ? WHERE id = ?").run(norm, newOrgId);
-  return { recorded: true };
+  try {
+    if (!code) return { recorded: false };
+    const norm = String(code).trim().toUpperCase();
+    if (!norm) return { recorded: false };
+    const referrer = db.prepare("SELECT id, active FROM organisations WHERE referral_code = ?").get(norm);
+    if (!referrer || referrer.id === newOrgId || referrer.active === 0) return { recorded: false };
+    db.prepare("UPDATE organisations SET referred_by_code = ? WHERE id = ?").run(norm, newOrgId);
+    return { recorded: true };
+  } catch (e) {
+    console.error("recordReferralIntent failed (registration continues):", e.message);
+    return { recorded: false };
+  }
 }
 // Called when a referred account first acquires paid credits. Pays the referrer once (idempotent).
 function maybeRewardReferral(orgId, reason) {
-  const acct = db.prepare("SELECT id, name, referred_by_code FROM organisations WHERE id = ?").get(orgId);
-  if (!acct || !acct.referred_by_code) return { rewarded: false };
-  if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(orgId)) return { rewarded: false }; // already paid
-  const referrer = db.prepare("SELECT id, name, account_type, active, credits FROM organisations WHERE referral_code = ?").get(acct.referred_by_code);
-  if (!referrer || referrer.id === orgId || referrer.active === 0) return { rewarded: false };
-  const reward = rewardForType(referrer.account_type);
-  inTransaction(() => {
-    const bal = (referrer.credits || 0) + reward;
-    db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(bal, referrer.id);
-    db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
-      .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — ${acct.name} made their first purchase`, new Date().toISOString());
-    db.prepare("INSERT INTO referrals (id,referrer_org_id,referred_org_id,code,credits,created_at) VALUES (?,?,?,?,?,?)")
-      .run(genId("REF"), referrer.id, orgId, acct.referred_by_code, reward, new Date().toISOString());
-  });
-  console.log(`🎁 REFERRAL PAID: ${referrer.name} earned ${reward} credits — ${acct.name} ${reason || "made a purchase"}`);
-  return { rewarded: true, reward };
+  try {
+    const acct = db.prepare("SELECT id, name, referred_by_code FROM organisations WHERE id = ?").get(orgId);
+    if (!acct || !acct.referred_by_code) return { rewarded: false };
+    if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(orgId)) return { rewarded: false }; // already paid
+    const referrer = db.prepare("SELECT id, name, account_type, active, credits FROM organisations WHERE referral_code = ?").get(acct.referred_by_code);
+    if (!referrer || referrer.id === orgId || referrer.active === 0) return { rewarded: false };
+    const reward = rewardForType(referrer.account_type);
+    inTransaction(() => {
+      const bal = (referrer.credits || 0) + reward;
+      db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(bal, referrer.id);
+      db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+        .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — ${acct.name} made their first purchase`, new Date().toISOString());
+      db.prepare("INSERT INTO referrals (id,referrer_org_id,referred_org_id,code,credits,created_at) VALUES (?,?,?,?,?,?)")
+        .run(genId("REF"), referrer.id, orgId, acct.referred_by_code, reward, new Date().toISOString());
+    });
+    console.log(`🎁 REFERRAL PAID: ${referrer.name} earned ${reward} credits — ${acct.name} ${reason || "made a purchase"}`);
+    return { rewarded: true, reward };
+  } catch (e) {
+    console.error("maybeRewardReferral failed (purchase continues):", e.message);
+    return { rewarded: false };
+  }
 }
 function referralSummary(orgId) {
-  const org = db.prepare("SELECT referral_code, account_type FROM organisations WHERE id = ?").get(orgId);
-  const code = org ? org.referral_code : null;
-  const rewarded = db.prepare("SELECT credits FROM referrals WHERE referrer_org_id = ?").all(orgId);
-  const referredCount = code ? db.prepare("SELECT COUNT(*) AS n FROM organisations WHERE referred_by_code = ?").get(code).n : 0;
-  return {
-    code,
-    rewardPerReferral: rewardForType(org ? org.account_type : "company"),
-    count: rewarded.length,                                   // referrals that have paid out (made a purchase)
-    creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0),
-    pending: Math.max(0, referredCount - rewarded.length),    // signed up, not yet purchased
-  };
+  try {
+    const org = db.prepare("SELECT referral_code, account_type FROM organisations WHERE id = ?").get(orgId);
+    const code = org ? org.referral_code : null;
+    const rewarded = db.prepare("SELECT credits FROM referrals WHERE referrer_org_id = ?").all(orgId);
+    let pending = 0;
+    try {
+      const referredCount = code ? db.prepare("SELECT COUNT(*) AS n FROM organisations WHERE referred_by_code = ?").get(code).n : 0;
+      pending = Math.max(0, referredCount - rewarded.length);   // signed up, not yet purchased
+    } catch (e) { console.error("referralSummary pending count failed:", e.message); }
+    return {
+      code,
+      rewardPerReferral: rewardForType(org ? org.account_type : "company"),
+      count: rewarded.length,                                   // referrals that have paid out (made a purchase)
+      creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0),
+      pending,
+    };
+  } catch (e) {
+    console.error("referralSummary failed:", e.message);
+    return { code: null, rewardPerReferral: 0, count: 0, creditsEarned: 0, pending: 0 };
+  }
 }
 
 // Grant credits for a completed checkout session — idempotent (one grant per session id).
