@@ -283,6 +283,60 @@ function buildCalculator() {
   return wrap;
 }
 
+// ─── FAQ (collapsible, toggles between organisations and care professionals) ──
+const FAQ = {
+  org: [
+    { q: "How do I get my organisation set up?", a: "Register your organisation in a couple of minutes, then add your carers as staff and assign the courses they need. Your staff, courses, certificates and compliance all live in one dashboard." },
+    { q: "How does pricing work?", a: "Two simple options: a subscription at £2 per carer per month with volume discounts as your team grows, or pay as you go at £4 per course per carer with no commitment. Use the calculator above to estimate your cost." },
+    { q: "Are the courses aligned with CQC and Skills for Care requirements?", a: "Yes. Our courses cover the statutory and mandatory training expected in adult social care and include the full 16-standard Care Certificate, so you're ready for a CQC inspection." },
+    { q: "How do I track compliance and certificates?", a: "Your dashboard shows each carer's progress in real time and highlights anyone whose training is due or expiring. When a carer passes, a dated certificate is generated automatically." },
+    { q: "Can I manage carers and courses at any time?", a: "Absolutely. Add carers, assign or remove courses, deactivate or reactivate licences, and reset PINs whenever you need — there's no lock-in." },
+    { q: "What are course credits?", a: "Credits are a prepaid balance for pay-as-you-go training: one credit covers one course for one carer. Credits never expire, so you can buy in advance and use them whenever it suits you." },
+  ],
+  staff: [
+    { q: "How do I log in?", a: "Your manager will give you an email and a 4-digit PIN. Choose ‘Staff Login’ on the home page and enter them — that's all you need." },
+    { q: "How do I complete a course?", a: "Open an assigned course, work through the short lessons at your own pace, then take the quiz at the end. You can revisit any lesson before you answer." },
+    { q: "Do I get a certificate?", a: "Yes. The moment you pass, your certificate is issued instantly and you can view or download it from your portal at any time." },
+    { q: "Can I learn on my phone and at my own pace?", a: "Yes. Care2Learn works on phones, tablets and computers, and your progress is saved as you go — so you can stop and pick up exactly where you left off." },
+    { q: "What is the Care Certificate?", a: "It's a set of 16 standards every new carer in adult social care should meet. On Care2Learn it's broken into short modules you can complete in any order, with a certificate at the end." },
+    { q: "What if I forget my PIN?", a: "No problem — ask your manager to reset it or email you a reminder. You'll receive a new PIN you can use straight away." },
+  ],
+};
+function buildFAQ() {
+  const wrap = el(`
+    <div class="faq-band">
+      <div class="faq-inner">
+        <div class="faq-head">
+          <h2>Frequently asked questions</h2>
+          <p>Answers for care providers and for the carers using Care2Learn.</p>
+        </div>
+        <div class="faq-toggle">
+          <button data-aud="org">For Organisations</button>
+          <button data-aud="staff">For Care Professionals</button>
+        </div>
+        <div class="faq-list" id="faq-list"></div>
+      </div>
+    </div>`);
+  let aud = "org";
+  const listEl = wrap.querySelector("#faq-list");
+  function render() {
+    wrap.querySelectorAll(".faq-toggle button").forEach(b => b.classList.toggle("active", b.dataset.aud === aud));
+    listEl.innerHTML = "";
+    FAQ[aud].forEach(item => {
+      const it = el(`
+        <div class="faq-item">
+          <button class="faq-q"><span>${esc(item.q)}</span><span class="faq-ico">+</span></button>
+          <div class="faq-a"><p>${esc(item.a)}</p></div>
+        </div>`);
+      it.querySelector(".faq-q").onclick = () => it.classList.toggle("open");
+      listEl.appendChild(it);
+    });
+  }
+  wrap.querySelectorAll(".faq-toggle button").forEach(b => b.onclick = () => { aud = b.dataset.aud; render(); });
+  render();
+  return wrap;
+}
+
 function renderLanding() {
   App.innerHTML = "";
   App.appendChild(el(`
@@ -308,12 +362,13 @@ function renderLanding() {
         </div>
         <div class="lcard">
           <div class="lcard-icon">👤</div>
-          <h2>For Care Workers</h2>
+          <h2>For Care Professionals</h2>
           <p>Access the courses your manager has assigned, complete assessments, and download your certificates.</p>
           <button class="btn-primary green" id="go-staff-login">Staff Login</button>
         </div>
       </div>
       <div id="calc-slot"></div>
+      <div id="faq-slot"></div>
       <div class="footer">Aligned to the Care Certificate 2026 · CQC Inspection Ready · Powered by Care2Learn</div>
     </div>
   `));
@@ -321,6 +376,7 @@ function renderLanding() {
   document.getElementById("go-org-reg").onclick = renderOrgRegister;
   document.getElementById("go-staff-login").onclick = renderStaffLogin;
   document.getElementById("calc-slot").appendChild(buildCalculator());
+  document.getElementById("faq-slot").appendChild(buildFAQ());
 }
 
 // ─── ORG REGISTER ─────────────────────────────────────────────────────────────
@@ -618,7 +674,7 @@ function showAddStaffForm(slot) {
       <div class="row2">
         <div class="fg"><label>Job Role</label>
           <select class="inp" id="a-role">
-            ${["Care Assistant","Senior Carer","Team Leader","Deputy Manager","Registered Manager","Support Worker","Nurse","Other"].map(r=>`<option>${r}</option>`).join("")}
+            ${["Care Assistant","Senior Carer","Team Leader","Deputy Manager","Registered Manager","Support Carer","Nurse","Other"].map(r=>`<option>${r}</option>`).join("")}
           </select>
         </div>
         <div class="fg"><label>Start Date</label><input class="inp" id="a-start" type="date" value="${new Date().toISOString().split("T")[0]}"></div>

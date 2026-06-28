@@ -41,6 +41,24 @@
   .plan-toggle button.active{background:#fff;color:#1B2A4A;box-shadow:0 2px 6px rgba(0,0,0,.18)}
   .plan-toggle button span{font-size:11px;font-weight:600;color:#9FB0C4}
   .plan-toggle button.active span{color:#7A8599}
+  /* FAQ section */
+  .faq-band{background:#F4F7FB;padding:50px 20px}
+  .faq-inner{max-width:760px;margin:0 auto}
+  .faq-head{text-align:center;margin-bottom:6px}
+  .faq-head h2{font-size:26px;font-weight:800;color:#1B2A4A;margin-bottom:6px}
+  .faq-head p{font-size:14px;color:#5A6474}
+  .faq-toggle{display:flex;background:#E6ECF3;border-radius:30px;padding:5px;max-width:430px;margin:18px auto 22px;gap:4px}
+  .faq-toggle button{flex:1;border:none;background:transparent;padding:10px 12px;border-radius:24px;font-size:14px;font-weight:700;color:#5A6474;cursor:pointer;transition:all .15s}
+  .faq-toggle button.active{background:#fff;color:#1B2A4A;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+  .faq-list{display:flex;flex-direction:column;gap:10px}
+  .faq-item{background:#fff;border:1px solid #E3E9F0;border-radius:12px;overflow:hidden}
+  .faq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;background:none;border:none;text-align:left;font-size:15px;font-weight:700;color:#1B2A4A;cursor:pointer;line-height:1.4}
+  .faq-q:hover{background:#F8FAFC}
+  .faq-ico{flex:0 0 auto;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:300;color:#2980B9;transition:transform .2s}
+  .faq-item.open .faq-ico{transform:rotate(45deg)}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .25s ease}
+  .faq-item.open .faq-a{max-height:360px}
+  .faq-a p{font-size:14px;color:#5A6474;line-height:1.65;margin:0;padding:0 18px 16px}
   .plan-card{display:grid;grid-template-columns:1fr 1fr;gap:28px;background:#fff;border:1px solid #E8ECF0;border-radius:16px;padding:30px;box-shadow:0 4px 22px rgba(13,27,42,.07)}
   .plan-left h3{font-size:20px;font-weight:800;color:#1B2A4A;margin-bottom:10px}
   .plan-left p{font-size:14px;color:#5A6474;line-height:1.6;margin-bottom:18px}
@@ -582,7 +600,7 @@ const COURSES = [
       { heading: "Your Wellbeing & Security", visual: "compare",
         visualData: { left: { title: "Your wellbeing", items: ["Recognise signs of stress and burnout", "Take your breaks", "Follow safe lone-working procedures", "Ask for support — it's a strength"] }, right: { title: "Security measures", items: ["Check the identity of visitors", "Keep premises and keys secure", "Protect personal and care records", "Report anything that feels unsafe"] } },
         body: "Health and safety also covers your own mental health and personal wellbeing, and keeping people, premises and information secure.",
-        points: ["Your employer has a duty to protect your wellbeing too", "Lone workers should have a check-in system and a way to raise the alarm", "Never share door codes or service users' information", "Speak up early — small concerns are easier to resolve"] },
+        points: ["Your employer has a duty to protect your wellbeing too", "Lone carers should have a check-in system and a way to raise the alarm", "Never share door codes or service users' information", "Speak up early — small concerns are easier to resolve"] },
     ],
     quiz: [
       { q: "What is the primary health and safety law in the UK?", options: ["Management Regs 1999", "Health and Safety at Work Act 1974", "RIDDOR 2013", "Manual Handling Regs 1992"], answer: 1, explanation: "HASAWA 1974 is the primary, overarching legislation." },
@@ -670,7 +688,7 @@ const COURSES = [
       { q: "A service user with capacity refuses their medication. What should you do?", options: ["Give it anyway", "Respect their choice, record it and inform your supervisor", "Call 999", "Get next-of-kin consent"], answer: 1, explanation: "A person with capacity may refuse treatment; forcing it would be unlawful." },
       { q: "A manager instructs you to do something you believe is unsafe. What do you do?", options: ["Follow it without question", "Leave your shift", "Raise your concern and escalate if it isn't resolved", "Comply quietly"], answer: 2, explanation: "Your duty of care takes precedence over an unsafe instruction; raise and escalate concerns." },
       { q: "How should you respond to a complaint?", options: ["Defend yourself firmly", "Listen, apologise for the distress and report it", "Ignore it if you disagree", "Tell them to put it in writing only"], answer: 1, explanation: "Listen, acknowledge the distress, record it and follow the complaints procedure." },
-      { q: "What protects a worker who reports wrongdoing in good faith?", options: ["The Care Act 2014", "The Public Interest Disclosure Act", "RIDDOR", "COSHH"], answer: 1, explanation: "The Public Interest Disclosure Act 1998 protects whistleblowers acting in good faith." },
+      { q: "What protects a carer who reports wrongdoing in good faith?", options: ["The Care Act 2014", "The Public Interest Disclosure Act", "RIDDOR", "COSHH"], answer: 1, explanation: "The Public Interest Disclosure Act 1998 protects whistleblowers acting in good faith." },
     ],
   },
 
@@ -772,7 +790,7 @@ const COURSES = [
     slides: [
       { heading: "Why It Matters", visual: "stat",
         visualData: { stats: [{ n: "#1", l: "Cause of injury in social care" }, { n: "MSDs", l: "Musculoskeletal disorders" }, { n: "0", l: "Manual lifts where a hoist exists" }] },
-        body: "Musculoskeletal injuries are the most common cause of harm to care workers. Safe handling protects everyone.",
+        body: "Musculoskeletal injuries are the most common cause of harm to carers. Safe handling protects everyone.",
         points: ["Never lift a person manually if an aid is available", "Poor technique causes long-term back injury", "Equipment exists to keep both of you safe"] },
       { heading: "The Legislation", visual: "grid",
         visualData: { items: ["HASAWA 1974", "Manual Handling Ops 1992", "LOLER 1998", "PUWER 1998", "Management Regs 1999"] },
@@ -920,7 +938,7 @@ const COURSES = [
         points: ["Don't assume new symptoms are 'just part of' their condition", "Take physical health concerns seriously and act on them", "Make sure eligible people get their annual health check", "Always listen to families and carers who know the person best"] },
     ],
     quiz: [
-      { q: "The Oliver McGowan Mandatory Training is named after a young man who was…", options: ["A care worker", "An autistic man with a learning disability who died avoidably", "A doctor", "A government minister"], answer: 1, explanation: "Oliver McGowan was an autistic young man with a learning disability whose avoidable death led to the training." },
+      { q: "The Oliver McGowan Mandatory Training is named after a young man who was…", options: ["A carer", "An autistic man with a learning disability who died avoidably", "A doctor", "A government minister"], answer: 1, explanation: "Oliver McGowan was an autistic young man with a learning disability whose avoidable death led to the training." },
       { q: "Which law made this training a legal requirement?", options: ["Care Act 2014", "Health and Care Act 2022", "Mental Health Act 1983", "Equality Act 2010"], answer: 1, explanation: "The Health and Care Act 2022 introduced the requirement." },
       { q: "Is autism the same as a learning disability?", options: ["Yes, they are identical", "No — they are different, though a person can have both", "Autism is a mental illness", "A learning disability is a type of autism"], answer: 1, explanation: "They are different; some people are both autistic and have a learning disability." },
       { q: "What is a 'reasonable adjustment'?", options: ["A change that helps a person access care equally", "A reduction in their care", "A medical procedure", "A type of medication"], answer: 0, explanation: "A reasonable adjustment is a change that helps a person access care equally, required under the Equality Act 2010." },
@@ -2084,6 +2102,60 @@ function buildCalculator() {
   return wrap;
 }
 
+// ─── FAQ (collapsible, toggles between organisations and care professionals) ──
+const FAQ = {
+  org: [
+    { q: "How do I get my organisation set up?", a: "Register your organisation in a couple of minutes, then add your carers as staff and assign the courses they need. Your staff, courses, certificates and compliance all live in one dashboard." },
+    { q: "How does pricing work?", a: "Two simple options: a subscription at £2 per carer per month with volume discounts as your team grows, or pay as you go at £4 per course per carer with no commitment. Use the calculator above to estimate your cost." },
+    { q: "Are the courses aligned with CQC and Skills for Care requirements?", a: "Yes. Our courses cover the statutory and mandatory training expected in adult social care and include the full 16-standard Care Certificate, so you're ready for a CQC inspection." },
+    { q: "How do I track compliance and certificates?", a: "Your dashboard shows each carer's progress in real time and highlights anyone whose training is due or expiring. When a carer passes, a dated certificate is generated automatically." },
+    { q: "Can I manage carers and courses at any time?", a: "Absolutely. Add carers, assign or remove courses, deactivate or reactivate licences, and reset PINs whenever you need — there's no lock-in." },
+    { q: "What are course credits?", a: "Credits are a prepaid balance for pay-as-you-go training: one credit covers one course for one carer. Credits never expire, so you can buy in advance and use them whenever it suits you." },
+  ],
+  staff: [
+    { q: "How do I log in?", a: "Your manager will give you an email and a 4-digit PIN. Choose ‘Staff Login’ on the home page and enter them — that's all you need." },
+    { q: "How do I complete a course?", a: "Open an assigned course, work through the short lessons at your own pace, then take the quiz at the end. You can revisit any lesson before you answer." },
+    { q: "Do I get a certificate?", a: "Yes. The moment you pass, your certificate is issued instantly and you can view or download it from your portal at any time." },
+    { q: "Can I learn on my phone and at my own pace?", a: "Yes. Care2Learn works on phones, tablets and computers, and your progress is saved as you go — so you can stop and pick up exactly where you left off." },
+    { q: "What is the Care Certificate?", a: "It's a set of 16 standards every new carer in adult social care should meet. On Care2Learn it's broken into short modules you can complete in any order, with a certificate at the end." },
+    { q: "What if I forget my PIN?", a: "No problem — ask your manager to reset it or email you a reminder. You'll receive a new PIN you can use straight away." },
+  ],
+};
+function buildFAQ() {
+  const wrap = el(`
+    <div class="faq-band">
+      <div class="faq-inner">
+        <div class="faq-head">
+          <h2>Frequently asked questions</h2>
+          <p>Answers for care providers and for the carers using Care2Learn.</p>
+        </div>
+        <div class="faq-toggle">
+          <button data-aud="org">For Organisations</button>
+          <button data-aud="staff">For Care Professionals</button>
+        </div>
+        <div class="faq-list" id="faq-list"></div>
+      </div>
+    </div>`);
+  let aud = "org";
+  const listEl = wrap.querySelector("#faq-list");
+  function render() {
+    wrap.querySelectorAll(".faq-toggle button").forEach(b => b.classList.toggle("active", b.dataset.aud === aud));
+    listEl.innerHTML = "";
+    FAQ[aud].forEach(item => {
+      const it = el(`
+        <div class="faq-item">
+          <button class="faq-q"><span>${esc(item.q)}</span><span class="faq-ico">+</span></button>
+          <div class="faq-a"><p>${esc(item.a)}</p></div>
+        </div>`);
+      it.querySelector(".faq-q").onclick = () => it.classList.toggle("open");
+      listEl.appendChild(it);
+    });
+  }
+  wrap.querySelectorAll(".faq-toggle button").forEach(b => b.onclick = () => { aud = b.dataset.aud; render(); });
+  render();
+  return wrap;
+}
+
 function renderLanding() {
   App.innerHTML = "";
   App.appendChild(el(`
@@ -2109,12 +2181,13 @@ function renderLanding() {
         </div>
         <div class="lcard">
           <div class="lcard-icon">👤</div>
-          <h2>For Care Workers</h2>
+          <h2>For Care Professionals</h2>
           <p>Access the courses your manager has assigned, complete assessments, and download your certificates.</p>
           <button class="btn-primary green" id="go-staff-login">Staff Login</button>
         </div>
       </div>
       <div id="calc-slot"></div>
+      <div id="faq-slot"></div>
       <div class="footer">Aligned to the Care Certificate 2026 · CQC Inspection Ready · Powered by Care2Learn</div>
     </div>
   `));
@@ -2122,6 +2195,7 @@ function renderLanding() {
   document.getElementById("go-org-reg").onclick = renderOrgRegister;
   document.getElementById("go-staff-login").onclick = renderStaffLogin;
   document.getElementById("calc-slot").appendChild(buildCalculator());
+  document.getElementById("faq-slot").appendChild(buildFAQ());
 }
 
 // ─── ORG REGISTER ─────────────────────────────────────────────────────────────
@@ -2419,7 +2493,7 @@ function showAddStaffForm(slot) {
       <div class="row2">
         <div class="fg"><label>Job Role</label>
           <select class="inp" id="a-role">
-            ${["Care Assistant","Senior Carer","Team Leader","Deputy Manager","Registered Manager","Support Worker","Nurse","Other"].map(r=>`<option>${r}</option>`).join("")}
+            ${["Care Assistant","Senior Carer","Team Leader","Deputy Manager","Registered Manager","Support Carer","Nurse","Other"].map(r=>`<option>${r}</option>`).join("")}
           </select>
         </div>
         <div class="fg"><label>Start Date</label><input class="inp" id="a-start" type="date" value="${new Date().toISOString().split("T")[0]}"></div>

@@ -180,7 +180,7 @@ export const COURSES = [
       { heading: "Your Wellbeing & Security", visual: "compare",
         visualData: { left: { title: "Your wellbeing", items: ["Recognise signs of stress and burnout", "Take your breaks", "Follow safe lone-working procedures", "Ask for support — it's a strength"] }, right: { title: "Security measures", items: ["Check the identity of visitors", "Keep premises and keys secure", "Protect personal and care records", "Report anything that feels unsafe"] } },
         body: "Health and safety also covers your own mental health and personal wellbeing, and keeping people, premises and information secure.",
-        points: ["Your employer has a duty to protect your wellbeing too", "Lone workers should have a check-in system and a way to raise the alarm", "Never share door codes or service users' information", "Speak up early — small concerns are easier to resolve"] },
+        points: ["Your employer has a duty to protect your wellbeing too", "Lone carers should have a check-in system and a way to raise the alarm", "Never share door codes or service users' information", "Speak up early — small concerns are easier to resolve"] },
     ],
     quiz: [
       { q: "What is the primary health and safety law in the UK?", options: ["Management Regs 1999", "Health and Safety at Work Act 1974", "RIDDOR 2013", "Manual Handling Regs 1992"], answer: 1, explanation: "HASAWA 1974 is the primary, overarching legislation." },
@@ -268,7 +268,7 @@ export const COURSES = [
       { q: "A service user with capacity refuses their medication. What should you do?", options: ["Give it anyway", "Respect their choice, record it and inform your supervisor", "Call 999", "Get next-of-kin consent"], answer: 1, explanation: "A person with capacity may refuse treatment; forcing it would be unlawful." },
       { q: "A manager instructs you to do something you believe is unsafe. What do you do?", options: ["Follow it without question", "Leave your shift", "Raise your concern and escalate if it isn't resolved", "Comply quietly"], answer: 2, explanation: "Your duty of care takes precedence over an unsafe instruction; raise and escalate concerns." },
       { q: "How should you respond to a complaint?", options: ["Defend yourself firmly", "Listen, apologise for the distress and report it", "Ignore it if you disagree", "Tell them to put it in writing only"], answer: 1, explanation: "Listen, acknowledge the distress, record it and follow the complaints procedure." },
-      { q: "What protects a worker who reports wrongdoing in good faith?", options: ["The Care Act 2014", "The Public Interest Disclosure Act", "RIDDOR", "COSHH"], answer: 1, explanation: "The Public Interest Disclosure Act 1998 protects whistleblowers acting in good faith." },
+      { q: "What protects a carer who reports wrongdoing in good faith?", options: ["The Care Act 2014", "The Public Interest Disclosure Act", "RIDDOR", "COSHH"], answer: 1, explanation: "The Public Interest Disclosure Act 1998 protects whistleblowers acting in good faith." },
     ],
   },
 
@@ -370,7 +370,7 @@ export const COURSES = [
     slides: [
       { heading: "Why It Matters", visual: "stat",
         visualData: { stats: [{ n: "#1", l: "Cause of injury in social care" }, { n: "MSDs", l: "Musculoskeletal disorders" }, { n: "0", l: "Manual lifts where a hoist exists" }] },
-        body: "Musculoskeletal injuries are the most common cause of harm to care workers. Safe handling protects everyone.",
+        body: "Musculoskeletal injuries are the most common cause of harm to carers. Safe handling protects everyone.",
         points: ["Never lift a person manually if an aid is available", "Poor technique causes long-term back injury", "Equipment exists to keep both of you safe"] },
       { heading: "The Legislation", visual: "grid",
         visualData: { items: ["HASAWA 1974", "Manual Handling Ops 1992", "LOLER 1998", "PUWER 1998", "Management Regs 1999"] },
@@ -518,7 +518,7 @@ export const COURSES = [
         points: ["Don't assume new symptoms are 'just part of' their condition", "Take physical health concerns seriously and act on them", "Make sure eligible people get their annual health check", "Always listen to families and carers who know the person best"] },
     ],
     quiz: [
-      { q: "The Oliver McGowan Mandatory Training is named after a young man who was…", options: ["A care worker", "An autistic man with a learning disability who died avoidably", "A doctor", "A government minister"], answer: 1, explanation: "Oliver McGowan was an autistic young man with a learning disability whose avoidable death led to the training." },
+      { q: "The Oliver McGowan Mandatory Training is named after a young man who was…", options: ["A carer", "An autistic man with a learning disability who died avoidably", "A doctor", "A government minister"], answer: 1, explanation: "Oliver McGowan was an autistic young man with a learning disability whose avoidable death led to the training." },
       { q: "Which law made this training a legal requirement?", options: ["Care Act 2014", "Health and Care Act 2022", "Mental Health Act 1983", "Equality Act 2010"], answer: 1, explanation: "The Health and Care Act 2022 introduced the requirement." },
       { q: "Is autism the same as a learning disability?", options: ["Yes, they are identical", "No — they are different, though a person can have both", "Autism is a mental illness", "A learning disability is a type of autism"], answer: 1, explanation: "They are different; some people are both autistic and have a learning disability." },
       { q: "What is a 'reasonable adjustment'?", options: ["A change that helps a person access care equally", "A reduction in their care", "A medical procedure", "A type of medication"], answer: 0, explanation: "A reasonable adjustment is a change that helps a person access care equally, required under the Equality Act 2010." },
