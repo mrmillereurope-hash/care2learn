@@ -183,6 +183,17 @@
   .abtn.danger{color:#E74C3C;border-color:#E74C3C33}
   .abtn.danger:hover{background:#E74C3C;color:#fff}
   .empty{padding:36px;text-align:center;color:#7A8599;font-size:14px}
+  /* Mobile: replace 6-column grid with stacked cards */
+  @media(max-width:640px){
+    .thead{display:none}
+    .trow{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px 16px}
+    .trow-top{display:flex;align-items:flex-start;justify-content:space-between;width:100%;gap:8px}
+    .trow-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
+    .trow-pin-label{font-size:11px;font-weight:700;color:#7A8599;text-transform:uppercase;letter-spacing:.5px}
+    .trow-pin-val{font-family:monospace;font-weight:700;color:#2980B9;font-size:14px}
+    .row-actions{width:100%;gap:8px}
+    .abtn{flex:1;text-align:center;padding:8px 10px;font-size:13px}
+  }
 
   /* card form */
   .cardform{background:#F0F4F8;border:2px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:20px}

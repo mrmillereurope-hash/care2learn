@@ -648,11 +648,15 @@ async function paintOrgTab(org) {
           : `<span class="pill amber">In Progress</span>`;
         const row = el(`
           <div class="trow">
-            <span><div class="t-name">${esc(s.name)}</div><div class="t-email">${esc(s.email)}</div></span>
-            <span class="t-role">${esc(s.role)}</span>
-            <span><b style="color:${s.completedCount===s.assignedCount&&s.assignedCount>0?"#27AE60":"#E67E22"}">${s.completedCount}</b>/${s.assignedCount}</span>
-            <span>${statusPill}</span>
-            <span class="t-pin">${esc(s.pin)}</span>
+            <div class="trow-top">
+              <span><div class="t-name">${esc(s.name)}</div><div class="t-email">${esc(s.email)}</div></span>
+              <span class="t-role">${esc(s.role)}</span>
+            </div>
+            <div class="trow-meta">
+              <span><b style="color:${s.completedCount===s.assignedCount&&s.assignedCount>0?"#27AE60":"#E67E22"}">${s.completedCount}</b>/${s.assignedCount}</span>
+              <span>${statusPill}</span>
+              <span><span class="trow-pin-label">PIN </span><span class="t-pin trow-pin-val">${esc(s.pin)}</span></span>
+            </div>
             <span class="row-actions">
               <button class="abtn" data-act="view">Manage</button>
               ${s.active ? `<button class="abtn danger" data-act="deact">Deactivate</button>` : `<button class="abtn" data-act="react">Reactivate</button>`}
