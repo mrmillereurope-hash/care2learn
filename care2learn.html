@@ -1,0 +1,2602 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Care2Learn · Mandatory Training Platform</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Crect%20width%3D%27100%27%20height%3D%27100%27%20rx%3D%2722%27%20fill%3D%27%230D1B2A%27%2F%3E%3Cpath%20d%3D%27M50%2022%20L74%2030%20L74%2050%20C74%2064%2064%2073%2050%2078%20C36%2073%2026%2064%2026%2050%20L26%2030%20Z%27%20fill%3D%27%23ffffff%27%2F%3E%3Cpath%20d%3D%27M40%2051%20L47%2058%20L62%2040%27%20fill%3D%27none%27%20stroke%3D%27%2316A34A%27%20stroke-width%3D%276%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#F0F4F8;color:#1A1A2E}
+  button{font-family:inherit;cursor:pointer}
+  input,select{font-family:inherit}
+  .hidden{display:none !important}
+
+  /* ── Landing ── */
+  .landing-hero{background:linear-gradient(135deg,#0D1B2A,#1B2A4A 50%,#1A3A5C);color:#fff;padding:56px 24px 44px;text-align:center}
+  .landing-logo{font-size:48px;margin-bottom:10px}
+  .landing-title{font-size:44px;font-weight:900;letter-spacing:-2px;margin-bottom:6px}
+  .landing-tag{font-size:13px;color:#94A3B8;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px}
+  .landing-desc{font-size:15px;color:#CBD5E1;max-width:520px;margin:0 auto 32px;line-height:1.7}
+  .landing-stats{display:flex;justify-content:center;gap:36px;flex-wrap:wrap}
+  .lstat-n{display:block;font-size:30px;font-weight:900;color:#3BAFDA}
+  .lstat-l{font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px}
+  .landing-cards{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:36px 24px;max-width:880px;margin:0 auto}
+  @media(max-width:640px){.landing-cards{grid-template-columns:1fr}}
+  .lcard{background:#fff;border-radius:16px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+  .lcard-icon{font-size:38px;margin-bottom:14px}
+  .lcard h2{font-size:21px;font-weight:800;margin-bottom:9px}
+  .lcard p{font-size:14px;color:#5A6474;line-height:1.6;margin-bottom:22px}
+  .btn-primary{width:100%;padding:13px;border:none;border-radius:10px;background:#1B2A4A;color:#fff;font-weight:700;font-size:14px;margin-bottom:10px;transition:opacity .2s}
+  .btn-primary:hover{opacity:.85}
+  .btn-primary.green{background:#27AE60}
+  .btn-secondary{width:100%;padding:12px;border:2px solid #1B2A4A;border-radius:10px;background:transparent;color:#1B2A4A;font-weight:700;font-size:14px;transition:all .2s}
+  .btn-secondary:hover{background:#1B2A4A;color:#fff}
+  .footer{background:#1A1A2E;color:#64748B;text-align:center;padding:16px;font-size:12px}
+  /* ── Pricing calculator ── */
+  .plan-band{background:linear-gradient(160deg,#0D1B2A,#1B2A4A 55%,#1A3A5C);padding:46px 0}
+  .plan{max-width:880px;margin:0 auto;padding:0 24px}
+  .plan-head{text-align:center;margin-bottom:22px}
+  .plan-head h2{font-size:26px;font-weight:800;color:#fff;margin-bottom:8px}
+  .plan-head p{font-size:14px;color:#CBD5E1;line-height:1.6;max-width:580px;margin:0 auto}
+  .plan-toggle{display:flex;background:rgba(255,255,255,.12);border-radius:30px;padding:5px;max-width:460px;margin:0 auto 22px;gap:4px}
+  .plan-toggle button{flex:1;border:none;background:transparent;padding:11px 14px;border-radius:24px;font-size:14px;font-weight:700;color:#CBD5E1;cursor:pointer;transition:all .15s}
+  .plan-toggle button.active{background:#fff;color:#1B2A4A;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+  .plan-toggle button span{font-size:11px;font-weight:600;color:#9FB0C4}
+  .plan-toggle button.active span{color:#7A8599}
+  .plan-card{display:grid;grid-template-columns:1fr 1fr;gap:28px;background:#fff;border:1px solid #E8ECF0;border-radius:16px;padding:30px;box-shadow:0 4px 22px rgba(13,27,42,.07)}
+  .plan-left h3{font-size:20px;font-weight:800;color:#1B2A4A;margin-bottom:10px}
+  .plan-left p{font-size:14px;color:#5A6474;line-height:1.6;margin-bottom:18px}
+  .plan-list{list-style:none;padding:0;margin:0}
+  .plan-list li{display:flex;align-items:flex-start;gap:9px;font-size:14px;color:#2C3E50;padding:6px 0}
+  .plan-list li::before{content:"✓";color:#16A34A;font-weight:800;flex-shrink:0}
+  .est{background:#2980B90D;border:1px solid #2980B926;border-radius:14px;padding:22px}
+  .est-title{font-size:17px;font-weight:800;color:#1B2A4A;margin-bottom:18px}
+  .est-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:#374151;margin-bottom:6px}
+  .est-row b{font-size:24px;font-weight:900;color:#1B2A4A}
+  .est input[type=range]{width:100%;accent-color:#2980B9;margin:2px 0 4px;cursor:pointer}
+  .est-disc{font-size:12px;font-weight:700;color:#16A34A;min-height:15px;margin:2px 0 4px}
+  .est-perlearner{font-size:13px;color:#5A6474;margin:16px 0 8px;font-weight:600}
+  .est-perlearner span{color:#9AA5B1;font-weight:400}
+  .est-cost{background:#fff;border-radius:10px;padding:14px;text-align:center;display:flex;align-items:baseline;justify-content:center;gap:8px}
+  .est-cost-v{font-size:34px;font-weight:900;color:#2980B9;line-height:1}
+  .est-cost-u{font-size:14px;color:#7A8599;font-weight:600}
+  .est-sub{font-size:12px;color:#7A8599;text-align:center;margin-top:10px}
+  .plan-cta{margin-top:16px;width:100%}
+  @media(max-width:680px){.plan-card{grid-template-columns:1fr;gap:22px;padding:22px}.plan-head h2{font-size:22px}}
+
+  /* ── Auth ── */
+  .auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .auth-card{background:#fff;border-radius:16px;padding:36px;width:100%;max-width:460px;box-shadow:0 8px 32px rgba(0,0,0,.1)}
+  .back-sm{background:none;border:none;color:#5A6474;font-size:13px;margin-bottom:18px;padding:0}
+  .auth-logo{font-size:18px;font-weight:800;margin-bottom:14px}
+  .auth-title{font-size:24px;font-weight:800;margin-bottom:6px}
+  .auth-sub{font-size:14px;color:#7A8599;margin-bottom:22px}
+  .err{background:#E74C3C18;border:1px solid #E74C3C44;color:#922B21;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .ok-banner{background:#27AE6018;border:1px solid #27AE6044;color:#1A5732;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .fg{margin-bottom:14px}
+  .fg label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px}
+  .inp{width:100%;padding:10px 12px;border:2px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none;transition:border-color .2s}
+  .inp:focus{border-color:#2980B9}
+  .btn-auth{width:100%;padding:13px;border:none;border-radius:10px;background:#1B2A4A;color:#fff;font-weight:700;font-size:15px;margin-bottom:10px}
+  .btn-demo{width:100%;padding:12px;border:2px dashed #94A3B8;border-radius:10px;background:transparent;color:#5A6474;font-weight:600;font-size:14px}
+  .btn-demo:hover{border-color:#2980B9;color:#2980B9}
+
+  /* ── Dashboard shell ── */
+  .dash-hdr{background:#0D1B2A;color:#fff;padding:0 24px;display:flex;align-items:center;gap:16px;height:60px;position:sticky;top:0;z-index:50}
+  .dash-brand{display:flex;align-items:center;gap:10px;min-width:180px}
+  .dash-logo{font-size:24px}
+  .dash-org{font-size:15px;font-weight:800}
+  .dash-sub{font-size:10px;color:#94A3B8}
+  .dash-nav{display:flex;gap:2px;flex:1;justify-content:center;flex-wrap:wrap}
+  .nav-btn{background:transparent;border:none;color:#94A3B8;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;transition:all .2s}
+  .nav-btn.active,.nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+  .logout{background:rgba(255,255,255,.1);border:none;color:#94A3B8;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;flex:0 0 auto}
+  .logout:hover{color:#fff}
+  /* On narrow screens, stack the header: brand + Log Out on top, nav as its own scrollable row */
+  @media(max-width:760px){
+    .dash-hdr{height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px}
+    .dash-brand{order:1;flex:1 1 auto;min-width:0}
+    .dash-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .logout{order:2}
+    .dash-nav{order:3;flex-basis:100%;width:100%;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    .nav-btn{flex:0 0 auto;white-space:nowrap}
+  }
+  .body{padding:24px;max-width:1200px;margin:0 auto}
+  .hero h1{font-size:25px;font-weight:800;margin-bottom:4px}
+  .hero p{color:#5A6474;font-size:14px;margin-bottom:22px}
+
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px}
+  @media(max-width:700px){.metrics{grid-template-columns:repeat(2,1fr)}}
+  .metric{background:#fff;border-radius:12px;padding:18px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .metric-i{font-size:22px;margin-bottom:6px}
+  .metric-v{font-size:30px;font-weight:900;margin-bottom:3px}
+  .metric-l{font-size:12px;color:#7A8599;font-weight:600}
+
+  .sec-title{font-size:16px;font-weight:800;margin:6px 0 12px}
+  .cc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:8px}
+  .cc{background:#fff;border-radius:10px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .cc-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .cc-name{flex:1;font-size:13px;font-weight:700}
+  .cc-frac{font-size:12px;font-weight:700}
+  .cc-bar{height:4px;background:#E8ECF0;border-radius:2px}
+  .cc-fill{height:100%;border-radius:2px;transition:width .5s}
+
+  /* section header w/ action */
+  .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .sh h2{font-size:22px;font-weight:800}
+  .btn-add{padding:10px 18px;border:none;border-radius:10px;background:#1B2A4A;color:#fff;font-weight:700;font-size:13px}
+  .btn-add:hover{opacity:.85}
+
+  /* staff table */
+  .table{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .thead,.trow{display:grid;grid-template-columns:2fr 1.4fr 1.1fr 1.1fr .7fr 1.4fr;padding:13px 18px;align-items:center}
+  .thead{background:#F4F6F9;font-size:11px;font-weight:700;color:#7A8599;text-transform:uppercase;letter-spacing:.5px}
+  .trow{border-top:1px solid #F0F2F5;font-size:13px}
+  .t-name{font-weight:700}.t-email{font-size:11px;color:#7A8599;font-weight:400}
+  .t-role{color:#5A6474}
+  .t-pin{font-family:monospace;font-weight:700;color:#2980B9;font-size:15px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
+  .pill.green{background:#27AE6018;color:#1A5732}
+  .pill.amber{background:#E67E2218;color:#7D6608}
+  .pill.grey{background:#E5E7EB;color:#6B7280}
+  .pill.red{background:#E74C3C18;color:#922B21}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .abtn{padding:5px 11px;border:1px solid #E5E7EB;border-radius:6px;background:#fff;font-size:12px;font-weight:600;color:#374151}
+  .abtn:hover{border-color:#1B2A4A;color:#1B2A4A}
+  .abtn.danger{color:#E74C3C;border-color:#E74C3C33}
+  .abtn.danger:hover{background:#E74C3C;color:#fff}
+  .empty{padding:36px;text-align:center;color:#7A8599;font-size:14px}
+
+  /* card form */
+  .cardform{background:#F0F4F8;border:2px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:20px}
+  .cardform h3{font-size:16px;font-weight:800;margin-bottom:16px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:560px){.row2{grid-template-columns:1fr}}
+  .chk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:6px 0 14px}
+  .chk{display:flex;align-items:center;gap:8px;padding:8px 10px;border:2px solid #E5E7EB;border-radius:8px;font-size:13px;cursor:pointer;background:#fff}
+  .chk input{cursor:pointer}
+  .chk.on{border-color:#2980B9;background:#2980B910}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+  .btn-cancel{padding:9px 18px;border:2px solid #E5E7EB;border-radius:8px;background:#fff;font-weight:600;font-size:13px;color:#5A6474}
+  .btn-save{padding:9px 18px;border:none;border-radius:8px;background:#27AE60;color:#fff;font-weight:700;font-size:13px}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-h{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 22px 0}
+  .modal-h h2{font-size:21px;font-weight:800;margin-bottom:3px}
+  .modal-h p{font-size:13px;color:#7A8599}
+  .x{background:none;border:none;font-size:20px;color:#7A8599;line-height:1}
+  .info-row{display:flex;gap:18px;flex-wrap:wrap;padding:12px 22px;background:#F0F4F8;margin-top:14px;font-size:12px;color:#5A6474}
+  .crow{display:flex;align-items:center;gap:10px;padding:10px 22px;border-bottom:1px solid #F0F2F5}
+  .crow-icon{font-size:20px}
+  .crow-name{flex:1;font-size:13px;font-weight:600}
+  .crow-meta{font-size:11px;color:#7A8599}
+  .mini-bar{width:80px;height:5px;background:#E8ECF0;border-radius:3px;margin-top:3px}
+  .mini-fill{height:100%;border-radius:3px}
+
+  /* compliance matrix */
+  .matrix{background:#fff;border-radius:12px;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .mh,.mr{display:flex;align-items:center;padding:11px 14px;gap:7px}
+  .mh{background:#F4F6F9;font-size:11px;font-weight:700;color:#7A8599;text-transform:uppercase;position:sticky;top:0}
+  .mh span:first-child,.mr .m-name{min-width:150px;font-weight:700;font-size:13px}
+  .mh span:not(:first-child){width:30px;text-align:center;font-size:15px}
+  .mr{border-top:1px solid #F0F2F5}
+  .cell{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-size:13px;font-weight:700}
+  .cell.ok{background:#27AE6018;color:#27AE60}
+  .cell.amber{background:#E67E2218;color:#E67E22}
+  .cell.red{background:#E74C3C18;color:#E74C3C}
+  .cell.prog{background:#2980B918;color:#2980B9}
+  .cell.none{color:#BDC3C7}
+  .legend{display:flex;gap:6px;align-items:center;padding:12px 4px;font-size:12px;color:#7A8599;flex-wrap:wrap}
+
+  /* settings */
+  .scard{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .scard h3{padding:16px 20px 0;font-size:15px;font-weight:700}
+  .srow{display:flex;justify-content:space-between;padding:13px 20px;border-bottom:1px solid #F0F2F5;font-size:14px}
+  .srow label{color:#7A8599;font-weight:600}
+  .mono{font-family:monospace;font-size:12px;background:#F4F6F9;padding:3px 8px;border-radius:4px}
+
+  /* staff course cards */
+  .alert{background:#E67E2215;border:1px solid #E67E2240;color:#7D6608;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:18px}
+  .obar-wrap{margin-bottom:20px}
+  .obar-l{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:#5A6474;margin-bottom:6px}
+  .obar{height:6px;background:#E8ECF0;border-radius:3px}
+  .obar-f{height:100%;background:linear-gradient(90deg,#27AE60,#3BAFDA);border-radius:3px;transition:width .5s}
+  .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+  .sc{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);cursor:pointer;transition:transform .2s,box-shadow .2s}
+  .sc:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+  .sc-top{padding:18px;display:flex;justify-content:space-between;align-items:flex-start;min-height:70px}
+  .sc-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:12px;color:#fff}
+  .sc-body{padding:14px}
+  .sc-title{font-size:15px;font-weight:800;margin-bottom:5px}
+  .sc-meta{font-size:11px;color:#7A8599;margin-bottom:11px}
+  .sc-cta{width:100%;padding:9px;border:none;border-radius:8px;color:#fff;font-weight:700;font-size:13px}
+  .sc-done{display:flex;justify-content:space-between;align-items:center}
+  .sc-score{font-size:18px;font-weight:900}
+  .sc-exp{font-size:11px;color:#7A8599}
+
+  /* player */
+  .player-hdr{color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px}
+  .back-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600}
+  .player-title{flex:1;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700}
+  .player-prog{font-size:12px;color:rgba(255,255,255,.65)}
+  .dots{display:flex;align-items:center;gap:4px;padding:10px 24px;background:#fff;border-bottom:1px solid #E8ECF0}
+  .dot{flex:1;height:4px;border-radius:2px;transition:background .3s}
+  .pbody{padding:24px;max-width:820px;margin:0 auto}
+  .slide{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media(max-width:640px){.slide{grid-template-columns:1fr}}
+  .svis{background:#fff;border-radius:12px;padding:18px;min-height:200px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .svis-emoji{font-size:64px}
+  .slide h2{font-size:20px;font-weight:800;margin-bottom:8px}
+  .slide-body-txt{font-size:14px;color:#5A6474;line-height:1.7;margin-bottom:12px}
+  .plist{list-style:none}
+  .plist li{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#2C3E50;line-height:1.5;padding:4px 0}
+  .pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
+  .snav{display:flex;align-items:center;padding-top:20px;margin-top:20px;border-top:1px solid #E8ECF0}
+  .btn-out{padding:11px 22px;border:2px solid;border-radius:10px;background:transparent;font-weight:700;font-size:14px}
+  .btn-go{padding:12px 24px;border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px}
+
+  /* quiz */
+  .quiz{max-width:640px;margin:0 auto}
+  .qbar{height:5px;background:#E8ECF0;border-radius:3px;margin-bottom:14px}
+  .qbar-f{height:100%;border-radius:3px;transition:width .4s}
+  .qmeta{display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px}
+  .qq{font-size:17px;font-weight:700;line-height:1.5;margin-bottom:18px}
+  .qopts{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .qopt{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:2px solid #E8ECF0;border-radius:10px;background:#fff;text-align:left;font-size:13px;color:#2C3E50;line-height:1.5;transition:all .2s}
+  .qopt:hover{border-color:#BDC3C7}
+  .qopt.correct{border-color:#27AE60;background:#27AE6010}
+  .qopt.wrong{border-color:#E74C3C;background:#E74C3C10}
+  .qletter{width:24px;height:24px;border-radius:6px;background:#F4F6F9;color:#5A6474;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .qexp{padding:12px 14px;background:#F9FAFB;border-radius:8px;margin-bottom:14px;font-size:13px;line-height:1.6}
+  .qexp p{margin-top:5px;color:#5A6474}
+  .qnext{padding:11px 22px;border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;display:block;margin-left:auto}
+  .qdone{text-align:center;padding:30px 20px;max-width:440px;margin:0 auto}
+  .qscore-box{display:inline-flex;flex-direction:column;align-items:center;padding:18px 40px;border:3px solid;border-radius:14px;margin:16px auto}
+  .qbig{font-size:48px;font-weight:900;line-height:1}
+  .btn-retry{padding:10px 22px;border:2px solid;border-radius:10px;background:transparent;font-weight:700;font-size:14px;display:block;margin:16px auto 0}
+
+  /* certificate */
+  .cert{background:#fff;border-radius:16px;width:100%;max-width:600px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .cert-hdr{padding:22px;display:flex;justify-content:space-between;align-items:center}
+  .cert-logo{color:#fff;font-size:18px;font-weight:900}
+  .cert-badge{color:rgba(255,255,255,.75);font-size:11px;letter-spacing:1px}
+  .cert-body{padding:30px;text-align:center}
+  .cert-icon{font-size:52px;margin-bottom:8px}
+  .cert-sm{font-size:13px;color:#7A8599;margin-bottom:4px}
+  .cert-name{font-size:28px;font-weight:900;margin-bottom:4px}
+  .cert-course{font-size:20px;font-weight:800;margin-bottom:4px}
+  .cert-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+  @media(max-width:480px){.cert-meta{grid-template-columns:repeat(2,1fr)}}
+  .cm-l{font-size:10px;color:#7A8599;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  .cm-v{font-size:14px;font-weight:800;margin-top:2px}
+  .cert-actions{display:flex;gap:10px;padding:16px 22px;border-top:1px solid #F0F2F5}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A1A2E;color:#fff;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .spin{text-align:center;padding:50px;color:#7A8599}
+
+  /* ── Course intro screen ── */
+  .intro{max-width:720px;margin:0 auto;padding:30px 24px}
+  .intro-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+  .intro-top{padding:32px;color:#fff;text-align:center}
+  .intro-icon{font-size:60px;margin-bottom:10px}
+  .intro-title{font-size:28px;font-weight:900;margin-bottom:6px}
+  .intro-summary{font-size:14px;opacity:.9;max-width:480px;margin:0 auto;line-height:1.6}
+  .intro-meta{display:flex;justify-content:center;gap:24px;margin-top:18px;flex-wrap:wrap}
+  .intro-meta-item{text-align:center}
+  .intro-meta-n{display:block;font-size:20px;font-weight:800}
+  .intro-meta-l{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.5px}
+  .intro-body{padding:28px 32px}
+  .intro-body h3{font-size:16px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .obj-list{list-style:none;margin-bottom:24px}
+  .obj-list li{display:flex;align-items:flex-start;gap:11px;padding:9px 0;font-size:14px;color:#2C3E50;line-height:1.5;border-bottom:1px solid #F4F6F9}
+  .obj-list li:last-child{border-bottom:none}
+  .obj-check{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700}
+  .intro-start{width:100%;padding:15px;border:none;border-radius:12px;color:#fff;font-weight:800;font-size:16px;margin-top:4px}
+  .intro-resume{background:#F0F4F8;border:1px solid #E5E7EB;border-radius:10px;padding:12px 16px;font-size:13px;color:#5A6474;margin-bottom:16px;text-align:center}
+
+  /* ── Slide visuals ── */
+  .vstat{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%}
+  .vstat-icon{font-size:56px}
+  .vstat-row{display:flex;gap:10px;width:100%;justify-content:center;flex-wrap:wrap}
+  .vstat-card{background:#fff;border-radius:10px;padding:12px 14px;text-align:center;flex:1;min-width:90px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .vstat-n{font-size:24px;font-weight:900;line-height:1}
+  .vstat-l{font-size:10px;color:#7A8599;margin-top:4px;line-height:1.3}
+  .vgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}
+  .vgrid-item{background:#fff;border-radius:8px;padding:9px 11px;font-size:12px;font-weight:600;color:#2C3E50;border-left:3px solid;display:flex;align-items:center;gap:7px}
+  .vgrid-num{font-weight:800;font-size:11px}
+  .vflow{display:flex;flex-direction:column;gap:0;width:100%}
+  .vflow-step{display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:10px 12px;font-size:12px;font-weight:600;color:#2C3E50;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .vflow-num{width:24px;height:24px;border-radius:50%;color:#fff;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .vflow-arr{text-align:center;color:#BDC3C7;font-size:14px;padding:2px 0}
+  .vpillars{display:flex;gap:8px;width:100%;justify-content:center;flex-wrap:wrap}
+  .vpillar{flex:1;min-width:70px;background:#fff;border-radius:8px;border-top:4px solid;padding:16px 8px;text-align:center;font-size:12px;font-weight:700;color:#2C3E50;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .vcompare{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+  .vcol{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .vcol-h{padding:8px 12px;color:#fff;font-size:12px;font-weight:800;text-align:center}
+  .vcol-items{padding:8px 12px;list-style:none}
+  .vcol-items li{font-size:11px;color:#2C3E50;padding:4px 0;line-height:1.4;display:flex;gap:6px;align-items:flex-start}
+  .vcol-items li::before{content:"•";font-weight:800;flex-shrink:0}
+  .vcycle{display:flex;flex-wrap:wrap;gap:6px;width:100%;justify-content:center;align-items:center}
+  .vcycle-item{background:#fff;border-radius:20px;padding:7px 13px;font-size:11px;font-weight:700;color:#2C3E50;border:2px solid;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .vcycle-arr{color:#BDC3C7;font-size:13px;font-weight:700}
+  .obar-mini{height:8px;background:#E8ECF0;border-radius:4px;overflow:hidden}
+  .obar-mini-f{height:100%;border-radius:4px;transition:width .4s}
+
+  /* ── Print: if printing the page directly, show only the certificate ── */
+  @media print {
+    body { background:#fff !important; }
+    #app { display:none !important; }
+    .toast { display:none !important; }
+    .overlay { position:static !important; background:none !important; padding:0 !important; display:block !important; }
+    .cert { box-shadow:none !important; max-width:100% !important; border-radius:0 !important; }
+    .cert-actions { display:none !important; }
+  }
+</style></head><body><div id="app"></div>
+<script>
+// ─── COURSE CATALOGUE ─────────────────────────────────────────────────────────
+// The canonical list of Skills for Care mandatory courses. Each course has a
+// summary, learning objectives, content slides (each with a visual type), and a
+// multiple-choice assessment. Served to the frontend via /api/courses.
+//
+// Slide visual types (rendered by the course player):
+//   stat     visualData: { stats: [{n, l}] }            big figures
+//   grid     visualData: { items: ["..."] }             numbered tags
+//   flow     visualData: { steps: ["..."] }             a step-by-step process
+//   pillars  visualData: { items: ["..."] }             labelled columns
+//   compare  visualData: { left:{title,items}, right:{title,items} }   do / don't
+//   cycle    visualData: { items: ["..."] }             a loop / chain
+//   icon     (no data)                                  the course icon
+
+const COURSES = [
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "safeguarding", title: "Safeguarding Adults", icon: "🛡️", color: "#1B4F72", duration: "45 min",
+    summary: "Recognise, respond to and report abuse and neglect of adults at risk.",
+    objectives: [
+      "Define safeguarding and explain who counts as an adult at risk",
+      "Recognise the ten categories of abuse and their warning signs",
+      "Apply the six safeguarding principles to your practice",
+      "Respond and report correctly when you suspect abuse",
+      "Recognise restrictive practices and use the least-restrictive option",
+    ],
+    slides: [
+      { heading: "What is Safeguarding?", visual: "stat",
+        visualData: { stats: [{ n: "2M+", l: "Adults receiving care in England" }, { n: "500K+", l: "Safeguarding concerns raised /yr" }, { n: "6", l: "Core principles" }] },
+        body: "Safeguarding means protecting an adult's right to live in safety, free from abuse and neglect. Under the Care Act 2014, local authorities have a legal duty to protect adults at risk.",
+        points: ["An 'adult at risk' has care and support needs", "They may be unable to protect themselves from harm", "Safeguarding is everyone's responsibility", "The adult's own wishes stay central to any action"] },
+      { heading: "The 10 Types of Abuse", visual: "grid",
+        visualData: { items: ["Physical", "Sexual", "Psychological", "Financial", "Neglect", "Discriminatory", "Organisational", "Domestic", "Modern Slavery", "Self-neglect"] },
+        body: "The Care Act 2014 sets out ten categories of abuse and neglect. You must be able to recognise each one.",
+        points: ["Abuse can be a single act or repeated over time", "It can be deliberate or the result of ignorance", "It can happen anywhere, by anyone", "Often more than one type occurs together"] },
+      { heading: "Recognising the Signs", visual: "compare",
+        visualData: { left: { title: "Possible signs", items: ["Unexplained injuries or bruising", "Sudden changes in behaviour", "Withdrawal or fearfulness", "Unexplained money problems", "Poor hygiene or weight loss"] }, right: { title: "Your response", items: ["Stay calm and reassure", "Listen — do not interrogate", "Preserve any evidence", "Record exactly what you saw/heard", "Report without delay"] } },
+        body: "Signs are not proof, but they are reasons to be alert and to report your concern. Never assume someone else will raise it.",
+        points: ["Trust your professional instinct", "A disclosure may be the only sign you get", "Believe the person and take them seriously"] },
+      { heading: "The 6 Safeguarding Principles", visual: "pillars",
+        visualData: { items: ["Empowerment", "Prevention", "Proportionality", "Protection", "Partnership", "Accountability"] },
+        body: "The Care Act 2014 sets six principles that underpin all safeguarding activity.",
+        points: ["Empowerment — support people's own decisions", "Prevention — act before harm occurs", "Proportionality — the least intrusive response", "Protection — support for those in greatest need", "Partnership — local services working together", "Accountability — transparency in safeguarding"] },
+      { heading: "How to Report a Concern", visual: "flow",
+        visualData: { steps: ["Ensure immediate safety", "Do NOT investigate yourself", "Tell your safeguarding lead / manager", "Record facts clearly and promptly", "Follow your organisation's procedure"] },
+        body: "If you suspect abuse, acting quickly and correctly protects the person. Reporting is a duty, not a choice.",
+        points: ["In an emergency call 999 first", "Never confront the alleged abuser", "Never promise to keep a disclosure secret", "If your manager is implicated, escalate above them or to the local authority"] },
+      { heading: "Restrictive Practices", visual: "compare",
+        visualData: { left: { title: "What it can look like", items: ["Restricting where someone can go", "Withholding choice or belongings", "Physical or chemical restraint", "Blanket rules for everyone"] }, right: { title: "The right approach", items: ["Use the least-restrictive option", "Only ever as a last resort", "Properly authorised and recorded", "Reviewed and kept to a minimum"] } },
+        body: "A restrictive practice is anything that limits a person's rights or freedom of movement. Used wrongly it is a form of abuse, and it must always be the last resort.",
+        points: ["Restraint is only lawful to prevent harm and must be proportionate", "It must be authorised, recorded and regularly reviewed", "Restrictions need a clear legal basis (e.g. the Mental Capacity Act / DoLS)", "Challenge blanket rules — care must be personalised"] },
+    ],
+    quiz: [
+      { q: "Under which legislation do local authorities have a statutory duty to safeguard adults at risk?", options: ["Mental Health Act 2007", "Care Act 2014", "Health and Social Care Act 2012", "Mental Capacity Act 2005"], answer: 1, explanation: "The Care Act 2014 placed adult safeguarding on a statutory footing." },
+      { q: "How many categories of abuse does the Care Act 2014 identify?", options: ["6", "8", "10", "12"], answer: 2, explanation: "The Care Act 2014 identifies 10 types of abuse and neglect." },
+      { q: "Which principle means using the least intrusive response appropriate to the risk?", options: ["Prevention", "Protection", "Proportionality", "Partnership"], answer: 2, explanation: "Proportionality means the response should be the least intrusive necessary." },
+      { q: "A service user discloses abuse and asks you to keep it secret. What should you do?", options: ["Agree, to keep their trust", "Explain you must pass it on to keep them safe, then report", "Only report if you see proof", "Decide later"], answer: 1, explanation: "You cannot keep abuse secret. Be honest that you must report it to keep them safe." },
+      { q: "You suspect a colleague is financially abusing a service user. What is your first action?", options: ["Confront the colleague", "Investigate it yourself", "Report to your manager or safeguarding lead immediately", "Wait to be certain"], answer: 2, explanation: "Report immediately. Never investigate or confront the alleged abuser yourself." },
+      { q: "Which of these is a recognised type of abuse under the Care Act?", options: ["Self-neglect", "Forgetfulness", "Shyness", "Tiredness"], answer: 0, explanation: "Self-neglect is one of the ten recognised categories." },
+      { q: "When is a restrictive practice such as restraint acceptable?", options: ["Whenever it makes care easier", "Only as a proportionate last resort to prevent harm, properly authorised", "As a routine house rule", "Never, under any circumstances"], answer: 1, explanation: "Restrictive practices must be the least-restrictive last resort, proportionate, authorised and reviewed." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "fire-safety", title: "Fire Safety", icon: "🔥", color: "#922B21", duration: "30 min",
+    summary: "Prevent fires and respond safely to protect the people in your care.",
+    objectives: [
+      "Explain the fire triangle and how to prevent fires",
+      "Follow the RACE procedure in a fire emergency",
+      "Identify the correct fire extinguisher for each fire type",
+      "Support a safe evacuation of people in your care",
+    ],
+    slides: [
+      { heading: "The Fire Triangle", visual: "pillars",
+        visualData: { items: ["Fuel", "Heat", "Oxygen"] },
+        body: "Fire needs three elements together. Remove any one and the fire cannot start or continue.",
+        points: ["Fuel — anything that can burn", "Heat — a source of ignition", "Oxygen — present in the air around us", "Good prevention removes one side of the triangle"] },
+      { heading: "Preventing Fires in Care", visual: "compare",
+        visualData: { left: { title: "Common risks", items: ["Overloaded sockets", "Faulty electrical equipment", "Smoking materials", "Cooking left unattended", "Blocked fire exits"] }, right: { title: "Good practice", items: ["Report damaged wiring", "Keep exits clear at all times", "Follow the smoking policy", "Never wedge fire doors open", "Know your evacuation plan"] } },
+        body: "Most fires are preventable. Day-to-day vigilance is the most effective protection.",
+        points: ["Fire doors save lives — keep them shut", "PEEPs set out how each person will be evacuated"] },
+      { heading: "RACE — Your Response", visual: "flow",
+        visualData: { steps: ["Rescue anyone in immediate danger", "Alert — raise the alarm, call 999", "Contain — close doors and windows", "Evacuate or Extinguish if safe"] },
+        body: "In a fire, follow RACE without hesitation. Your priority is always people, not property.",
+        points: ["Only tackle a fire if it is small and you are trained", "Never put yourself at risk", "Use the nearest safe exit"] },
+      { heading: "Extinguisher Types", visual: "grid",
+        visualData: { items: ["Water — wood/paper", "Foam — flammable liquids", "CO₂ — electrical", "Dry powder — multi", "Wet chemical — cooking oil"] },
+        body: "Using the wrong extinguisher can make a fire far worse. Match the extinguisher to the fire.",
+        points: ["Never use water on electrical or oil fires", "CO₂ (black label) is for electrical fires", "Wet chemical (yellow) is for deep-fat fryers", "If in doubt, evacuate instead"] },
+      { heading: "Using an Extinguisher — PASS", visual: "flow",
+        visualData: { steps: ["Pull the safety pin", "Aim at the base of the fire", "Squeeze the handle", "Sweep side to side"] },
+        body: "If it is safe and you are trained, the PASS technique is used for all extinguisher types.",
+        points: ["Always keep an exit behind you", "Stand back a safe distance", "If the fire grows, get out immediately"] },
+    ],
+    quiz: [
+      { q: "Which element of the fire triangle must you remove to stop a fire?", options: ["All three at once", "Any one of fuel, heat, or oxygen", "Only oxygen", "Only heat"], answer: 1, explanation: "Removing any single element of the triangle stops the fire." },
+      { q: "What does the 'C' in RACE stand for?", options: ["Call the brigade", "Contain by closing doors", "Check the building", "Carry residents out"], answer: 1, explanation: "Contain — closing doors and windows slows the spread of fire and smoke." },
+      { q: "Which extinguisher is correct for an electrical fire?", options: ["Water", "Foam", "CO₂", "Wet chemical"], answer: 2, explanation: "CO₂ (black label) is correct for electrical fires. Never use water." },
+      { q: "What does the 'A' in the PASS technique stand for?", options: ["Alert", "Aim at the base of the fire", "Activate", "Approach"], answer: 1, explanation: "Aim at the base of the fire, not the flames." },
+      { q: "Why must fire doors never be wedged open?", options: ["They look untidy", "They contain fire and smoke when closed", "It damages the hinges", "It is against the smoking policy"], answer: 1, explanation: "Closed fire doors slow the spread of fire and smoke, protecting escape routes." },
+      { q: "What is your top priority in a fire?", options: ["Saving equipment", "Protecting the building", "The safety of people", "Finding the cause"], answer: 2, explanation: "People always come before property." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "infection-control", title: "Infection Prevention & Control", icon: "🦠", color: "#1E8449", duration: "40 min",
+    summary: "Break the chain of infection and protect people through safe practice.",
+    objectives: [
+      "Describe the chain of infection and how to break it",
+      "Perform hand hygiene at the right moments and to the right standard",
+      "Put on and remove PPE in the correct order",
+      "Apply standard precautions in everyday care",
+    ],
+    slides: [
+      { heading: "The Chain of Infection", visual: "cycle",
+        visualData: { items: ["Infectious agent", "Reservoir", "Portal of exit", "Transmission", "Portal of entry", "Susceptible host"] },
+        body: "Infection spreads through six linked stages. Breaking any single link stops the infection spreading.",
+        points: ["Most links are broken by good hygiene", "Hand hygiene breaks the transmission link", "PPE protects portals of entry and exit", "Cleaning removes reservoirs"] },
+      { heading: "Standard Precautions", visual: "grid",
+        visualData: { items: ["Hand hygiene", "PPE", "Safe sharps", "Waste disposal", "Spillage management", "Clean equipment"] },
+        body: "Standard precautions are applied to everyone, all the time, regardless of known infection status.",
+        points: ["Assume all blood and body fluids are infectious", "Protect yourself and the people you care for", "Consistency is what keeps everyone safe"] },
+      { heading: "The 5 Moments for Hand Hygiene", visual: "flow",
+        visualData: { steps: ["Before touching a person", "Before a clean/aseptic task", "After body-fluid exposure risk", "After touching a person", "After touching their surroundings"] },
+        body: "The WHO 'Five Moments' identify exactly when hand hygiene is critical.",
+        points: ["Wash for at least 20 seconds", "Cover all surfaces, including thumbs and fingertips", "Use soap and water if hands are visibly soiled", "Alcohol gel is fine when hands look clean"] },
+      { heading: "PPE — The Right Order", visual: "compare",
+        visualData: { left: { title: "Putting ON", items: ["1. Apron", "2. Mask", "3. Eye protection", "4. Gloves"] }, right: { title: "Taking OFF", items: ["1. Gloves", "2. Eye protection", "3. Apron", "4. Mask"] } },
+        body: "Order matters. Remove the most contaminated items first to avoid spreading infection.",
+        points: ["Change gloves between tasks and people", "Never reuse single-use PPE", "Hand hygiene after removing all PPE"] },
+      { heading: "Safe Waste & Sharps", visual: "grid",
+        visualData: { items: ["Yellow — infectious", "Orange — clinical", "Black — domestic", "Sharps bin — needles", "Never overfill", "Never recap needles"] },
+        body: "Correct segregation and sharps handling prevents injury and cross-infection.",
+        points: ["Dispose of sharps at the point of use", "Sharps bins are filled only to the marked line", "Report any sharps injury immediately"] },
+    ],
+    quiz: [
+      { q: "Breaking which link in the chain of infection stops transmission?", options: ["Only the agent", "Any single link", "Only transmission", "Entry and exit together"], answer: 1, explanation: "Breaking any single link interrupts the chain." },
+      { q: "How long should effective handwashing take?", options: ["5 seconds", "10 seconds", "At least 20 seconds", "60 seconds"], answer: 2, explanation: "At least 20 seconds, covering all surfaces of the hands." },
+      { q: "What is the correct order for removing PPE?", options: ["Mask first", "Apron first", "Gloves → eye protection → apron → mask", "Any order is fine"], answer: 2, explanation: "Remove the most contaminated items first: gloves, then eye protection, apron, and mask." },
+      { q: "To whom do standard precautions apply?", options: ["Only people with a known infection", "Only during outbreaks", "Everyone, all the time", "Only in hospitals"], answer: 2, explanation: "Standard precautions apply to everyone, at all times." },
+      { q: "When should you dispose of a sharp?", options: ["At the end of your shift", "At the point of use, immediately", "Once the bin is full", "After recapping the needle"], answer: 1, explanation: "Dispose of sharps immediately at the point of use; never recap needles." },
+      { q: "Which colour bin is used for infectious waste?", options: ["Black", "Yellow", "Blue", "Green"], answer: 1, explanation: "Yellow is used for infectious waste in the UK colour-coded system." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "health-safety", title: "Health & Safety", icon: "⛑️", color: "#6B4226", duration: "35 min",
+    summary: "Understand your health and safety duties and keep your workplace safe.",
+    objectives: [
+      "Identify the key health and safety legislation in care",
+      "Carry out the five steps of risk assessment",
+      "Understand your own duties under the law",
+      "Know how and when to report incidents",
+      "Look after your own wellbeing and follow security measures",
+    ],
+    slides: [
+      { heading: "Key Legislation", visual: "grid",
+        visualData: { items: ["HASAWA 1974", "Management Regs 1999", "RIDDOR 2013", "COSHH 2002", "Manual Handling 1992", "PUWER 1998"] },
+        body: "Several laws underpin health and safety in care. The Health and Safety at Work Act 1974 is the foundation.",
+        points: ["HASAWA places duties on employers and employees", "Regulations add specific requirements", "Your employer must provide training and a safe workplace"] },
+      { heading: "Shared Responsibility", visual: "compare",
+        visualData: { left: { title: "Employer must", items: ["Provide a safe workplace", "Assess and control risks", "Provide training and PPE", "Report serious incidents"] }, right: { title: "You must", items: ["Take care of yourself and others", "Co-operate with your employer", "Use equipment correctly", "Report hazards and near-misses"] } },
+        body: "Health and safety is a shared duty between the employer and every member of staff.",
+        points: ["You must not misuse anything provided for safety", "Reporting a near-miss can prevent a future injury"] },
+      { heading: "Risk Assessment: 5 Steps", visual: "flow",
+        visualData: { steps: ["Identify the hazards", "Decide who might be harmed", "Evaluate and control the risks", "Record and implement findings", "Review regularly"] },
+        body: "A risk assessment is a careful look at what could cause harm, so you can weigh up sensible precautions.",
+        points: ["A hazard is anything that could cause harm", "A risk is the chance of harm occurring", "Controls should reduce risk 'so far as reasonably practicable'"] },
+      { heading: "RIDDOR — Reporting", visual: "grid",
+        visualData: { items: ["Deaths", "Specified injuries", "7-day absences", "Occupational diseases", "Dangerous occurrences", "Gas incidents"] },
+        body: "RIDDOR requires certain serious workplace events to be reported to the HSE.",
+        points: ["Specified injuries include fractures and amputations", "Over-7-day absences are reportable", "Your manager makes the formal report — you must tell them"] },
+      { heading: "Hazardous Substances (COSHH)", visual: "flow",
+        visualData: { steps: ["Identify the substance", "Read the safety data sheet", "Store and label correctly", "Use the right PPE", "Dispose of safely"] },
+        body: "COSHH covers cleaning chemicals, clinical waste and other substances hazardous to health.",
+        points: ["Never decant chemicals into unlabelled bottles", "Follow the product's safety data sheet", "Report spillages and adverse reactions"] },
+      { heading: "Your Wellbeing & Security", visual: "compare",
+        visualData: { left: { title: "Your wellbeing", items: ["Recognise signs of stress and burnout", "Take your breaks", "Follow safe lone-working procedures", "Ask for support — it's a strength"] }, right: { title: "Security measures", items: ["Check the identity of visitors", "Keep premises and keys secure", "Protect personal and care records", "Report anything that feels unsafe"] } },
+        body: "Health and safety also covers your own mental health and personal wellbeing, and keeping people, premises and information secure.",
+        points: ["Your employer has a duty to protect your wellbeing too", "Lone workers should have a check-in system and a way to raise the alarm", "Never share door codes or service users' information", "Speak up early — small concerns are easier to resolve"] },
+    ],
+    quiz: [
+      { q: "What is the primary health and safety law in the UK?", options: ["Management Regs 1999", "Health and Safety at Work Act 1974", "RIDDOR 2013", "Manual Handling Regs 1992"], answer: 1, explanation: "HASAWA 1974 is the primary, overarching legislation." },
+      { q: "What does RIDDOR require?", options: ["Risk documentation", "Reporting of injuries, diseases and dangerous occurrences", "Manual handling training", "Substance control"], answer: 1, explanation: "RIDDOR 2013 requires reporting of specified workplace incidents to the HSE." },
+      { q: "What is the first step of a risk assessment?", options: ["Evaluate the risks", "Record the findings", "Identify the hazards", "Decide who is harmed"], answer: 2, explanation: "You cannot control a hazard you have not first identified." },
+      { q: "Under HASAWA, what duty do you have as an employee?", options: ["None — it's the employer's job", "Take reasonable care of yourself and others", "Only to wear a uniform", "Only to attend training"], answer: 1, explanation: "Employees must take reasonable care for their own safety and that of others." },
+      { q: "What does COSHH cover?", options: ["Manual handling", "Substances hazardous to health", "Fire safety", "Working at height"], answer: 1, explanation: "COSHH 2002 covers the control of substances hazardous to health." },
+      { q: "What is a 'near-miss'?", options: ["A minor injury", "An event that could have caused harm but didn't", "A reportable death", "A type of PPE"], answer: 1, explanation: "A near-miss is an event that could have caused harm; reporting it helps prevent future incidents." },
+      { q: "Health and safety training should also cover which of these?", options: ["Only physical hazards", "Your own mental health and personal wellbeing", "Nothing beyond first aid", "Only the employer's duties"], answer: 1, explanation: "Your own mental health and wellbeing are part of health and safety in care." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "mental-capacity", title: "Mental Capacity Act", icon: "🧠", color: "#6C3483", duration: "40 min",
+    summary: "Support decision-making and protect the rights of people who may lack capacity.",
+    objectives: [
+      "Apply the five principles of the Mental Capacity Act 2005",
+      "Carry out the two-stage test of capacity",
+      "Make and record best-interests decisions correctly",
+      "Understand DoLS and Lasting Power of Attorney",
+    ],
+    slides: [
+      { heading: "The 5 Key Principles", visual: "pillars",
+        visualData: { items: ["Presume capacity", "Support decisions", "Unwise ≠ incapable", "Best interests", "Least restrictive"] },
+        body: "The Mental Capacity Act 2005 protects and empowers people aged 16+ who may lack capacity to make particular decisions.",
+        points: ["Assume capacity unless proven otherwise", "Give all practicable support to decide", "A person may make decisions others see as unwise", "Decisions for those lacking capacity must be in their best interests", "Always choose the least restrictive option"] },
+      { heading: "Capacity is Decision-Specific", visual: "compare",
+        visualData: { left: { title: "Capacity is...", items: ["About one decision at a time", "Assessed at the time needed", "Able to fluctuate", "Always presumed first"] }, right: { title: "Capacity is NOT...", items: ["About a diagnosis or label", "Permanent or all-or-nothing", "Based on others' opinions", "Removed by one unwise choice"] } },
+        body: "A person may have capacity for some decisions but not others, and capacity can change over time.",
+        points: ["Re-assess for each significant decision", "Maximise capacity — right time, place and support"] },
+      { heading: "The 2-Stage Capacity Test", visual: "flow",
+        visualData: { steps: ["Stage 1: Is there an impairment of mind or brain?", "Stage 2: Does it stop this decision?", "Can they understand the information?", "Retain, weigh and communicate it?"] },
+        body: "To lack capacity, a person must fail the functional test because of an impairment of, or disturbance in, the mind or brain.",
+        points: ["Failing any one of the four functional elements = lacks capacity for that decision", "Understand, retain, weigh, communicate", "Record how you reached your conclusion"] },
+      { heading: "Best-Interests Decisions", visual: "grid",
+        visualData: { items: ["Past wishes", "Present feelings", "Beliefs & values", "Consult family/carers", "Least restrictive", "Involve the person"] },
+        body: "When someone lacks capacity for a decision, anything done for them must be in their best interests.",
+        points: ["Consider their past and present wishes", "Consult those close to them", "Never make assumptions based on age or condition", "Encourage their own participation"] },
+      { heading: "DoLS & LPA", visual: "compare",
+        visualData: { left: { title: "DoLS", items: ["Authorises a deprivation of liberty", "Used in care homes & hospitals", "Must be the least restrictive option", "Has a right of review"] }, right: { title: "Lasting Power of Attorney", items: ["Appoints a decision-maker", "Property & Financial Affairs", "Health & Welfare", "Health LPA used only when capacity is lost"] } },
+        body: "DoLS protects people who need restrictions for their safety; an LPA lets a trusted person decide on their behalf.",
+        points: ["A deprivation of liberty must always be lawful", "Check whether an LPA is registered before deciding for someone"] },
+    ],
+    quiz: [
+      { q: "What is the starting assumption about an adult's capacity?", options: ["A diagnosis means no capacity", "Capacity is presumed unless proven otherwise", "Capacity must be proven first", "The family decides"], answer: 1, explanation: "Principle 1: assume capacity unless it is established otherwise." },
+      { q: "A person makes a decision others think is unwise. What does this tell you about their capacity?", options: ["They lack capacity", "An assessment is automatically needed", "Nothing — people may make unwise decisions", "You should call a GP"], answer: 2, explanation: "Making an unwise decision is not, by itself, evidence of incapacity." },
+      { q: "How many functional elements must a person fail to lack capacity for a decision?", options: ["All four", "Three", "Two", "Any one"], answer: 3, explanation: "Failing any one of understand, retain, weigh, or communicate means lacking capacity for that decision." },
+      { q: "A decision made for someone who lacks capacity must be...", options: ["The cheapest option", "What the family prefers", "In their best interests", "Decided by the manager"], answer: 2, explanation: "Anything done for a person lacking capacity must be in their best interests." },
+      { q: "What does DoLS stand for?", options: ["Duty of Local Services", "Deprivation of Liberty Safeguards", "Decisions on Living Standards", "Default of Legal Support"], answer: 1, explanation: "DoLS — Deprivation of Liberty Safeguards — make a necessary deprivation of liberty lawful." },
+      { q: "Capacity under the MCA is best described as...", options: ["Permanent once lost", "Based on a person's diagnosis", "Decision- and time-specific", "Decided by next of kin"], answer: 2, explanation: "Capacity is specific to each decision and the time it needs to be made." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "duty-of-care", title: "Duty of Care", icon: "🤝", color: "#1A5276", duration: "25 min",
+    summary: "Understand your duty of care and how to balance safety with people's rights.",
+    objectives: [
+      "Explain what duty of care means in practice",
+      "Balance duty of care with a person's right to choose",
+      "Handle conflicts, dilemmas and complaints appropriately",
+      "Raise concerns and whistleblow when necessary",
+    ],
+    slides: [
+      { heading: "What is Duty of Care?", visual: "stat",
+        visualData: { stats: [{ n: "Auto", l: "Arises from the care role" }, { n: "All", l: "Covers users, colleagues, visitors" }, { n: "0", l: "Times it can be delegated away" }] },
+        body: "Duty of care is a legal obligation to act in the best interests of those you care for and to avoid acts or omissions that could foreseeably cause harm.",
+        points: ["It arises automatically from the care relationship", "It applies to everyone affected by your work", "It cannot be passed off to someone else", "Breaching it can lead to disciplinary or legal action"] },
+      { heading: "Duty vs Autonomy", visual: "compare",
+        visualData: { left: { title: "Duty of care", items: ["Keep people safe from harm", "Act in their best interests", "Provide safe, good-quality care"] }, right: { title: "Right to choose", items: ["People with capacity may take risks", "They may refuse care or treatment", "Their choices must be respected"] } },
+        body: "A frequent dilemma is balancing your duty to protect with a person's right to make their own choices.",
+        points: ["A person with capacity may make 'risky' choices", "Support positive risk-taking, don't override it", "Where capacity is lacking, act in best interests", "Always assess, record and involve your manager"] },
+      { heading: "Handling Complaints", visual: "flow",
+        visualData: { steps: ["Listen and stay calm", "Apologise for the distress", "Record the complaint", "Pass it to your manager", "Follow the complaints procedure"] },
+        body: "Complaints are a valuable source of improvement. Everyone has the right to complain and to be taken seriously.",
+        points: ["Never be defensive or dismissive", "Reassure the person it will be looked into", "Know your organisation's complaints policy"] },
+      { heading: "Raising Concerns & Whistleblowing", visual: "flow",
+        visualData: { steps: ["Raise it with your line manager", "Escalate within your organisation", "Contact CQC if unresolved", "You are protected in law"] },
+        body: "If you see poor or unsafe practice, you have a duty to speak up. Whistleblowers are protected under the law.",
+        points: ["Duty of care outranks an unsafe instruction", "The Public Interest Disclosure Act protects you", "Acting in good faith is the key test", "Silence can allow harm to continue"] },
+    ],
+    quiz: [
+      { q: "When does duty of care arise?", options: ["On signing a contract", "When a manager confirms it", "Automatically from the care relationship", "After a risk assessment"], answer: 2, explanation: "Duty of care arises automatically from the caring relationship." },
+      { q: "A service user with capacity refuses their medication. What should you do?", options: ["Give it anyway", "Respect their choice, record it and inform your supervisor", "Call 999", "Get next-of-kin consent"], answer: 1, explanation: "A person with capacity may refuse treatment; forcing it would be unlawful." },
+      { q: "A manager instructs you to do something you believe is unsafe. What do you do?", options: ["Follow it without question", "Leave your shift", "Raise your concern and escalate if it isn't resolved", "Comply quietly"], answer: 2, explanation: "Your duty of care takes precedence over an unsafe instruction; raise and escalate concerns." },
+      { q: "How should you respond to a complaint?", options: ["Defend yourself firmly", "Listen, apologise for the distress and report it", "Ignore it if you disagree", "Tell them to put it in writing only"], answer: 1, explanation: "Listen, acknowledge the distress, record it and follow the complaints procedure." },
+      { q: "What protects a worker who reports wrongdoing in good faith?", options: ["The Care Act 2014", "The Public Interest Disclosure Act", "RIDDOR", "COSHH"], answer: 1, explanation: "The Public Interest Disclosure Act 1998 protects whistleblowers acting in good faith." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "equality-diversity", title: "Equality, Diversity & Dignity", icon: "🌈", color: "#117A65", duration: "35 min",
+    summary: "Promote equality, value diversity and protect the dignity of every person.",
+    objectives: [
+      "Identify the nine protected characteristics under the Equality Act 2010",
+      "Recognise the four main types of discrimination",
+      "Deliver person-centred, dignified care",
+      "Apply the 6Cs to your everyday practice",
+    ],
+    slides: [
+      { heading: "The Equality Act 2010", visual: "grid",
+        visualData: { items: ["Age", "Disability", "Gender reassignment", "Marriage / civil partnership", "Pregnancy / maternity", "Race", "Religion / belief", "Sex", "Sexual orientation"] },
+        body: "The Equality Act 2010 protects people from discrimination across nine 'protected characteristics'.",
+        points: ["Discrimination on any of these grounds is unlawful", "Protection applies in work and in care", "Everyone is covered by the Act"] },
+      { heading: "Equality, Diversity & Inclusion", visual: "pillars",
+        visualData: { items: ["Equality", "Diversity", "Inclusion"] },
+        body: "These three ideas work together to make sure everyone is treated fairly and feels they belong.",
+        points: ["Equality — fair treatment and equal opportunity", "Diversity — valuing what makes people different", "Inclusion — everyone feels welcomed and respected", "Fair treatment is not the same as identical treatment"] },
+      { heading: "Types of Discrimination", visual: "grid",
+        visualData: { items: ["Direct", "Indirect", "Harassment", "Victimisation"] },
+        body: "Discrimination can be obvious or hidden. The Equality Act recognises four main forms.",
+        points: ["Direct — treating someone worse because of a characteristic", "Indirect — a rule that disadvantages a group", "Harassment — unwanted conduct that violates dignity", "Victimisation — treating someone badly for raising a concern"] },
+      { heading: "Dignity in Care", visual: "compare",
+        visualData: { left: { title: "Upholding dignity", items: ["Offer real choice", "Respect privacy", "Listen and involve", "Use preferred names"] }, right: { title: "Undermining dignity", items: ["Rushing personal care", "Talking over someone", "Ignoring preferences", "Exposing the body unnecessarily"] } },
+        body: "Dignity means treating people as individuals and respecting what matters to them.",
+        points: ["Person-centred care puts the individual first", "Small things make a big difference", "Privacy and respect are non-negotiable"] },
+      { heading: "The 6Cs of Care", visual: "pillars",
+        visualData: { items: ["Care", "Compassion", "Competence", "Communication", "Courage", "Commitment"] },
+        body: "The 6Cs are the shared values that underpin compassionate, high-quality care.",
+        points: ["Courage means speaking up when something is wrong", "Communication keeps care safe and personal", "Competence comes from training and reflection"] },
+    ],
+    quiz: [
+      { q: "How many protected characteristics are in the Equality Act 2010?", options: ["6", "7", "9", "11"], answer: 2, explanation: "There are 9 protected characteristics." },
+      { q: "Which of the 6Cs means speaking up when something is wrong?", options: ["Commitment", "Competence", "Courage", "Care"], answer: 2, explanation: "Courage means doing the right thing and speaking up." },
+      { q: "A rule that unintentionally disadvantages one group is which type of discrimination?", options: ["Direct", "Indirect", "Harassment", "Victimisation"], answer: 1, explanation: "Indirect discrimination is a rule or practice that puts a group at a disadvantage." },
+      { q: "What does person-centred care mean?", options: ["Treating everyone identically", "Putting the individual and their preferences first", "Following a fixed routine", "Letting family decide everything"], answer: 1, explanation: "Person-centred care focuses on the individual's needs, wishes and preferences." },
+      { q: "Treating someone badly because they made a discrimination complaint is...", options: ["Direct discrimination", "Harassment", "Victimisation", "Indirect discrimination"], answer: 2, explanation: "Victimisation is treating someone unfairly for raising or supporting a complaint." },
+      { q: "Which of these best upholds a person's dignity?", options: ["Choosing their clothes for them", "Using their preferred name and offering choice", "Rushing to save time", "Discussing them in front of others"], answer: 1, explanation: "Respecting preferences and offering real choice upholds dignity." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "medication", title: "Medication Awareness", icon: "💊", color: "#7B241C", duration: "45 min",
+    summary: "Support people with medicines safely, accurately and within your role.",
+    objectives: [
+      "Apply the rights of safe medication support",
+      "Complete MAR charts correctly and legally",
+      "Distinguish prompting, assisting and administering",
+      "Respond correctly to medication errors and refusals",
+      "Recognise when extra training is needed for specific or specialist medicines",
+    ],
+    slides: [
+      { heading: "Levels of Support", visual: "pillars",
+        visualData: { items: ["Prompting", "Assisting", "Administering"] },
+        body: "Your role determines how you may support a person with their medicines. Never work beyond your training.",
+        points: ["Prompting — reminding a person to take their medicine", "Assisting — practical help, e.g. opening a bottle", "Administering — giving the medicine directly", "Only administer if trained and assessed as competent"] },
+      { heading: "The Rights of Medication", visual: "grid",
+        visualData: { items: ["Right person", "Right medicine", "Right dose", "Right route", "Right time", "Right to refuse", "Right documentation"] },
+        body: "Check every 'right', every time, before supporting any medicine.",
+        points: ["Use at least two identifiers for the person", "Check the medicine, dose, route and time against the MAR", "A person always has the right to refuse", "Record immediately afterwards"] },
+      { heading: "MAR Charts", visual: "compare",
+        visualData: { left: { title: "Always", items: ["Sign immediately after giving", "Record refusals with a reason", "Use the correct code", "Keep the chart legible"] }, right: { title: "Never", items: ["Sign in advance", "Leave blank gaps", "Alter a previous entry", "Guess a missed entry"] } },
+        body: "The Medication Administration Record is a legal document and must be accurate and complete.",
+        points: ["A gap on a MAR chart is a serious error", "Use the agreed codes for refusals and omissions", "Charts are retained for a minimum of 8 years"] },
+      { heading: "Medication Errors", visual: "flow",
+        visualData: { steps: ["Stay calm — check the person", "Seek medical advice if needed", "Tell your manager immediately", "Record exactly what happened", "Complete an incident report"] },
+        body: "If an error happens, the person's safety comes first, followed by honest and prompt reporting.",
+        points: ["Never hide or 'correct' an error quietly", "Errors are reported so practice can improve", "Be open and honest — the duty of candour applies"] },
+      { heading: "Special Situations", visual: "grid",
+        visualData: { items: ["Controlled drugs", "Covert medication", "PRN (as required)", "Time-critical meds", "Patches, creams & inhalers", "Buccal midazolam"] },
+        body: "Some medicines and circumstances need extra care, specific procedures, and additional training before you can support them.",
+        points: ["Specific forms — patches, creams, inhalers, eye drops — need extra training", "Specialist medicines such as buccal midazolam need named, trained staff", "Controlled drugs need a witness and separate records", "Covert medication needs a best-interests decision and pharmacist advice", "Always check for documented allergies"] },
+    ],
+    quiz: [
+      { q: "How many identifiers should you use to confirm a person before giving medication?", options: ["One", "At least two", "Three", "None if you know them"], answer: 1, explanation: "Use at least two identifiers (e.g. name and date of birth) every time." },
+      { q: "When should you sign the MAR chart?", options: ["At the end of your shift", "Immediately after giving the medicine", "Before giving it", "Once the person confirms"], answer: 1, explanation: "Sign immediately after administering — never in advance." },
+      { q: "How long must MAR charts be retained?", options: ["3 years", "5 years", "A minimum of 8 years", "12 years"], answer: 2, explanation: "MAR charts are kept for a minimum of 8 years." },
+      { q: "What is the difference between prompting and administering?", options: ["No difference", "Prompting reminds; administering gives the medicine directly", "Administering is only for nurses", "Prompting needs no training at all"], answer: 1, explanation: "Prompting is reminding; administering is giving the medicine directly and needs competence." },
+      { q: "A person refuses their medication. What should you do?", options: ["Insist they take it", "Hide it in their food", "Respect the refusal, record it and inform your manager", "Sign it as given"], answer: 2, explanation: "Respect the right to refuse, record it accurately, and report to your manager." },
+      { q: "You realise you gave the wrong dose. What is your first priority?", options: ["Update the MAR quietly", "Check the person's wellbeing and seek advice", "Finish your round first", "Wait and see"], answer: 1, explanation: "The person's safety comes first — check them, seek advice, then report and record openly." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "manual-handling", title: "Moving & Handling", icon: "🏋️", color: "#7D6608", duration: "35 min",
+    summary: "Move and support people safely, protecting them and yourself from injury.",
+    objectives: [
+      "Understand the legislation governing moving and handling",
+      "Assess a move using the TILE / LITE factors",
+      "Apply safe handling principles and technique",
+      "Use moving-and-handling equipment appropriately",
+    ],
+    slides: [
+      { heading: "Why It Matters", visual: "stat",
+        visualData: { stats: [{ n: "#1", l: "Cause of injury in social care" }, { n: "MSDs", l: "Musculoskeletal disorders" }, { n: "0", l: "Manual lifts where a hoist exists" }] },
+        body: "Musculoskeletal injuries are the most common cause of harm to care workers. Safe handling protects everyone.",
+        points: ["Never lift a person manually if an aid is available", "Poor technique causes long-term back injury", "Equipment exists to keep both of you safe"] },
+      { heading: "The Legislation", visual: "grid",
+        visualData: { items: ["HASAWA 1974", "Manual Handling Ops 1992", "LOLER 1998", "PUWER 1998", "Management Regs 1999"] },
+        body: "The Manual Handling Operations Regulations 1992 require employers to avoid hazardous manual handling where possible.",
+        points: ["Avoid — assess — reduce is the legal hierarchy", "LOLER covers lifting equipment like hoists", "Hoists must be serviced and inspected regularly"] },
+      { heading: "Assess First — TILE", visual: "flow",
+        visualData: { steps: ["Task — what is being done?", "Individual — your own capability", "Load — the person or object", "Environment — space and hazards"] },
+        body: "Before any move, assess the TILE (or LITE) factors. Every person has a personal moving-and-handling plan.",
+        points: ["Read the person's handling plan first", "Check the route and clear obstructions", "Never improvise an unplanned lift", "If anything has changed, reassess"] },
+      { heading: "Safe Technique", visual: "compare",
+        visualData: { left: { title: "Do", items: ["Bend your knees, not your back", "Keep the load close", "Maintain a stable base", "Move your feet to turn"] }, right: { title: "Don't", items: ["Twist or stoop", "Hold the load away from you", "Lift above shoulder height", "Rush or jerk the movement"] } },
+        body: "Good technique keeps your spine protected and the move controlled and comfortable.",
+        points: ["Keep a natural curve in your back", "Lead with your head, not your back", "Move people with dignity — explain, involve them and go at their pace", "Communicate with the person and any colleague"] },
+      { heading: "Using Equipment", visual: "grid",
+        visualData: { items: ["Hoists", "Slide sheets", "Transfer boards", "Stand aids", "Handling belts", "Wheelchairs"] },
+        body: "The right equipment, used correctly, removes most of the risk from a move.",
+        points: ["Only use equipment you are trained on", "Check equipment is serviced and undamaged before use", "Match the sling size and type to the person", "Two carers are needed for many hoist moves"] },
+    ],
+    quiz: [
+      { q: "What does TILE stand for?", options: ["Task, Individual, Load, Environment", "Tilt, Incline, Lift, Extend", "Time, Injury, Lower, Engage", "Turn, Inspect, Lift, Evaluate"], answer: 0, explanation: "TILE: Task, Individual, Load, Environment — the factors to assess before a move." },
+      { q: "When should you lift a person manually?", options: ["Always", "Only if no hoist or aid is available and it is assessed as safe", "Never under any circumstances", "Whenever it's quicker"], answer: 1, explanation: "Avoid manual lifting; use aids and follow the person's handling plan." },
+      { q: "What is the most common cause of injury in social care?", options: ["Cuts", "Burns", "Musculoskeletal injuries", "Falls"], answer: 2, explanation: "Musculoskeletal injuries from poor moving and handling are the most common." },
+      { q: "Which is correct safe technique?", options: ["Bend from the back and reach", "Bend your knees and keep the load close", "Twist as you lift", "Lift above your shoulders"], answer: 1, explanation: "Bend your knees, keep your back's natural curve, and hold the load close." },
+      { q: "What does LOLER chiefly govern?", options: ["Cleaning chemicals", "Lifting equipment such as hoists", "Fire exits", "Food hygiene"], answer: 1, explanation: "LOLER 1998 covers lifting equipment, including the inspection of hoists." },
+      { q: "Before using a hoist, you should...", options: ["Use any sling that's nearby", "Check it's serviced, undamaged and use the correct sling", "Work alone to save time", "Skip the handling plan"], answer: 1, explanation: "Check the equipment is safe and serviced, use the right sling, and follow the plan." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW — Skills for Care Part 1 statutory/mandatory topics
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "basic-life-support", title: "Basic Life Support & First Aid", icon: "❤️", color: "#C0392B", duration: "30 min",
+    summary: "Recognise an emergency and provide basic life support and first aid with confidence.",
+    objectives: [
+      "Recognise and respond safely to accidents and sudden illness",
+      "Carry out the primary survey using DR ABC",
+      "Perform CPR and place someone in the recovery position",
+      "Take the right first-aid action for bleeding, choking and shock",
+    ],
+    slides: [
+      { heading: "First on the Scene — DR ABC", visual: "flow",
+        visualData: { steps: ["Danger — is the area safe?", "Response — are they responsive?", "Airway — open the airway", "Breathing — look, listen and feel", "Call 999 and start CPR if needed"] },
+        body: "The primary survey, DR ABC, is the systematic check you make on anyone who collapses or is injured.",
+        points: ["Protect yourself first — don't become a second casualty", "Shout for help and send someone to call 999", "If they are not breathing normally, start CPR immediately", "Ask a bystander to find an AED (defibrillator)"] },
+      { heading: "Recognising Sudden Illness", visual: "grid",
+        visualData: { items: ["Heart attack", "Stroke (FAST)", "Seizure", "Choking", "Anaphylaxis", "Diabetic emergency"] },
+        body: "Early recognition saves lives. Know the common emergencies you may meet in care.",
+        points: ["Stroke — use FAST: Face, Arms, Speech, Time to call 999", "Chest pain spreading to the arm or jaw may be a heart attack", "Anaphylaxis can follow a known allergen — use an adrenaline pen if prescribed", "When in doubt, call 999"] },
+      { heading: "CPR — Chest Compressions", visual: "flow",
+        visualData: { steps: ["Confirm not breathing normally", "Call 999 and get an AED", "30 chest compressions", "2 rescue breaths (if trained)", "Continue 30:2 until help arrives"] },
+        body: "If an adult is unresponsive and not breathing normally, start CPR straight away.",
+        points: ["Push hard and fast in the centre of the chest", "Depth about 5–6 cm, rate 100–120 per minute", "Compression-only CPR is fine if you can't give breaths", "Swap with another rescuer every 2 minutes if you can"] },
+      { heading: "The Recovery Position", visual: "grid",
+        visualData: { items: ["Unresponsive", "But breathing normally", "Roll onto their side", "Tilt the head back", "Keep the airway open", "Keep monitoring"] },
+        body: "An unconscious person who is breathing should be placed in the recovery position to keep their airway clear.",
+        points: ["Use it when they are breathing but not responding", "It stops the tongue blocking the airway and lets fluids drain", "Keep checking they are still breathing", "Be ready to start CPR if breathing stops"] },
+      { heading: "Common First Aid", visual: "compare",
+        visualData: { left: { title: "Severe bleeding", items: ["Apply firm, direct pressure", "Use a clean dressing or pad", "Raise the injury if you can", "Call 999"] }, right: { title: "Choking", items: ["Encourage them to cough", "5 firm back blows", "5 abdominal thrusts", "Call 999 if it doesn't clear"] } },
+        body: "A few simple actions for bleeding, choking and shock can keep a person alive until help arrives.",
+        points: ["For shock — lay them down, raise their legs, keep them warm", "Never give food or drink to someone who may need surgery", "Know your workplace first-aiders and where the kit is", "Refresh basic life support at least yearly; first aid every three years"] },
+    ],
+    quiz: [
+      { q: "What does the 'D' in DR ABC stand for?", options: ["Defibrillator", "Danger", "Diagnosis", "Dressing"], answer: 1, explanation: "Danger — always check the area is safe before you approach." },
+      { q: "An adult is unresponsive and not breathing normally. What should you do?", options: ["Put them in the recovery position", "Give them water", "Start CPR and make sure 999 is called", "Wait to see if they improve"], answer: 2, explanation: "Begin CPR immediately and ensure 999 is called." },
+      { q: "What is the correct rate for chest compressions?", options: ["40–60 per minute", "100–120 per minute", "150–180 per minute", "As fast as possible"], answer: 1, explanation: "Compress at 100–120 per minute, about 5–6 cm deep." },
+      { q: "The letters FAST help you recognise which emergency?", options: ["Choking", "Heart attack", "Stroke", "Seizure"], answer: 2, explanation: "FAST — Face, Arms, Speech, Time — helps you spot a stroke." },
+      { q: "When should a person be placed in the recovery position?", options: ["When they are bleeding", "When they are unresponsive but breathing normally", "Only during CPR", "When they are choking"], answer: 1, explanation: "Use the recovery position for someone unresponsive who is breathing normally." },
+      { q: "How do you treat severe external bleeding?", options: ["Give a hot drink", "Apply firm, direct pressure and call 999", "Wait for it to clot", "Move the person quickly"], answer: 1, explanation: "Apply firm, direct pressure with a clean dressing and call 999." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "safeguarding-children", title: "Safeguarding Children", icon: "🧒", color: "#CA6F1E", duration: "30 min",
+    summary: "Recognise the signs that a child may be at risk and know exactly what to do.",
+    objectives: [
+      "Understand your duty to protect children and young people",
+      "Recognise the four main categories of child abuse",
+      "Spot the warning signs of abuse and neglect",
+      "Report a concern about a child correctly and without delay",
+    ],
+    slides: [
+      { heading: "Everyone's Responsibility", visual: "stat",
+        visualData: { stats: [{ n: "Under 18", l: "Counts as a child in law" }, { n: "Any setting", l: "Where you might meet a child" }, { n: "Standard 11", l: "Care Certificate duty" }] },
+        body: "Even in adult social care you may meet children — a visiting grandchild, a young carer, or a child in someone's home. Safeguarding children is everyone's responsibility.",
+        points: ["A child is anyone under 18", "You don't need proof — a genuine concern is enough", "The Children Acts 1989 and 2004 set the legal framework", "'Working Together to Safeguard Children' is the key statutory guidance"] },
+      { heading: "The 4 Types of Abuse", visual: "grid",
+        visualData: { items: ["Physical", "Emotional", "Sexual", "Neglect"] },
+        body: "Child abuse falls into four main categories. A child may experience more than one at the same time.",
+        points: ["Physical — hitting, shaking or otherwise causing harm", "Emotional — persistent ill-treatment affecting development", "Sexual — involving a child in sexual activity", "Neglect — failing to meet basic physical or emotional needs"] },
+      { heading: "Warning Signs", visual: "compare",
+        visualData: { left: { title: "Signs in the child", items: ["Unexplained injuries", "Becoming withdrawn or fearful", "Age-inappropriate behaviour", "Hunger, poor hygiene, untreated needs", "Reluctance to go home"] }, right: { title: "Signs in adults", items: ["Unrealistic expectations of the child", "Hostility or rejection", "Lack of supervision", "Odd explanations for injuries", "Isolating the child"] } },
+        body: "Signs are not proof, but they are reasons to be alert and to pass on your concern.",
+        points: ["One sign alone may mean nothing — consider the whole picture", "A disclosure may be the only sign you ever get", "Always take what a child tells you seriously"] },
+      { heading: "If a Child Discloses", visual: "flow",
+        visualData: { steps: ["Listen calmly and patiently", "Reassure — it is not their fault", "Do NOT promise to keep secrets", "Do NOT investigate or lead them", "Record and report immediately"] },
+        body: "How you respond to a disclosure matters. Your job is to listen and pass it on — not to investigate.",
+        points: ["Use the TED prompts: Tell, Explain, Describe", "Never interrogate or repeatedly question the child", "Write down the child's own words as soon as you can", "Tell your safeguarding lead straight away"] },
+      { heading: "Reporting a Concern", visual: "flow",
+        visualData: { steps: ["Make sure the child is safe now", "Tell your designated safeguarding lead", "Record the facts and the child's words", "Lead refers to children's social care / MASH", "Call 999 if a child is in immediate danger"] },
+        body: "Reporting protects the child. If you don't act, no one else may.",
+        points: ["Every organisation has a designated safeguarding lead", "Concerns go to children's social care or the MASH", "If no action is taken, escalate — you can contact the LADO or NSPCC", "Refresh this training at least every three years"] },
+    ],
+    quiz: [
+      { q: "In law, a child is defined as anyone under what age?", options: ["13", "16", "18", "21"], answer: 2, explanation: "A child is anyone under the age of 18." },
+      { q: "How many main categories of child abuse are there?", options: ["Three", "Four", "Six", "Ten"], answer: 1, explanation: "Physical, emotional, sexual abuse and neglect — four categories." },
+      { q: "A child begins to disclose abuse. What should you NOT do?", options: ["Listen calmly", "Reassure them", "Promise to keep it a secret", "Record what they say"], answer: 2, explanation: "Never promise secrecy — you must pass the concern on to keep the child safe." },
+      { q: "Which Care Certificate standard covers safeguarding children?", options: ["Standard 1", "Standard 7", "Standard 11", "Standard 15"], answer: 2, explanation: "Care Certificate Standard 11 covers safeguarding children." },
+      { q: "Do you need proof before reporting a concern about a child?", options: ["Yes, always", "No — a genuine concern is enough", "Only if you saw it yourself", "Only with the parents' permission"], answer: 1, explanation: "You don't need proof; a genuine concern is enough to report." },
+      { q: "A child is in immediate danger. What should you do first?", options: ["Email your manager", "Call 999", "Wait until your shift ends", "Ask the parents"], answer: 1, explanation: "If a child is in immediate danger, call 999 without delay." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "learning-disability-autism", title: "Learning Disability & Autism Awareness", icon: "🧩", color: "#2E86C1", duration: "35 min",
+    summary: "Understand learning disability and autism and adapt your care so everyone is included.",
+    objectives: [
+      "Understand what a learning disability and autism are",
+      "Explain why the Oliver McGowan training is a legal requirement",
+      "Make reasonable adjustments so people access care equally",
+      "Communicate and support people in ways that suit them",
+    ],
+    slides: [
+      { heading: "Oliver's Legacy", visual: "stat",
+        visualData: { stats: [{ n: "Oliver", l: "McGowan" }, { n: "2022", l: "Health & Care Act duty" }, { n: "Reg 18", l: "CQC training requirement" }] },
+        body: "Oliver McGowan was a young autistic man with a learning disability who died after being given medication against his and his family's wishes. His name is now on the mandatory training all health and care staff must complete.",
+        points: ["The Health and Care Act 2022 made this training a legal requirement", "CQC Regulation 18 requires staff to be trained to the right level", "Training is tiered — everyone completes at least the awareness level", "People with a learning disability and autistic people have a right to equal care"] },
+      { heading: "Understanding the Difference", visual: "compare",
+        visualData: { left: { title: "Learning disability", items: ["A reduced ability to learn new skills", "Affects everyday living", "Present from childhood", "Ranges from mild to profound"] }, right: { title: "Autism", items: ["A difference in how the brain works", "Affects communication & interaction", "A lifelong neurodevelopmental difference", "Every autistic person is an individual"] } },
+        body: "A learning disability and autism are not the same thing, although some people are both autistic and have a learning disability.",
+        points: ["Autism is not a learning disability or a mental illness", "Many autistic people have average or high intelligence", "Avoid assumptions — ask the person what they need"] },
+      { heading: "Reasonable Adjustments", visual: "grid",
+        visualData: { items: ["Extra time", "A quiet space", "Easy-read information", "Clear, literal language", "Predictable routine", "Involve their supporters"] },
+        body: "The Equality Act 2010 requires reasonable adjustments so people can access care equally. Small changes make a big difference.",
+        points: ["Reduce noise, bright lights and crowding where you can", "Use easy-read formats or pictures alongside words", "Give one instruction at a time and allow processing time", "Find out what works from the person and those who know them"] },
+      { heading: "Communication That Works", visual: "flow",
+        visualData: { steps: ["Get to know the person first", "Use clear, concrete words", "Allow time to process and reply", "Check you have understood each other", "Use their preferred communication aids"] },
+        body: "Good communication is the foundation of good care. Adapt to the person rather than expecting them to adapt to you.",
+        points: ["Avoid jargon, sarcasm and figures of speech", "Some people use signing, symbols or devices to communicate", "Watch body language — behaviour is communication too", "Behaviour that challenges is often unmet need or distress"] },
+      { heading: "Avoiding Diagnostic Overshadowing", visual: "stat",
+        visualData: { stats: [{ n: "Avoidable", l: "Many early deaths are" }, { n: "Listen", l: "To the person & family" }, { n: "Equal", l: "Right to healthcare" }] },
+        body: "Diagnostic overshadowing is when signs of illness are wrongly blamed on a person's learning disability or autism. It can be fatal — as it was for Oliver.",
+        points: ["Don't assume new symptoms are 'just part of' their condition", "Take physical health concerns seriously and act on them", "Make sure eligible people get their annual health check", "Always listen to families and carers who know the person best"] },
+    ],
+    quiz: [
+      { q: "The Oliver McGowan Mandatory Training is named after a young man who was…", options: ["A care worker", "An autistic man with a learning disability who died avoidably", "A doctor", "A government minister"], answer: 1, explanation: "Oliver McGowan was an autistic young man with a learning disability whose avoidable death led to the training." },
+      { q: "Which law made this training a legal requirement?", options: ["Care Act 2014", "Health and Care Act 2022", "Mental Health Act 1983", "Equality Act 2010"], answer: 1, explanation: "The Health and Care Act 2022 introduced the requirement." },
+      { q: "Is autism the same as a learning disability?", options: ["Yes, they are identical", "No — they are different, though a person can have both", "Autism is a mental illness", "A learning disability is a type of autism"], answer: 1, explanation: "They are different; some people are both autistic and have a learning disability." },
+      { q: "What is a 'reasonable adjustment'?", options: ["A change that helps a person access care equally", "A reduction in their care", "A medical procedure", "A type of medication"], answer: 0, explanation: "A reasonable adjustment is a change that helps a person access care equally, required under the Equality Act 2010." },
+      { q: "What is 'diagnostic overshadowing'?", options: ["Giving two diagnoses", "Blaming new symptoms on a person's disability instead of investigating", "A type of health check", "A communication aid"], answer: 1, explanation: "It is wrongly attributing signs of illness to someone's learning disability or autism, which can be dangerous." },
+      { q: "An autistic person seems distressed in a busy, noisy room. A good first step is to…", options: ["Tell them to calm down", "Offer a quieter space and reduce the noise", "Ignore it", "Restrict their visitors"], answer: 1, explanation: "Reducing sensory overload — noise, light and crowding — is a simple, effective adjustment." },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "food-hygiene", title: "Food Safety & Hygiene", icon: "🍽️", color: "#16A085", duration: "30 min",
+    summary: "Handle, prepare and serve food safely to protect the people you support.",
+    objectives: [
+      "Understand why food safety matters in care",
+      "Apply the 4 C's of food hygiene",
+      "Prevent cross-contamination and control bacteria",
+      "Store and cook food at the correct temperatures",
+    ],
+    slides: [
+      { heading: "Why Food Safety Matters", visual: "stat",
+        visualData: { stats: [{ n: "4 C's", l: "Of food hygiene" }, { n: "8°C", l: "Legal max fridge temp" }, { n: "75°C", l: "Core temp when cooked" }] },
+        body: "People who draw on care can be more vulnerable to food poisoning. Safe food handling prevents serious illness.",
+        points: ["Older and unwell people are at higher risk from food-borne illness", "Food safety is a legal requirement (Food Safety Act 1990)", "The Food Standards Agency sets the standards", "Good hygiene protects the people you support"] },
+      { heading: "The 4 C's", visual: "pillars",
+        visualData: { items: ["Cleaning", "Cooking", "Chilling", "Cross-contamination"] },
+        body: "The four C's are the foundation of food safety. Get these right and you prevent most food-borne illness.",
+        points: ["Cleaning — keep surfaces, hands and equipment clean", "Cooking — cook food thoroughly to kill bacteria", "Chilling — keep cold food cold", "Cross-contamination — keep raw and ready-to-eat foods apart"] },
+      { heading: "Stopping Cross-Contamination", visual: "grid",
+        visualData: { items: ["Separate chopping boards", "Raw meat on the bottom shelf", "Wash hands between tasks", "Clean as you go", "Cover and label food", "Don't reuse raw-meat utensils"] },
+        body: "Cross-contamination is when bacteria spread from one food (often raw meat) to ready-to-eat food. It's a leading cause of food poisoning.",
+        points: ["Use colour-coded boards where available", "Store raw meat below ready-to-eat food in the fridge", "Wash hands after handling raw food", "Keep pets and pests away from food areas"] },
+      { heading: "Temperature Control", visual: "flow",
+        visualData: { steps: ["Fridge at 5°C or below (legal max 8°C)", "Cook to 75°C in the core", "Hot-hold above 63°C", "Cool leftovers within 90 minutes", "Reheat once, to 75°C"] },
+        body: "Bacteria multiply fastest between 8°C and 63°C — the 'danger zone'. Temperature control keeps food out of it.",
+        points: ["Use a clean probe thermometer to check the core temperature", "Never refreeze food that has thawed", "Label and date food in the fridge", "When in doubt, throw it out"] },
+      { heading: "Personal Hygiene", visual: "grid",
+        visualData: { items: ["Wash hands thoroughly", "Tie back hair", "Wear a clean apron", "Cover cuts (blue plaster)", "No food handling if ill", "Report sickness"] },
+        body: "Your own hygiene is the first line of defence. Bacteria are easily carried on hands, clothing and hair.",
+        points: ["Wash hands before handling food and after using the toilet", "Use blue waterproof plasters so they're easy to spot", "Don't handle food if you have sickness or diarrhoea", "Stay off food handling until 48 hours after symptoms stop"] },
+    ],
+    quiz: [
+      { q: "What are the '4 C's' of food safety?", options: ["Cleaning, Cooking, Chilling, Cross-contamination", "Care, Caution, Cleaning, Cooking", "Cold, Cooked, Clean, Covered", "Check, Cook, Cool, Clear"], answer: 0, explanation: "Cleaning, Cooking, Chilling and avoiding Cross-contamination." },
+      { q: "What is the legal maximum temperature for a fridge?", options: ["2°C", "5°C", "8°C", "12°C"], answer: 2, explanation: "The legal maximum is 8°C; best practice is 5°C or below." },
+      { q: "What core temperature should food reach when cooked?", options: ["55°C", "63°C", "75°C", "100°C"], answer: 2, explanation: "Food should reach 75°C in the core to kill harmful bacteria." },
+      { q: "How should raw meat be stored in a fridge?", options: ["On the top shelf", "On the bottom shelf, below ready-to-eat food", "Next to the salad", "It doesn't matter"], answer: 1, explanation: "Store raw meat on the bottom shelf so it can't drip onto ready-to-eat food." },
+      { q: "Why are blue plasters used when handling food?", options: ["They're cheaper", "Blue isn't a natural food colour, so they're easy to spot", "They're more waterproof", "They're stronger"], answer: 1, explanation: "Blue is not a natural food colour, so a blue plaster is easy to see if it falls into food." },
+      { q: "You've had diarrhoea. When can you return to handling food?", options: ["Straight away", "As soon as you feel a bit better", "48 hours after symptoms have stopped", "After one hour"], answer: 2, explanation: "Stay off food handling until 48 hours after symptoms have completely stopped." },
+    ],
+  },
+];
+
+const COURSE_IDS = COURSES.map(c => c.id);
+const COURSE_MAP = Object.fromEntries(COURSES.map(c => [c.id, c]));
+
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  CARE2LEARN — IN-BROWSER BACKEND
+//  Mimics the Node server's REST API entirely in the browser so the platform
+//  runs from a single file with no server. Data persists via localStorage
+//  (with an in-memory fallback if storage is unavailable).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Persistent store (localStorage with in-memory fallback) ──
+const _mem = {};
+let _useLS = true;
+try {
+  const k = "__c2l_test__";
+  window.localStorage.setItem(k, "1");
+  window.localStorage.removeItem(k);
+} catch (e) { _useLS = false; }
+
+function _load(key, fallback) {
+  if (_useLS) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+  return _mem[key] !== undefined ? _mem[key] : fallback;
+}
+function _save(key, val) {
+  if (_useLS) {
+    try { window.localStorage.setItem(key, JSON.stringify(val)); return; } catch (e) {}
+  }
+  _mem[key] = val;
+}
+
+// ── Tables ──
+const DB = {
+  organisations: _load("c2l_orgs", []),
+  staff: _load("c2l_staff", []),
+  enrolments: _load("c2l_enrolments", []),
+  sessions: _load("c2l_sessions", []),
+};
+function persist() {
+  _save("c2l_orgs", DB.organisations);
+  _save("c2l_staff", DB.staff);
+  _save("c2l_enrolments", DB.enrolments);
+  _save("c2l_sessions", DB.sessions);
+}
+
+// ── ID helpers ──
+function rndHex(n) {
+  let s = "";
+  for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 16).toString(16);
+  return s.toUpperCase();
+}
+function genId(prefix) { return (prefix ? prefix + "-" : "") + rndHex(10); }
+function genToken() { return rndHex(48); }
+function genPin() { return String(Math.floor(1000 + Math.random() * 9000)); }
+
+function addYear(dateStr) {
+  const d = new Date(dateStr);
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().split("T")[0];
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  return Math.ceil((new Date(dateStr) - new Date()) / 86400000);
+}
+
+// ── Compliance shaping (mirrors server) ──
+function shapeEnrolment(row) {
+  const course = COURSE_MAP[row.course_id];
+  const days = daysUntil(row.expiry_date);
+  let compliance = "not_started";
+  if (row.status === "completed") {
+    if (days === null) compliance = "valid";
+    else if (days <= 0) compliance = "expired";
+    else if (days <= 30) compliance = "expiring";
+    else compliance = "valid";
+  } else if (row.status === "in_progress") compliance = "in_progress";
+  else if (row.status === "failed") compliance = "failed";
+  return {
+    id: row.id, courseId: row.course_id,
+    courseTitle: course ? course.title : row.course_id,
+    courseIcon: course ? course.icon : "📘",
+    courseColor: course ? course.color : "#555",
+    assignedAt: row.assigned_at, dueDate: row.due_date,
+    status: row.status, progress: row.progress, score: row.score,
+    attempts: row.attempts, completedAt: row.completed_at,
+    expiryDate: row.expiry_date, certId: row.cert_id,
+    daysUntilExpiry: days, compliance,
+  };
+}
+
+// ── Seed demo data (first run only) ──
+function seedDemo() {
+  if (DB.organisations.some(o => o.email === "demo@care2learn.co.uk")) return;
+  const now = new Date().toISOString();
+  const orgId = "ORG-DEMO001";
+  DB.organisations.push({
+    id: orgId, name: "Sunrise Care Ltd", email: "demo@care2learn.co.uk",
+    password: "demo123", phone: "0121 456 7890",
+    address: "12 Care Lane, Birmingham B1 1CC", cqc_number: "1-123456789",
+    created_at: "2024-01-15T09:00:00.000Z",
+  });
+  const staff = [
+    { id: "STF-DEMO001", name: "Sarah Johnson",  email: "sarah@demo.com",  role: "Senior Carer",   pin: "1234", start: "2024-02-01" },
+    { id: "STF-DEMO002", name: "Marcus Williams", email: "marcus@demo.com", role: "Care Assistant", pin: "5678", start: "2024-03-15" },
+    { id: "STF-DEMO003", name: "Priya Patel",    email: "priya@demo.com",  role: "Team Leader",    pin: "9012", start: "2023-11-01" },
+  ];
+  staff.forEach(s => DB.staff.push({
+    id: s.id, org_id: orgId, name: s.name, email: s.email, role: s.role,
+    pin: s.pin, start_date: s.start, active: 1, created_at: now,
+  }));
+
+  const monthsAgo = (n) => { const d = new Date(); d.setMonth(d.getMonth() - n); return d.toISOString().split("T")[0]; };
+  const enr = (staff_id, course_id, o) => DB.enrolments.push(Object.assign({
+    id: genId("ENR"), staff_id, course_id, assigned_at: now, due_date: null,
+    status: "assigned", progress: 0, score: null, attempts: 0,
+    completed_at: null, expiry_date: null, cert_id: null,
+  }, o));
+
+  // Priya — completed (valid), one expiring
+  [
+    { c: "safeguarding",     score: 92, date: monthsAgo(2) },
+    { c: "fire-safety",      score: 88, date: monthsAgo(2) },
+    { c: "infection-control",score: 85, date: monthsAgo(1) },
+    { c: "health-safety",    score: 78, date: monthsAgo(11) },
+  ].forEach(e => enr("STF-DEMO003", e.c, {
+    status: "completed", progress: 100, score: e.score, attempts: 1,
+    completed_at: e.date + "T10:00:00Z", expiry_date: addYear(e.date), cert_id: genId("CERT"),
+  }));
+  enr("STF-DEMO003", "medication", { due_date: "2025-12-31" });
+
+  // Sarah — in progress
+  enr("STF-DEMO001", "safeguarding", { status: "in_progress", progress: 60, due_date: "2025-12-31" });
+  enr("STF-DEMO001", "fire-safety", { due_date: "2025-12-31" });
+
+  // Marcus — assigned only
+  enr("STF-DEMO002", "safeguarding", { due_date: "2026-01-31" });
+  enr("STF-DEMO002", "manual-handling", { due_date: "2026-01-31" });
+
+  persist();
+}
+
+// ── Session helper ──
+function sessionFor(token) {
+  return DB.sessions.find(s => s.token === token) || null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LOCAL API ROUTER  — same signature & return shapes as the server version
+// ═══════════════════════════════════════════════════════════════════════════
+async function api(path, method = "GET", body) {
+  // simulate a tiny delay so the UI feels real
+  await new Promise(r => setTimeout(r, 60));
+  const token = state.token;
+  const err = (msg) => { throw new Error(msg); };
+
+  // ── Public ──
+  if (path === "/courses" && method === "GET") return { courses: COURSES };
+  if (path === "/health") return { ok: true, time: new Date().toISOString() };
+
+  // ── Org register ──
+  if (path === "/org/register" && method === "POST") {
+    if (!body.name || !body.email || !body.password) err("Name, email and password are required.");
+    if (body.password.length < 6) err("Password must be at least 6 characters.");
+    if (DB.organisations.some(o => o.email === body.email.toLowerCase())) err("An organisation with this email already exists.");
+    const id = genId("ORG");
+    DB.organisations.push({
+      id, name: body.name, email: body.email.toLowerCase(), password: body.password,
+      phone: body.phone || null, address: body.address || null,
+      cqc_number: body.cqcNumber || null, created_at: new Date().toISOString(),
+    });
+    const tok = genToken();
+    DB.sessions.push({ token: tok, subject_id: id, kind: "org", created_at: new Date().toISOString() });
+    persist();
+    const org = DB.organisations.find(o => o.id === id);
+    return { token: tok, org: pubOrg(org) };
+  }
+
+  // ── Org login ──
+  if (path === "/org/login" && method === "POST") {
+    if (!body.email || !body.password) err("Email and password are required.");
+    const org = DB.organisations.find(o => o.email === body.email.toLowerCase());
+    if (!org) err("No organisation found with this email.");
+    if (org.password !== body.password) err("Incorrect password.");
+    const tok = genToken();
+    DB.sessions.push({ token: tok, subject_id: org.id, kind: "org", created_at: new Date().toISOString() });
+    persist();
+    return { token: tok, org: pubOrg(org) };
+  }
+
+  // ── Org: me (dashboard) ──
+  if (path === "/org/me" && method === "GET") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated as an organisation.");
+    const org = DB.organisations.find(o => o.id === s.subject_id);
+    if (!org) err("Organisation not found.");
+    const orgStaff = DB.staff.filter(x => x.org_id === org.id);
+    const activeStaff = orgStaff.filter(x => x.active);
+    const staffIds = orgStaff.map(x => x.id);
+    const allEnr = DB.enrolments.filter(e => staffIds.includes(e.staff_id));
+
+    let fullyCompliant = 0, expiringSoon = 0;
+    for (const member of activeStaff) {
+      const mine = allEnr.filter(e => e.staff_id === member.id).map(shapeEnrolment);
+      if (mine.length === 0) continue;
+      if (mine.every(e => e.compliance === "valid")) fullyCompliant++;
+      if (mine.some(e => e.compliance === "expiring")) expiringSoon++;
+    }
+    const byCourse = COURSES.map(c => {
+      const enr = allEnr.filter(e => e.course_id === c.id);
+      const completed = enr.map(shapeEnrolment).filter(e => e.compliance === "valid").length;
+      return { courseId: c.id, title: c.title, icon: c.icon, color: c.color, assigned: enr.length, completed };
+    });
+    return {
+      org: pubOrg(org),
+      summary: { activeStaff: activeStaff.length, totalStaff: orgStaff.length, totalEnrolments: allEnr.length, fullyCompliant, expiringSoon },
+      byCourse,
+    };
+  }
+
+  // ── Org: list staff ──
+  if (path === "/org/staff" && method === "GET") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated as an organisation.");
+    const orgStaff = DB.staff.filter(x => x.org_id === s.subject_id)
+      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    const result = orgStaff.map(member => {
+      const enr = DB.enrolments.filter(e => e.staff_id === member.id).map(shapeEnrolment);
+      const completed = enr.filter(e => e.compliance === "valid").length;
+      return {
+        id: member.id, name: member.name, email: member.email, role: member.role,
+        pin: member.pin, startDate: member.start_date, active: !!member.active,
+        assignedCount: enr.length, completedCount: completed,
+        compliant: enr.length > 0 && enr.every(e => e.compliance === "valid"),
+        enrolments: enr,
+      };
+    });
+    return { staff: result };
+  }
+
+  // ── Org: add staff ──
+  if (path === "/org/staff" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated.");
+    if (!body.name || !body.email) err("Name and email are required.");
+    const id = genId("STF");
+    const pin = genPin();
+    DB.staff.push({
+      id, org_id: s.subject_id, name: body.name, email: body.email,
+      role: body.role || "Care Assistant", pin,
+      start_date: body.startDate || new Date().toISOString().split("T")[0],
+      active: 1, created_at: new Date().toISOString(),
+    });
+    if (Array.isArray(body.courseIds)) {
+      for (const cid of body.courseIds) {
+        if (COURSE_IDS.includes(cid) && !DB.enrolments.some(e => e.staff_id === id && e.course_id === cid)) {
+          DB.enrolments.push(newEnrolment(id, cid, body.dueDate));
+        }
+      }
+    }
+    persist();
+    const member = DB.staff.find(x => x.id === id);
+    return { staff: Object.assign({}, member, { active: !!member.active }), pin };
+  }
+
+  // ── Org: update staff (PATCH /org/staff/:id) ──
+  let m = path.match(/^\/org\/staff\/([^/]+)$/);
+  if (m && method === "PATCH") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated.");
+    const member = DB.staff.find(x => x.id === m[1] && x.org_id === s.subject_id);
+    if (!member) err("Staff member not found.");
+    if (body.name !== undefined) member.name = body.name;
+    if (body.role !== undefined) member.role = body.role;
+    if (body.active !== undefined) member.active = body.active ? 1 : 0;
+    persist();
+    return { staff: Object.assign({}, member, { active: !!member.active }) };
+  }
+
+  // ── Org: enrol (POST /org/staff/:id/enrol) ──
+  m = path.match(/^\/org\/staff\/([^/]+)\/enrol$/);
+  if (m && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated.");
+    const member = DB.staff.find(x => x.id === m[1] && x.org_id === s.subject_id);
+    if (!member) err("Staff member not found.");
+    const courseIds = Array.isArray(body.courseIds) ? body.courseIds : (body.courseId ? [body.courseId] : []);
+    if (courseIds.length === 0) err("Provide courseId or courseIds.");
+    let added = 0;
+    for (const cid of courseIds) {
+      if (!COURSE_IDS.includes(cid)) continue;
+      if (DB.enrolments.some(e => e.staff_id === member.id && e.course_id === cid)) continue;
+      DB.enrolments.push(newEnrolment(member.id, cid, body.dueDate));
+      added++;
+    }
+    persist();
+    const enrolments = DB.enrolments.filter(e => e.staff_id === member.id).map(shapeEnrolment);
+    return { added, enrolments };
+  }
+
+  // ── Org: remove enrolment (DELETE /org/staff/:id/enrol/:courseId) ──
+  m = path.match(/^\/org\/staff\/([^/]+)\/enrol\/([^/]+)$/);
+  if (m && method === "DELETE") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated.");
+    const member = DB.staff.find(x => x.id === m[1] && x.org_id === s.subject_id);
+    if (!member) err("Staff member not found.");
+    DB.enrolments = DB.enrolments.filter(e => !(e.staff_id === member.id && e.course_id === m[2]));
+    persist();
+    return { ok: true };
+  }
+
+  // ── Staff login ──
+  if (path === "/staff/login" && method === "POST") {
+    if (!body.email || !body.pin) err("Email and PIN are required.");
+    const member = DB.staff.find(x => x.email === body.email && x.pin === String(body.pin) && x.active);
+    if (!member) err("Incorrect email or PIN, or your licence is inactive.");
+    const tok = genToken();
+    DB.sessions.push({ token: tok, subject_id: member.id, kind: "staff", created_at: new Date().toISOString() });
+    persist();
+    const org = DB.organisations.find(o => o.id === member.org_id);
+    return {
+      token: tok,
+      staff: { id: member.id, name: member.name, email: member.email, role: member.role, startDate: member.start_date, pin: member.pin },
+      org: { id: org.id, name: org.name },
+    };
+  }
+
+  // ── Staff: me ──
+  if (path === "/staff/me" && method === "GET") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "staff") err("Not authenticated as staff.");
+    const member = DB.staff.find(x => x.id === s.subject_id);
+    if (!member) err("Staff not found.");
+    const org = DB.organisations.find(o => o.id === member.org_id);
+    const enrolments = DB.enrolments.filter(e => e.staff_id === member.id).map(shapeEnrolment);
+    return {
+      staff: { id: member.id, name: member.name, email: member.email, role: member.role, startDate: member.start_date, pin: member.pin },
+      org: { id: org.id, name: org.name },
+      enrolments,
+    };
+  }
+
+  // ── Staff: progress ──
+  if (path === "/staff/progress" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "staff") err("Not authenticated as staff.");
+    if (!body.courseId) err("courseId is required.");
+    const e = DB.enrolments.find(x => x.staff_id === s.subject_id && x.course_id === body.courseId);
+    if (!e) err("You are not enrolled on this course.");
+    const progress = Math.max(0, Math.min(100, Number(body.progress) || 0));
+    e.progress = progress;
+    if (e.status !== "completed") e.status = progress > 0 ? "in_progress" : "assigned";
+    persist();
+    return { ok: true, enrolment: shapeEnrolment(e) };
+  }
+
+  // ── Staff: quiz ──
+  if (path === "/staff/quiz" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "staff") err("Not authenticated as staff.");
+    if (!body.courseId || typeof body.score !== "number") err("courseId and numeric score are required.");
+    const e = DB.enrolments.find(x => x.staff_id === s.subject_id && x.course_id === body.courseId);
+    if (!e) err("You are not enrolled on this course.");
+    const score = Math.max(0, Math.min(100, Math.round(body.score)));
+    const passed = score >= 70;
+    e.attempts = (e.attempts || 0) + 1;
+    e.score = score;
+    if (passed) {
+      const completedAt = new Date().toISOString();
+      e.status = "completed"; e.progress = 100;
+      e.completed_at = completedAt;
+      e.expiry_date = addYear(completedAt);
+      e.cert_id = e.cert_id || genId("CERT");
+    } else {
+      e.status = "failed";
+    }
+    persist();
+    return { passed, score, enrolment: shapeEnrolment(e) };
+  }
+
+  // ── Logout ──
+  if (path === "/logout" && method === "POST") {
+    DB.sessions = DB.sessions.filter(x => x.token !== token);
+    persist();
+    return { ok: true };
+  }
+
+  err("API route not found: " + method + " " + path);
+}
+
+function pubOrg(o) {
+  return { id: o.id, name: o.name, email: o.email, phone: o.phone, address: o.address, cqc_number: o.cqc_number, created_at: o.created_at };
+}
+function newEnrolment(staff_id, course_id, dueDate) {
+  return {
+    id: genId("ENR"), staff_id, course_id, assigned_at: new Date().toISOString(),
+    due_date: dueDate || null, status: "assigned", progress: 0, score: null,
+    attempts: 0, completed_at: null, expiry_date: null, cert_id: null,
+  };
+}
+
+// Seed on first load
+seedDemo();
+
+</script>
+<script>
+// ─── CARE2LEARN FRONTEND ──────────────────────────────────────────────────────
+// Vanilla JS. No build step, no JSX, no bundler. Talks to the REST API.
+
+const App = document.getElementById("app");
+const state = {
+  token: localStorage.getItem("c2l_token") || null,
+  kind: localStorage.getItem("c2l_kind") || null, // 'org' | 'staff'
+  courses: [],
+  view: "landing",
+};
+
+// ── API helper ──
+
+function setAuth(token, kind) {
+  state.token = token; state.kind = kind;
+  localStorage.setItem("c2l_token", token);
+  localStorage.setItem("c2l_kind", kind);
+}
+function clearAuth() {
+  state.token = null; state.kind = null;
+  localStorage.removeItem("c2l_token");
+  localStorage.removeItem("c2l_kind");
+}
+
+function el(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+function toast(msg) {
+  const t = el(`<div class="toast">${esc(msg)}</div>`);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── Brand logo (shield + tick). dark=true gives a navy shield for light backgrounds. ──
+function logoMark(size, dark) {
+  const shield = dark ? "#1B2A4A" : "#ffffff";
+  const tick = dark ? "#22C55E" : "#16A34A";
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 100 100" style="display:inline-block;vertical-align:middle;flex:0 0 auto" aria-label="Care2Learn">'
+    + '<path d="M50 14 L80 24 L80 47 C80 65 67 77 50 83 C33 77 20 65 20 47 L20 24 Z" fill="' + shield + '"/>'
+    + '<path d="M37 49 L46 58 L64 37" fill="none" stroke="' + tick + '" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '</svg>';
+}
+
+// ── Checkout return handling ──
+function checkCheckoutResult() {
+  const c = new URLSearchParams(location.search).get("checkout");
+  if (!c) return;
+  history.replaceState(null, "", location.pathname);
+  if (c === "success") toast("Payment received — thank you! We'll email you with access details shortly.");
+  else if (c === "cancelled") toast("Checkout cancelled — no payment was taken.");
+}
+
+// ── Boot ──
+async function boot() {
+  checkCheckoutResult();
+  App.innerHTML = `<div class="spin">Loading Care2Learn…</div>`;
+  try {
+    const { courses } = await api("/courses");
+    state.courses = courses;
+  } catch (e) {
+    App.innerHTML = `<div class="spin">Could not reach the server.<br>Make sure it is running: <code>node server.js</code></div>`;
+    return;
+  }
+  // Resume session if token present
+  if (state.token && state.kind === "org") {
+    try { await renderOrgDash(); return; } catch (e) { clearAuth(); }
+  }
+  if (state.token && state.kind === "staff") {
+    try { await renderStaffPortal(); return; } catch (e) { clearAuth(); }
+  }
+  renderLanding();
+}
+
+// ─── LANDING ──────────────────────────────────────────────────────────────────
+// ── Pricing model for the cost calculator. EDIT THESE to change your prices. ──
+const PRICING = {
+  currency: "£",
+  subscriptionPerLearnerMonth: 2, // Subscription: £2 per learner per month (before discount)
+  subDiscountPerStep: 10,         // ...discounted 10%...
+  subDiscountStepUsers: 50,       // ...for every 50 learners...
+  subDiscountMax: 50,             // ...up to a maximum of 50% off.
+  paygPerCourse: 4,               // Pay as you go: £4 per course, per learner
+};
+// Subscription volume discount (%) for a given number of learners.
+function subDiscountPct(users) {
+  const steps = Math.floor(users / PRICING.subDiscountStepUsers);
+  return Math.min(PRICING.subDiscountMax, steps * PRICING.subDiscountPerStep);
+}
+// Format a value given in pence as £X or £X.XX.
+function fmtMoney(pence) {
+  const pounds = pence / 100;
+  const opts = Number.isInteger(pounds) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return PRICING.currency + pounds.toLocaleString(undefined, opts);
+}
+
+// Stripe payment link used as a fallback if server-side checkout is unavailable.
+const STRIPE_PAYG_LINK = "https://buy.stripe.com/3cIfZg48PeVm93ncMOdZ602";
+
+// Start pay-as-you-go checkout: ask the server to create a Stripe session for the
+// exact amount (learners × courses × £4). If the server can't (not reachable, or the
+// Stripe key isn't set yet), fall back to the fixed-price payment link.
+async function startPaygCheckout(learners, courses) {
+  toast("Setting up secure checkout…");
+  try {
+    const res = await fetch("/api/checkout/payg", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ learners, courses }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.url) { window.location.href = data.url; return; }
+    }
+  } catch (e) { /* fall through to the static link */ }
+  window.open(STRIPE_PAYG_LINK, "_blank", "noopener");
+}
+
+// Build the interactive pricing calculator for the landing page.
+function buildCalculator() {
+  const courseCount = state.courses.length;
+  const cur = PRICING.currency;
+  const calc = { mode: "sub", learners: 30, courses: Math.min(3, courseCount) };
+
+  const wrap = el(`
+    <div class="plan-band">
+      <div class="plan">
+        <div class="plan-head">
+          <h2>Flexible pricing that grows with you</h2>
+          <p>Subscriptions suit small to large organisations. Running a micro business or working solo? Pay as you go gives you total flexibility.</p>
+        </div>
+        <div class="plan-toggle">
+          <button data-mode="sub">Subscription <span>Most popular</span></button>
+          <button data-mode="payg">Pay as you go</button>
+        </div>
+        <div class="plan-card" id="plan-card"></div>
+      </div>
+    </div>
+  `);
+
+  function render() {
+    wrap.querySelectorAll(".plan-toggle button").forEach(b => b.classList.toggle("active", b.dataset.mode === calc.mode));
+    const card = wrap.querySelector("#plan-card");
+
+    if (calc.mode === "sub") {
+      const disc = subDiscountPct(calc.learners);
+      const perPence = Math.round(PRICING.subscriptionPerLearnerMonth * 100 * (1 - disc / 100));
+      const monthlyPence = calc.learners * perPence;
+      const yearlyPence = monthlyPence * 12;
+      card.innerHTML = `
+        <div class="plan-left">
+          <h3>Subscribe & save</h3>
+          <p>The most cost-effective way to keep your whole team compliant — one low monthly price per learner covers every mandatory course, with bigger discounts as your team grows.</p>
+          <ul class="plan-list">
+            <li>Just ${cur}${PRICING.subscriptionPerLearnerMonth} per learner / month</li>
+            <li>Volume discounts — up to ${PRICING.subDiscountMax}% off</li>
+            <li>All ${courseCount} mandatory courses included</li>
+            <li>Unlimited certificates, renewals and reporting</li>
+          </ul>
+        </div>
+        <div class="plan-right">
+          <div class="est">
+            <div class="est-title">Estimate your training costs</div>
+            <div class="est-row"><span>Number of learners</span><b id="v-learn">${calc.learners}</b></div>
+            <input type="range" id="s-learn" min="1" max="500" value="${calc.learners}">
+            <div class="est-disc" id="v-disc">${disc > 0 ? disc + "% volume discount applied" : ""}</div>
+            <div class="est-perlearner">Your estimated cost <span>(billed monthly)</span></div>
+            <div class="est-cost"><span class="est-cost-v" id="v-total">${fmtMoney(monthlyPence)}</span><span class="est-cost-u">/ month</span></div>
+            <div class="est-sub" id="v-sub">${fmtMoney(yearlyPence)} per year · ${fmtMoney(perPence)} per learner / month</div>
+            <button class="btn-primary plan-cta" id="plan-cta">Get started</button>
+          </div>
+        </div>`;
+      const sl = card.querySelector("#s-learn");
+      sl.oninput = () => {
+        calc.learners = +sl.value;
+        const d = subDiscountPct(calc.learners);
+        const pp = Math.round(PRICING.subscriptionPerLearnerMonth * 100 * (1 - d / 100));
+        const mp = calc.learners * pp, yp = mp * 12;
+        card.querySelector("#v-learn").textContent = calc.learners + (calc.learners >= 500 ? "+" : "");
+        card.querySelector("#v-disc").textContent = d > 0 ? d + "% volume discount applied" : "";
+        card.querySelector("#v-total").textContent = fmtMoney(mp);
+        card.querySelector("#v-sub").textContent = fmtMoney(yp) + " per year · " + fmtMoney(pp) + " per learner / month";
+      };
+    } else {
+      const total = calc.learners * calc.courses * PRICING.paygPerCourse;
+      card.innerHTML = `
+        <div class="plan-left">
+          <h3>Pay as you go</h3>
+          <p>No commitment — buy only the courses you need, when you need them, for ${cur}${PRICING.paygPerCourse} per learner. And unlike other providers, your courses never expire.</p>
+          <ul class="plan-list">
+            <li><strong>Your courses never expire — ever</strong></li>
+            <li>No subscription or commitment</li>
+            <li>${cur}${PRICING.paygPerCourse} per course, per learner</li>
+            <li>Instant access, top up anytime</li>
+          </ul>
+        </div>
+        <div class="plan-right">
+          <div class="est">
+            <div class="est-title">Estimate your training costs</div>
+            <div class="est-row"><span>Number of learners</span><b id="v-learn">${calc.learners}</b></div>
+            <input type="range" id="s-learn" min="1" max="500" value="${calc.learners}">
+            <div class="est-row" style="margin-top:14px"><span>Number of courses</span><b id="v-course">${calc.courses}</b></div>
+            <input type="range" id="s-course" min="1" max="${courseCount}" value="${calc.courses}">
+            <div class="est-perlearner" style="margin-top:14px">Your estimated cost <span>(one-off)</span></div>
+            <div class="est-cost"><span class="est-cost-v" id="v-total">${cur}${total.toLocaleString()}</span></div>
+            <div class="est-sub" id="v-break">${calc.learners} learners × ${calc.courses} courses × ${cur}${PRICING.paygPerCourse}</div>
+            <button class="btn-primary plan-cta" id="plan-cta">Buy now</button>
+          </div>
+        </div>`;
+      const sl = card.querySelector("#s-learn");
+      const sc = card.querySelector("#s-course");
+      const upd = () => {
+        calc.learners = +sl.value; calc.courses = +sc.value;
+        const t = calc.learners * calc.courses * PRICING.paygPerCourse;
+        card.querySelector("#v-learn").textContent = calc.learners + (calc.learners >= 500 ? "+" : "");
+        card.querySelector("#v-course").textContent = calc.courses;
+        card.querySelector("#v-total").textContent = cur + t.toLocaleString();
+        card.querySelector("#v-break").textContent = calc.learners + " learners × " + calc.courses + " courses × " + cur + PRICING.paygPerCourse;
+      };
+      sl.oninput = upd; sc.oninput = upd;
+    }
+    card.querySelector("#plan-cta").onclick = (calc.mode === "payg")
+      ? () => startPaygCheckout(calc.learners, calc.courses)
+      : renderOrgRegister;
+  }
+
+  wrap.querySelectorAll(".plan-toggle button").forEach(b => {
+    b.onclick = () => { calc.mode = b.dataset.mode; render(); };
+  });
+  render();
+  return wrap;
+}
+
+function renderLanding() {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div>
+      <div class="landing-hero">
+        <div class="landing-logo">${logoMark(54, false)}</div>
+        <div class="landing-title">Care2Learn</div>
+        <div class="landing-tag">Skills for Care · Mandatory Training</div>
+        <p class="landing-desc">The complete e-learning platform for social care. Register your organisation, assign mandatory courses to staff, and track every learner's progress and compliance in real time.</p>
+        <div class="landing-stats">
+          <div><span class="lstat-n">${state.courses.length}</span><span class="lstat-l">Courses</span></div>
+          <div><span class="lstat-n">70%</span><span class="lstat-l">Pass Mark</span></div>
+          <div><span class="lstat-n">1yr</span><span class="lstat-l">Certificate Validity</span></div>
+          <div><span class="lstat-n">CQC</span><span class="lstat-l">Audit Ready</span></div>
+        </div>
+      </div>
+      <div class="landing-cards">
+        <div class="lcard">
+          <div class="lcard-icon">🏢</div>
+          <h2>For Organisations</h2>
+          <p>Register your care business, add staff, assign courses, and monitor compliance across your team.</p>
+          <button class="btn-primary" id="go-org-login">Organisation Login</button>
+          <button class="btn-secondary" id="go-org-reg">Register Your Organisation</button>
+        </div>
+        <div class="lcard">
+          <div class="lcard-icon">👤</div>
+          <h2>For Care Workers</h2>
+          <p>Access the courses your manager has assigned, complete assessments, and download your certificates.</p>
+          <button class="btn-primary green" id="go-staff-login">Staff Login</button>
+        </div>
+      </div>
+      <div id="calc-slot"></div>
+      <div class="footer">Aligned to the Care Certificate 2026 · CQC Inspection Ready · Powered by Care2Learn</div>
+    </div>
+  `));
+  document.getElementById("go-org-login").onclick = renderOrgLogin;
+  document.getElementById("go-org-reg").onclick = renderOrgRegister;
+  document.getElementById("go-staff-login").onclick = renderStaffLogin;
+  document.getElementById("calc-slot").appendChild(buildCalculator());
+}
+
+// ─── ORG REGISTER ─────────────────────────────────────────────────────────────
+function renderOrgRegister() {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Register Your Organisation</div>
+      <div class="auth-sub">Create your account to start managing staff training.</div>
+      <div id="err"></div>
+      <div class="fg"><label>Organisation Name *</label><input class="inp" id="name" placeholder="e.g. Sunrise Care Ltd"></div>
+      <div class="fg"><label>Email Address *</label><input class="inp" id="email" type="email" placeholder="admin@yourorg.com"></div>
+      <div class="fg"><label>Password *</label><input class="inp" id="password" type="password" placeholder="At least 6 characters"></div>
+      <div class="fg"><label>Phone Number</label><input class="inp" id="phone" placeholder="01234 567890"></div>
+      <div class="fg"><label>CQC Registration Number</label><input class="inp" id="cqc" placeholder="1-XXXXXXXXX"></div>
+      <div class="fg"><label>Address</label><input class="inp" id="address" placeholder="123 High Street, Town"></div>
+      <button class="btn-auth" id="submit">Register Organisation</button>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = renderLanding;
+  document.getElementById("submit").onclick = async () => {
+    const errBox = document.getElementById("err");
+    errBox.innerHTML = "";
+    const payload = {
+      name: val("name"), email: val("email"), password: val("password"),
+      phone: val("phone"), cqcNumber: val("cqc"), address: val("address"),
+    };
+    try {
+      const { token } = await api("/org/register", "POST", payload);
+      setAuth(token, "org");
+      await renderOrgDash();
+    } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+}
+
+// ─── ORG LOGIN ────────────────────────────────────────────────────────────────
+function renderOrgLogin() {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Organisation Login</div>
+      <div id="err"></div>
+      <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="admin@yourorg.com"></div>
+      <div class="fg"><label>Password</label><input class="inp" id="password" type="password" placeholder="Your password"></div>
+      <button class="btn-auth" id="submit">Sign In</button>
+      <button class="btn-demo" id="demo">🎯 Try Demo Account</button>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = renderLanding;
+  document.getElementById("submit").onclick = () => doOrgLogin(val("email"), val("password"));
+  document.getElementById("demo").onclick = () => doOrgLogin("demo@care2learn.co.uk", "demo123");
+}
+async function doOrgLogin(email, password) {
+  const errBox = document.getElementById("err");
+  if (errBox) errBox.innerHTML = "";
+  try {
+    const { token } = await api("/org/login", "POST", { email, password });
+    setAuth(token, "org");
+    await renderOrgDash();
+  } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+// ─── STAFF LOGIN ──────────────────────────────────────────────────────────────
+function renderStaffLogin() {
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Staff Login</div>
+      <div class="auth-sub">Use the email and PIN provided by your manager.</div>
+      <div id="err"></div>
+      <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="your.name@email.com"></div>
+      <div class="fg"><label>4-Digit PIN</label><input class="inp" id="pin" type="password" maxlength="4" placeholder="••••"></div>
+      <button class="btn-auth" id="submit">Sign In</button>
+      <button class="btn-demo" id="demo">🎯 Try Demo (Priya · 9012)</button>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = renderLanding;
+  document.getElementById("submit").onclick = () => doStaffLogin(val("email"), val("pin"));
+  document.getElementById("demo").onclick = () => doStaffLogin("priya@demo.com", "9012");
+}
+async function doStaffLogin(email, pin) {
+  const errBox = document.getElementById("err");
+  if (errBox) errBox.innerHTML = "";
+  try {
+    const { token } = await api("/staff/login", "POST", { email, pin });
+    setAuth(token, "staff");
+    await renderStaffPortal();
+  } catch (e) { if (errBox) errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+function val(id) { const e = document.getElementById(id); return e ? e.value.trim() : ""; }
+
+// ─── ORG DASHBOARD ────────────────────────────────────────────────────────────
+let orgTab = "overview";
+async function renderOrgDash() {
+  const me = await api("/org/me");
+  const org = me.org;
+
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div>
+      <div class="dash-hdr">
+        <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
+        <nav class="dash-nav" id="nav"></nav>
+        <button class="logout" id="logout">Log Out</button>
+      </div>
+      <div class="body" id="dashbody"></div>
+    </div>
+  `));
+
+  const nav = document.getElementById("nav");
+  [["overview","📊 Overview"],["staff","👥 Staff & Licences"],["compliance","✅ Compliance"],["settings","⚙️ Settings"]].forEach(([k,label]) => {
+    const b = el(`<button class="nav-btn ${orgTab===k?"active":""}">${label}</button>`);
+    b.onclick = () => { orgTab = k; paintOrgTab(org); };
+    nav.appendChild(b);
+  });
+  document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+
+  await paintOrgTab(org);
+}
+
+async function paintOrgTab(org) {
+  // refresh active nav
+  const navs = document.querySelectorAll("#nav .nav-btn");
+  const keys = ["overview","staff","compliance","settings"];
+  navs.forEach((b,i)=> b.classList.toggle("active", keys[i]===orgTab));
+
+  const body = document.getElementById("dashbody");
+  body.innerHTML = `<div class="spin">Loading…</div>`;
+
+  if (orgTab === "overview") {
+    const me = await api("/org/me");
+    body.innerHTML = "";
+    const hour = new Date().getHours();
+    body.appendChild(el(`<div class="hero"><h1>Good ${hour<12?"morning":hour<18?"afternoon":"evening"}! 👋</h1><p>Training compliance overview for ${esc(me.org.name)}.</p></div>`));
+    const m = me.summary;
+    body.appendChild(el(`
+      <div class="metrics">
+        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${m.activeStaff}</div><div class="metric-l">Active Staff</div></div>
+        <div class="metric"><div class="metric-i">✅</div><div class="metric-v" style="color:#27AE60">${m.fullyCompliant}</div><div class="metric-l">Fully Compliant</div></div>
+        <div class="metric"><div class="metric-i">⚠️</div><div class="metric-v" style="color:#E67E22">${m.expiringSoon}</div><div class="metric-l">Expiring ≤30 days</div></div>
+        <div class="metric"><div class="metric-i">📋</div><div class="metric-v" style="color:#9B59B6">${m.totalEnrolments}</div><div class="metric-l">Course Assignments</div></div>
+      </div>
+    `));
+    body.appendChild(el(`<div class="sec-title">Compliance by Course</div>`));
+    const grid = el(`<div class="cc-grid"></div>`);
+    me.byCourse.forEach(c => {
+      const total = m.activeStaff || 1;
+      const pct = Math.round((c.completed / total) * 100);
+      const color = pct >= 80 ? "#27AE60" : pct >= 50 ? "#E67E22" : "#E74C3C";
+      grid.appendChild(el(`
+        <div class="cc">
+          <div class="cc-top"><span style="font-size:22px">${c.icon}</span><div style="flex:1"><div class="cc-name">${esc(c.title)}</div><div class="cc-frac" style="color:${color}">${c.completed}/${c.assigned||total}</div></div></div>
+          <div class="cc-bar"><div class="cc-fill" style="width:${pct}%;background:${color}"></div></div>
+        </div>
+      `));
+    });
+    body.appendChild(grid);
+  }
+
+  if (orgTab === "staff") {
+    const { staff } = await api("/org/staff");
+    body.innerHTML = "";
+    const sh = el(`<div class="sh"><h2>Staff & Licences</h2><button class="btn-add" id="add">+ Add Staff Member</button></div>`);
+    body.appendChild(sh);
+    const formSlot = el(`<div id="formslot"></div>`);
+    body.appendChild(formSlot);
+
+    document.getElementById("add").onclick = () => showAddStaffForm(formSlot);
+
+    if (staff.length === 0) {
+      body.appendChild(el(`<div class="table"><div class="empty">No staff yet. Click "Add Staff Member" to create your first licence.</div></div>`));
+    } else {
+      const table = el(`<div class="table"><div class="thead"><span>Name</span><span>Role</span><span>Progress</span><span>Status</span><span>PIN</span><span>Actions</span></div></div>`);
+      staff.forEach(s => {
+        const statusPill = !s.active ? `<span class="pill grey">Inactive</span>`
+          : s.compliant ? `<span class="pill green">✓ Compliant</span>`
+          : s.assignedCount === 0 ? `<span class="pill grey">No courses</span>`
+          : `<span class="pill amber">In Progress</span>`;
+        const row = el(`
+          <div class="trow">
+            <span><div class="t-name">${esc(s.name)}</div><div class="t-email">${esc(s.email)}</div></span>
+            <span class="t-role">${esc(s.role)}</span>
+            <span><b style="color:${s.completedCount===s.assignedCount&&s.assignedCount>0?"#27AE60":"#E67E22"}">${s.completedCount}</b>/${s.assignedCount}</span>
+            <span>${statusPill}</span>
+            <span class="t-pin">${esc(s.pin)}</span>
+            <span class="row-actions">
+              <button class="abtn" data-act="view">Manage</button>
+              ${s.active ? `<button class="abtn danger" data-act="deact">Deactivate</button>` : `<button class="abtn" data-act="react">Reactivate</button>`}
+            </span>
+          </div>
+        `);
+        row.querySelector('[data-act="view"]').onclick = () => openStaffModal(s.id);
+        const deact = row.querySelector('[data-act="deact"]');
+        if (deact) deact.onclick = async () => { await api(`/org/staff/${s.id}`,"PATCH",{active:false}); toast(`${s.name}'s licence deactivated.`); paintOrgTab(org); };
+        const react = row.querySelector('[data-act="react"]');
+        if (react) react.onclick = async () => { await api(`/org/staff/${s.id}`,"PATCH",{active:true}); toast(`${s.name}'s licence reactivated.`); paintOrgTab(org); };
+        table.appendChild(row);
+      });
+      body.appendChild(table);
+    }
+  }
+
+  if (orgTab === "compliance") {
+    const { staff } = await api("/org/staff");
+    body.innerHTML = "";
+    const ch = el(`<div class="sh"><h2>Compliance Report</h2><button class="btn-add" id="dlpdf">⬇ Download PDF</button></div>`);
+    body.appendChild(ch);
+    document.getElementById("dlpdf").onclick = () => downloadComplianceReport();
+    const active = staff.filter(s => s.active);
+    const matrix = el(`<div class="matrix"></div>`);
+    const head = el(`<div class="mh"><span>Staff Member</span></div>`);
+    state.courses.forEach(c => head.appendChild(el(`<span title="${esc(c.title)}">${c.icon}</span>`)));
+    head.appendChild(el(`<span style="margin-left:auto;width:auto">Overall</span>`));
+    matrix.appendChild(head);
+
+    active.forEach(s => {
+      const row = el(`<div class="mr"><span class="m-name">${esc(s.name)}</span></div>`);
+      let validCount = 0;
+      state.courses.forEach(c => {
+        const enr = s.enrolments.find(e => e.courseId === c.id);
+        let cls = "none", sym = "—";
+        if (enr) {
+          if (enr.compliance === "valid") { cls = "ok"; sym = "✓"; validCount++; }
+          else if (enr.compliance === "expiring") { cls = "amber"; sym = "⚠"; validCount++; }
+          else if (enr.compliance === "expired") { cls = "red"; sym = "✗"; }
+          else if (enr.compliance === "in_progress") { cls = "prog"; sym = "◐"; }
+          else if (enr.compliance === "failed") { cls = "red"; sym = "✗"; }
+          else { cls = "none"; sym = "○"; }
+        }
+        const cell = el(`<span style="width:30px;text-align:center"><span class="cell ${cls}">${sym}</span></span>`);
+        if (enr) cell.title = enr.courseTitle + " — " + enr.compliance + (enr.expiryDate ? " (until " + fmtDate(enr.expiryDate) + ")" : "");
+        row.appendChild(cell);
+      });
+      row.appendChild(el(`<span style="margin-left:auto;width:auto"><b style="color:${validCount===state.courses.length?"#27AE60":"#E67E22"}">${validCount}/${state.courses.length}</b></span>`));
+      matrix.appendChild(row);
+    });
+    if (active.length === 0) matrix.appendChild(el(`<div class="empty">No active staff to report on.</div>`));
+    body.appendChild(matrix);
+    body.appendChild(el(`<div class="legend"><span class="cell ok">✓</span>Valid <span class="cell amber">⚠</span>Expiring <span class="cell prog">◐</span>In progress <span class="cell red">✗</span>Expired/Failed <span class="cell none">○</span>Assigned <span class="cell none">—</span>Not assigned</div>`));
+  }
+
+  if (orgTab === "settings") {
+    const me = await api("/org/me");
+    const o = me.org;
+    body.innerHTML = "";
+    body.appendChild(el(`<h2 style="margin-bottom:18px">Organisation Settings</h2>`));
+    body.appendChild(el(`
+      <div class="scard">
+        <div class="srow"><label>Organisation Name</label><span>${esc(o.name)}</span></div>
+        <div class="srow"><label>Email Address</label><span>${esc(o.email)}</span></div>
+        <div class="srow"><label>Phone Number</label><span>${esc(o.phone||"Not provided")}</span></div>
+        <div class="srow"><label>CQC Number</label><span>${esc(o.cqc_number||"Not provided")}</span></div>
+        <div class="srow"><label>Address</label><span>${esc(o.address||"Not provided")}</span></div>
+        <div class="srow"><label>Registered Since</label><span>${fmtDate(o.created_at)}</span></div>
+        <div class="srow"><label>Organisation ID</label><span class="mono">${esc(o.id)}</span></div>
+      </div>
+      <div class="scard" style="margin-top:16px">
+        <h3>Subscription</h3>
+        <div style="padding:0 20px 16px"><span class="pill" style="background:#2980B918;color:#1A5276">Standard Plan</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Unlimited staff licences · All ${state.courses.length} mandatory courses · Course assignment · Progress tracking · Certificate generation · CQC compliance report</p></div>
+      </div>
+    `));
+  }
+}
+
+// ── Add staff form ──
+function showAddStaffForm(slot) {
+  slot.innerHTML = "";
+  const courseChecks = state.courses.map(c =>
+    `<label class="chk" data-cid="${c.id}"><input type="checkbox" value="${c.id}"> ${c.icon} ${esc(c.title)}</label>`
+  ).join("");
+  const form = el(`
+    <div class="cardform">
+      <h3>Add New Staff Member</h3>
+      <div id="aerr"></div>
+      <div class="row2">
+        <div class="fg"><label>Full Name *</label><input class="inp" id="a-name" placeholder="Jane Smith"></div>
+        <div class="fg"><label>Email Address *</label><input class="inp" id="a-email" type="email" placeholder="jane@email.com"></div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Job Role</label>
+          <select class="inp" id="a-role">
+            ${["Care Assistant","Senior Carer","Team Leader","Deputy Manager","Registered Manager","Support Worker","Nurse","Other"].map(r=>`<option>${r}</option>`).join("")}
+          </select>
+        </div>
+        <div class="fg"><label>Start Date</label><input class="inp" id="a-start" type="date" value="${new Date().toISOString().split("T")[0]}"></div>
+      </div>
+      <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Assign Courses (optional)</label>
+      <div class="chk-grid">${courseChecks}</div>
+      <div class="form-actions"><button class="btn-cancel" id="a-cancel">Cancel</button><button class="btn-save" id="a-save">Create Licence</button></div>
+    </div>
+  `);
+  slot.appendChild(form);
+
+  form.querySelectorAll(".chk").forEach(lbl => {
+    const cb = lbl.querySelector("input");
+    cb.onchange = () => lbl.classList.toggle("on", cb.checked);
+  });
+  document.getElementById("a-cancel").onclick = () => slot.innerHTML = "";
+  document.getElementById("a-save").onclick = async () => {
+    const errBox = document.getElementById("aerr");
+    errBox.innerHTML = "";
+    const courseIds = [...form.querySelectorAll(".chk input:checked")].map(c => c.value);
+    const payload = {
+      name: val("a-name"), email: val("a-email"),
+      role: document.getElementById("a-role").value,
+      startDate: val("a-start"), courseIds,
+    };
+    if (!payload.name || !payload.email) { errBox.innerHTML = `<div class="err">Name and email are required.</div>`; return; }
+    try {
+      const { pin } = await api("/org/staff", "POST", payload);
+      slot.innerHTML = "";
+      toast(`✓ Licence created. Login PIN: ${pin}`);
+      paintOrgTab(null);
+    } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+}
+
+// ── Staff management modal (assign/remove courses, view progress) ──
+async function openStaffModal(staffId) {
+  const { staff } = await api("/org/staff");
+  const s = staff.find(x => x.id === staffId);
+  if (!s) return;
+
+  const assignedIds = s.enrolments.map(e => e.courseId);
+  const available = state.courses.filter(c => !assignedIds.includes(c.id));
+
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal">
+      <div class="modal-h">
+        <div><h2>${esc(s.name)}</h2><p>${esc(s.role)} · PIN ${esc(s.pin)}</p></div>
+        <button class="x" id="close">✕</button>
+      </div>
+      <div class="info-row"><span>📧 ${esc(s.email)}</span><span>📅 Since ${fmtDate(s.startDate)}</span><span>${s.completedCount}/${s.assignedCount} completed</span></div>
+
+      <div style="padding:18px 22px 6px"><b style="font-size:15px">Assigned Courses</b></div>
+      <div id="assigned"></div>
+
+      <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5;margin-top:8px"><b style="font-size:15px">Assign a New Course</b></div>
+      <div style="padding:0 22px 18px" id="assign-slot"></div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+
+  const assignedBox = modal.querySelector("#assigned");
+  if (s.enrolments.length === 0) {
+    assignedBox.appendChild(el(`<div style="padding:8px 22px;color:#7A8599;font-size:13px;font-style:italic">No courses assigned yet.</div>`));
+  } else {
+    s.enrolments.forEach(e => {
+      const c = state.courses.find(x => x.id === e.courseId) || {};
+      let badge;
+      if (e.compliance === "valid") badge = `<span class="pill green">✓ ${e.score}% · valid to ${fmtDate(e.expiryDate)}</span>`;
+      else if (e.compliance === "expiring") badge = `<span class="pill amber">⚠ expires ${fmtDate(e.expiryDate)}</span>`;
+      else if (e.compliance === "expired") badge = `<span class="pill red">✗ expired ${fmtDate(e.expiryDate)}</span>`;
+      else if (e.compliance === "in_progress") badge = `<span class="pill amber">◐ ${e.progress}% complete</span>`;
+      else if (e.compliance === "failed") badge = `<span class="pill red">✗ failed (${e.score}%)</span>`;
+      else badge = `<span class="pill grey">○ assigned</span>`;
+      const row = el(`
+        <div class="crow">
+          <span class="crow-icon">${c.icon||"📘"}</span>
+          <div style="flex:1"><div class="crow-name">${esc(e.courseTitle)}</div><div class="crow-meta">${badge}</div>
+            <div class="mini-bar"><div class="mini-fill" style="width:${e.progress}%;background:${c.color||"#2980B9"}"></div></div>
+          </div>
+          <button class="abtn danger" data-remove="${e.courseId}">Remove</button>
+        </div>
+      `);
+      row.querySelector("[data-remove]").onclick = async () => {
+        await api(`/org/staff/${s.id}/enrol/${e.courseId}`, "DELETE");
+        overlay.remove();
+        toast("Course removed.");
+        paintOrgTab(null);
+        openStaffModal(s.id);
+      };
+      assignedBox.appendChild(row);
+    });
+  }
+
+  const assignSlot = modal.querySelector("#assign-slot");
+  if (available.length === 0) {
+    assignSlot.appendChild(el(`<div style="color:#7A8599;font-size:13px;font-style:italic">All courses assigned.</div>`));
+  } else {
+    const sel = el(`<select class="inp" style="margin-bottom:10px">${available.map(c=>`<option value="${c.id}">${c.icon} ${esc(c.title)}</option>`).join("")}</select>`);
+    const btn = el(`<button class="btn-save" style="width:100%">Assign Course</button>`);
+    assignSlot.appendChild(sel);
+    assignSlot.appendChild(btn);
+    btn.onclick = async () => {
+      await api(`/org/staff/${s.id}/enrol`, "POST", { courseId: sel.value });
+      overlay.remove();
+      toast("Course assigned.");
+      paintOrgTab(null);
+      openStaffModal(s.id);
+    };
+  }
+}
+
+// ─── STAFF PORTAL ─────────────────────────────────────────────────────────────
+let staffTab = "courses";
+async function renderStaffPortal() {
+  const me = await api("/staff/me");
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div>
+      <div class="dash-hdr">
+        <div class="dash-brand"><span class="dash-logo">👤</span><div><div class="dash-org">${esc(me.staff.name)}</div><div class="dash-sub">${esc(me.staff.role)} · ${esc(me.org.name)}</div></div></div>
+        <nav class="dash-nav" id="snav"></nav>
+        <button class="logout" id="logout">Log Out</button>
+      </div>
+      <div class="body" id="sbody"></div>
+    </div>
+  `));
+  const nav = document.getElementById("snav");
+  [["courses","📚 My Courses"],["certificates","🏆 Certificates"],["profile","👤 Profile"]].forEach(([k,label]) => {
+    const b = el(`<button class="nav-btn ${staffTab===k?"active":""}">${label}</button>`);
+    b.onclick = () => { staffTab = k; paintStaffTab(); };
+    nav.appendChild(b);
+  });
+  document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+  await paintStaffTab();
+}
+
+async function paintStaffTab() {
+  const navs = document.querySelectorAll("#snav .nav-btn");
+  const keys = ["courses","certificates","profile"];
+  navs.forEach((b,i)=> b.classList.toggle("active", keys[i]===staffTab));
+
+  const me = await api("/staff/me");
+  const body = document.getElementById("sbody");
+  body.innerHTML = "";
+
+  const enrolments = me.enrolments;
+  const valid = enrolments.filter(e => e.compliance === "valid" || e.compliance === "expiring");
+  const doneCount = valid.length;
+  const total = enrolments.length;
+
+  if (staffTab === "courses") {
+    body.appendChild(el(`<div class="hero"><h1>Welcome back, ${esc(me.staff.name.split(" ")[0])}! 👋</h1><p>You've completed <b style="color:#27AE60">${doneCount} of ${total}</b> assigned course${total===1?"":"s"}.</p></div>`));
+
+    const expiring = enrolments.filter(e => e.compliance === "expiring");
+    if (expiring.length) {
+      body.appendChild(el(`<div class="alert">⚠️ <b>${expiring.length} certificate${expiring.length>1?"s":""} expiring within 30 days.</b> Please renew to stay compliant.</div>`));
+    }
+
+    if (total === 0) {
+      body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No courses have been assigned to you yet. Your manager will assign your mandatory training.</div>`));
+    } else {
+      body.appendChild(el(`<div class="obar-wrap"><div class="obar-l"><span>Overall Progress</span><span>${Math.round((doneCount/total)*100)}%</span></div><div class="obar"><div class="obar-f" style="width:${(doneCount/total)*100}%"></div></div></div>`));
+      const grid = el(`<div class="sc-grid"></div>`);
+      enrolments.forEach(e => {
+        const c = state.courses.find(x => x.id === e.courseId) || {};
+        let badge = "", cta = "Start Course →";
+        if (e.compliance === "valid") { badge = `<span class="sc-badge" style="background:rgba(255,255,255,.25)">✓ Valid</span>`; }
+        else if (e.compliance === "expiring") { badge = `<span class="sc-badge" style="background:rgba(230,126,34,.4)">⚠ Expiring</span>`; }
+        else if (e.compliance === "expired") { badge = `<span class="sc-badge" style="background:rgba(231,76,60,.4)">Expired</span>`; cta = "Renew Now"; }
+        else if (e.compliance === "in_progress") { badge = `<span class="sc-badge" style="background:rgba(255,255,255,.25)">◐ ${e.progress}%</span>`; cta = "Continue →"; }
+        else if (e.compliance === "failed") { badge = `<span class="sc-badge" style="background:rgba(231,76,60,.4)">Retake</span>`; cta = "Retake →"; }
+
+        const card = el(`
+          <div class="sc">
+            <div class="sc-top" style="background:${c.color||"#1B2A4A"}"><span style="font-size:32px">${c.icon||"📘"}</span>${badge}</div>
+            <div class="sc-body">
+              <div style="font-size:10px;font-weight:700;color:#2980B9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
+              <div class="sc-title">${esc(e.courseTitle)}</div>
+              <div class="sc-meta">⏱ ${c.duration||""} · ${(c.quiz||[]).length} questions${e.dueDate?` · due ${fmtDate(e.dueDate)}`:""}</div>
+              ${e.compliance==="in_progress" ? `<div class="obar-mini" style="margin-bottom:11px"><div class="obar-mini-f" style="width:${e.progress}%;background:${c.color}"></div></div>` : ""}
+              ${(e.compliance==="valid"||e.compliance==="expiring")
+                ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#2980B9"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
+                : `<button class="sc-cta" style="background:${c.color||"#2980B9"}">${cta}</button>`}
+            </div>
+          </div>
+        `);
+        card.onclick = () => openCoursePlayer(e.courseId, me);
+        grid.appendChild(card);
+      });
+      body.appendChild(grid);
+    }
+  }
+
+  if (staffTab === "certificates") {
+    body.appendChild(el(`<h2 style="margin-bottom:18px">My Certificates</h2>`));
+    const certs = enrolments.filter(e => e.certId && (e.compliance==="valid"||e.compliance==="expiring"||e.compliance==="expired"));
+    if (certs.length === 0) {
+      body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No certificates yet. Complete a course to earn one.</div>`));
+    } else {
+      const grid = el(`<div class="sc-grid"></div>`);
+      certs.forEach(e => {
+        const c = state.courses.find(x => x.id === e.courseId) || {};
+        const pillCls = e.compliance==="valid"?"green":e.compliance==="expiring"?"amber":"red";
+        const card = el(`
+          <div class="scard" style="border-top:4px solid ${c.color}">
+            <div style="padding:18px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:32px">${c.icon}</span><span class="pill ${pillCls}">${e.compliance==="valid"?"✓ Valid":e.compliance==="expiring"?"⚠ Expiring":"Expired"}</span></div>
+              <div style="font-size:15px;font-weight:800;margin-bottom:12px">${esc(e.courseTitle)}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;font-size:13px">
+                <div><div class="cm-l">Score</div><div style="font-weight:700;color:${c.color}">${e.score}%</div></div>
+                <div><div class="cm-l">Completed</div><div style="font-weight:700">${fmtDate(e.completedAt)}</div></div>
+                <div><div class="cm-l">Valid Until</div><div style="font-weight:700">${fmtDate(e.expiryDate)}</div></div>
+                <div><div class="cm-l">Cert ID</div><div class="mono">${esc(e.certId)}</div></div>
+              </div>
+              <button class="btn-out" style="width:100%;border-color:${c.color};color:${c.color}" data-cert="${e.courseId}">View Certificate</button>
+            </div>
+          </div>
+        `);
+        card.querySelector("[data-cert]").onclick = () => showCertificate(e, me);
+        grid.appendChild(card);
+      });
+      body.appendChild(grid);
+    }
+  }
+
+  if (staffTab === "profile") {
+    body.appendChild(el(`<h2 style="margin-bottom:18px">My Profile</h2>`));
+    body.appendChild(el(`
+      <div class="scard">
+        <div class="srow"><label>Full Name</label><span>${esc(me.staff.name)}</span></div>
+        <div class="srow"><label>Email Address</label><span>${esc(me.staff.email)}</span></div>
+        <div class="srow"><label>Job Role</label><span>${esc(me.staff.role)}</span></div>
+        <div class="srow"><label>Organisation</label><span>${esc(me.org.name)}</span></div>
+        <div class="srow"><label>Start Date</label><span>${fmtDate(me.staff.startDate)}</span></div>
+        <div class="srow"><label>Login PIN</label><span class="mono">${esc(me.staff.pin)}</span></div>
+      </div>
+      <div class="scard" style="margin-top:16px">
+        <h3>Training Summary</h3>
+        <div class="srow"><label>Courses Completed</label><span style="color:#27AE60;font-weight:700">${doneCount} / ${total}</span></div>
+        <div class="srow"><label>Compliance</label><span class="pill ${doneCount===total&&total>0?"green":"amber"}">${doneCount===total&&total>0?"✓ Fully Compliant":"In Progress"}</span></div>
+      </div>
+    `));
+  }
+}
+
+// ─── COURSE PLAYER ────────────────────────────────────────────────────────────
+// ─── COURSE PLAYER ────────────────────────────────────────────────────────────
+
+// Render the visual for a slide based on its `visual` type
+function renderSlideVisual(slide, course) {
+  const c = course.color;
+  const v = slide.visual || "icon";
+  const d = slide.visualData || {};
+
+  if (v === "stat" && d.stats) {
+    return `<div class="vstat"><div class="vstat-icon">${course.icon}</div><div class="vstat-row">${
+      d.stats.map(s => `<div class="vstat-card"><div class="vstat-n" style="color:${c}">${esc(s.n)}</div><div class="vstat-l">${esc(s.l)}</div></div>`).join("")
+    }</div></div>`;
+  }
+  if (v === "grid" && d.items) {
+    return `<div class="vgrid">${
+      d.items.map((it, i) => `<div class="vgrid-item" style="border-left-color:${c}"><span class="vgrid-num" style="color:${c}">${i+1}</span>${esc(it)}</div>`).join("")
+    }</div>`;
+  }
+  if (v === "flow" && d.steps) {
+    return `<div class="vflow">${
+      d.steps.map((s, i) => `<div class="vflow-step"><span class="vflow-num" style="background:${c}">${i+1}</span>${esc(s)}</div>${i < d.steps.length-1 ? `<div class="vflow-arr">↓</div>` : ""}`).join("")
+    }</div>`;
+  }
+  if (v === "pillars" && d.items) {
+    return `<div class="vpillars">${
+      d.items.map(it => `<div class="vpillar" style="border-top-color:${c}">${esc(it)}</div>`).join("")
+    }</div>`;
+  }
+  if (v === "compare" && d.left && d.right) {
+    const col = (side, bg) => `<div class="vcol"><div class="vcol-h" style="background:${bg}">${esc(side.title)}</div><ul class="vcol-items">${side.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul></div>`;
+    return `<div class="vcompare">${col(d.left, c)}${col(d.right, "#5A6474")}</div>`;
+  }
+  if (v === "cycle" && d.items) {
+    return `<div class="vcycle">${
+      d.items.map((it, i) => `<span class="vcycle-item" style="border-color:${c}">${esc(it)}</span>${i < d.items.length-1 ? `<span class="vcycle-arr">→</span>` : ""}`).join("")
+    }</div>`;
+  }
+  // fallback
+  return `<div class="svis-emoji">${course.icon}</div>`;
+}
+
+async function openCoursePlayer(courseId, me, opts) {
+  const course = state.courses.find(c => c.id === courseId);
+  if (!course) return;
+  const enr = (me.enrolments || []).find(e => e.courseId === courseId);
+  const alreadyStarted = enr && enr.progress > 0 && enr.status !== "completed";
+
+  // stage: "intro" | "slides" | "quiz"
+  let stage = (opts && opts.stage) || "intro";
+  let slideIdx = 0;
+  let inQuiz = false;
+
+  function render() {
+    App.innerHTML = "";
+    const wrap = el(`<div></div>`);
+
+    // ── INTRO SCREEN ──
+    if (stage === "intro") {
+      wrap.appendChild(el(`
+        <div class="player-hdr" style="background:${course.color}">
+          <button class="back-btn" id="pback">← Back to my courses</button>
+          <div class="player-title"><span>${course.icon}</span><span>${esc(course.title)}</span></div>
+          <div class="player-prog"></div>
+        </div>
+      `));
+      const intro = el(`<div class="intro"></div>`);
+      const card = el(`
+        <div class="intro-card">
+          <div class="intro-top" style="background:linear-gradient(135deg,${course.color},${course.color}cc)">
+            <div class="intro-icon">${course.icon}</div>
+            <div class="intro-title">${esc(course.title)}</div>
+            <div class="intro-summary">${esc(course.summary || "")}</div>
+            <div class="intro-meta">
+              <div class="intro-meta-item"><span class="intro-meta-n">${course.slides.length}</span><span class="intro-meta-l">Sections</span></div>
+              <div class="intro-meta-item"><span class="intro-meta-n">${course.quiz.length}</span><span class="intro-meta-l">Questions</span></div>
+              <div class="intro-meta-item"><span class="intro-meta-n">⏱ ${esc(course.duration||"")}</span><span class="intro-meta-l">Duration</span></div>
+              <div class="intro-meta-item"><span class="intro-meta-n">70%</span><span class="intro-meta-l">To pass</span></div>
+            </div>
+          </div>
+          <div class="intro-body">
+            ${alreadyStarted ? `<div class="intro-resume">You're ${enr.progress}% through this course — your progress is saved.</div>` : ""}
+            <h3>📋 What you'll learn</h3>
+            <ul class="obj-list">${
+              (course.objectives||[]).map(o => `<li><span class="obj-check" style="background:${course.color}">✓</span>${esc(o)}</li>`).join("")
+            }</ul>
+            <button class="intro-start" id="startbtn" style="background:${course.color}">${alreadyStarted ? "Resume Course →" : "Begin Course →"}</button>
+          </div>
+        </div>
+      `);
+      intro.appendChild(card);
+      wrap.appendChild(intro);
+      App.appendChild(wrap);
+      document.getElementById("pback").onclick = () => renderStaffPortal();
+      document.getElementById("startbtn").onclick = () => { stage = "slides"; slideIdx = 0; render(); };
+      return;
+    }
+
+    // ── HEADER (slides + quiz) ──
+    wrap.appendChild(el(`
+      <div class="player-hdr" style="background:${course.color}">
+        <button class="back-btn" id="pback">← Back</button>
+        <div class="player-title"><span>${course.icon}</span><span>${esc(course.title)}</span></div>
+        <div class="player-prog">${inQuiz ? "Assessment" : `Section ${slideIdx+1} of ${course.slides.length}`}</div>
+      </div>
+    `));
+
+    if (!inQuiz) {
+      // progress bar instead of plain dots
+      const pct = Math.round(((slideIdx) / course.slides.length) * 100);
+      const dots = el(`<div class="dots"></div>`);
+      course.slides.forEach((_, i) => dots.appendChild(el(`<div class="dot" style="background:${i <= slideIdx ? course.color : "#E0E0E0"}"></div>`)));
+      wrap.appendChild(dots);
+
+      const s = course.slides[slideIdx];
+      const pbody = el(`<div class="pbody"></div>`);
+      pbody.appendChild(el(`
+        <div class="slide">
+          <div class="svis">${renderSlideVisual(s, course)}</div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:${course.color};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Section ${slideIdx+1}</div>
+            <h2 style="color:${course.color}">${esc(s.heading)}</h2>
+            <p class="slide-body-txt">${esc(s.body)}</p>
+            <ul class="plist">${s.points.map(p => `<li><span class="pdot" style="background:${course.color}"></span>${esc(p)}</li>`).join("")}</ul>
+          </div>
+        </div>
+      `));
+      const nav = el(`<div class="snav"></div>`);
+      if (slideIdx > 0) { const b = el(`<button class="btn-out" style="border-color:${course.color};color:${course.color}">← Previous</button>`); b.onclick = () => { slideIdx--; render(); }; nav.appendChild(b); }
+      else { const b = el(`<button class="btn-out" style="border-color:#BDC3C7;color:#7A8599">← Overview</button>`); b.onclick = () => { stage = "intro"; render(); }; nav.appendChild(b); }
+      nav.appendChild(el(`<div style="flex:1"></div>`));
+      if (slideIdx < course.slides.length-1) { const b = el(`<button class="btn-go" style="background:${course.color}">Next →</button>`); b.onclick = async () => { slideIdx++; await saveProgress(); render(); }; nav.appendChild(b); }
+      else { const b = el(`<button class="btn-go" style="background:${course.color}">📝 Start Assessment</button>`); b.onclick = async () => { inQuiz = true; await saveProgress(100); render(); }; nav.appendChild(b); }
+      pbody.appendChild(nav);
+      wrap.appendChild(pbody);
+    } else {
+      wrap.appendChild(renderQuiz(course, me, () => { openCoursePlayer(courseId, me, { stage: "slides" }); }));
+    }
+
+    App.appendChild(wrap);
+    document.getElementById("pback").onclick = () => renderStaffPortal();
+  }
+
+  async function saveProgress(force) {
+    const pct = force != null ? force : Math.round(((slideIdx+1) / (course.slides.length+1)) * 100);
+    try { await api("/staff/progress", "POST", { courseId, progress: pct }); } catch (e) {}
+  }
+
+  render();
+}
+
+// ── Quiz ──
+function renderQuiz(course, me, onRestart) {
+  const wrap = el(`<div class="pbody"></div>`);
+  const quiz = course.quiz;
+  let cur = 0, selected = null, answered = false, correct = 0;
+  const results = [];
+
+  function paint() {
+    wrap.innerHTML = "";
+    const q = quiz[cur];
+    const inner = el(`<div class="quiz"></div>`);
+    inner.appendChild(el(`<div class="qbar"><div class="qbar-f" style="width:${(cur/quiz.length)*100}%;background:${course.color}"></div></div>`));
+    inner.appendChild(el(`<div class="qmeta"><span style="color:${course.color};font-weight:700">Question ${cur+1} of ${quiz.length}</span><span style="color:#7A8599">Score: ${correct}</span></div>`));
+    inner.appendChild(el(`<div class="qq">${esc(q.q)}</div>`));
+    const opts = el(`<div class="qopts"></div>`);
+    q.options.forEach((opt,i) => {
+      let cls = "qopt";
+      if (answered) { if (i===q.answer) cls+=" correct"; else if (i===selected) cls+=" wrong"; }
+      const b = el(`<button class="${cls}"><span class="qletter">${["A","B","C","D"][i]}</span>${esc(opt)}</button>`);
+      if (answered && i===q.answer) { b.style.borderColor=course.color; b.style.background=course.color+"15"; }
+      b.onclick = () => {
+        if (answered) return;
+        selected = i; answered = true;
+        if (i===q.answer) correct++;
+        results.push(i===q.answer);
+        paint();
+      };
+      opts.appendChild(b);
+    });
+    inner.appendChild(opts);
+    if (answered) {
+      inner.appendChild(el(`<div class="qexp" style="border-left:3px solid ${course.color}"><b style="color:${selected===q.answer?course.color:"#E74C3C"}">${selected===q.answer?"✓ Correct!":"✗ Incorrect"}</b><p>${esc(q.explanation)}</p></div>`));
+      const nb = el(`<button class="qnext" style="background:${course.color}">${cur+1>=quiz.length?"View Results":"Next →"}</button>`);
+      nb.onclick = async () => {
+        if (cur+1 >= quiz.length) { await finish(); }
+        else { cur++; selected=null; answered=false; paint(); }
+      };
+      inner.appendChild(nb);
+    }
+    wrap.appendChild(inner);
+  }
+
+  async function finish() {
+    const score = Math.round((results.filter(Boolean).length / quiz.length) * 100);
+    let passed = score >= 70;
+    let enrolment = null;
+    try {
+      const r = await api("/staff/quiz", "POST", { courseId: course.id, score });
+      passed = r.passed;
+      enrolment = r.enrolment;
+    } catch (e) {}
+    wrap.innerHTML = "";
+    const done = el(`
+      <div class="qdone">
+        <div style="font-size:56px;margin-bottom:12px">${passed?"🏆":"📚"}</div>
+        <h2 style="color:${passed?course.color:"#E74C3C"};margin-bottom:8px">${passed?"Competency Confirmed!":"Additional Study Required"}</h2>
+        <div class="qscore-box" style="border-color:${passed?course.color:"#E74C3C"}"><span class="qbig" style="color:${passed?course.color:"#E74C3C"}">${score}%</span><span style="color:#7A8599;font-size:14px">${results.filter(Boolean).length} of ${quiz.length} correct</span></div>
+        <p style="color:#5A6474;font-size:14px;line-height:1.7;max-width:400px;margin:0 auto">${passed?"You have demonstrated competency. Your certificate has been issued and your progress saved — your manager can now see this course as complete.":"You scored below the 70% pass mark. Review the course sections and try the assessment again."}</p>
+      </div>
+    `);
+    if (!passed) {
+      const rb = el(`<button class="btn-retry" style="border-color:${course.color};color:${course.color}">Retake Assessment</button>`);
+      rb.onclick = onRestart;
+      done.appendChild(rb);
+    } else {
+      if (enrolment && enrolment.certId) {
+        const vc = el(`<button class="btn-go" style="background:${course.color};margin:18px auto 0">🏆 View Your Certificate</button>`);
+        vc.onclick = () => showCertificate(enrolment, me);
+        done.appendChild(vc);
+      }
+      const bb = el(`<button class="btn-retry" style="border-color:${course.color};color:${course.color}">Back to My Courses</button>`);
+      bb.onclick = () => renderStaffPortal();
+      done.appendChild(bb);
+    }
+    wrap.appendChild(done);
+  }
+
+  paint();
+  return wrap;
+}
+
+// ── Certificate modal ──
+// ── Print the certificate via a hidden iframe (no pop-up window required) ──
+function printCertificate(enr, me) {
+  const c = state.courses.find(x => x.id === enr.courseId) || {};
+  const color = c.color || "#1B2A4A";
+  const doc =
+'<!DOCTYPE html><html><head><meta charset="utf-8">' +
+'<title>Certificate — ' + esc(enr.courseTitle) + ' — ' + esc(me.staff.name) + '</title>' +
+'<style>' +
+'@page{size:A4 portrait;margin:14mm;}' +
+'*{box-sizing:border-box;margin:0;padding:0;}' +
+'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1A1A2E;padding:10px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+'.sheet{border:3px solid ' + color + ';border-radius:14px;overflow:hidden;max-width:760px;margin:0 auto;}' +
+'.top{background:' + color + ';color:#fff;padding:24px 32px;display:flex;justify-content:space-between;align-items:center;}' +
+'.brand{font-size:22px;font-weight:900;display:flex;align-items:center;gap:8px;}' +
+'.badge{font-size:12px;opacity:.85;letter-spacing:1px;}' +
+'.bodyc{padding:40px 40px 30px;text-align:center;}' +
+'.icon{font-size:64px;margin-bottom:10px;}' +
+'.sm{font-size:14px;color:#7A8599;margin:6px 0;}' +
+'.name{font-size:34px;font-weight:900;margin:6px 0;}' +
+'.course{font-size:24px;font-weight:800;color:' + color + ';margin:6px 0;}' +
+'.meta{display:flex;justify-content:center;gap:38px;margin:28px 0 18px;flex-wrap:wrap;}' +
+'.ml{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#7A8599;font-weight:700;}' +
+'.mv{font-size:16px;font-weight:800;margin-top:3px;}' +
+'.strip{margin-top:6px;padding:14px;background:' + color + '14;border-radius:8px;display:flex;justify-content:space-between;font-size:12px;color:#5A6474;}' +
+'.foot{text-align:center;font-size:11px;color:#9AA5B1;margin-top:16px;}' +
+'</style></head><body>' +
+'<div class="sheet">' +
+'<div class="top"><div class="brand">' + logoMark(22, false) + ' Care2Learn</div><div class="badge">Skills for Care · Mandatory Training</div></div>' +
+'<div class="bodyc">' +
+'<div class="icon">' + (c.icon || "📘") + '</div>' +
+'<div class="sm">This certifies that</div>' +
+'<div class="name">' + esc(me.staff.name) + '</div>' +
+'<div class="sm">has successfully completed</div>' +
+'<div class="course">' + esc(enr.courseTitle) + '</div>' +
+'<div class="sm">on behalf of <strong>' + esc(me.org.name) + '</strong></div>' +
+'<div class="meta">' +
+'<div><div class="ml">Score</div><div class="mv" style="color:' + color + '">' + enr.score + '%</div></div>' +
+'<div><div class="ml">Completed</div><div class="mv">' + fmtDate(enr.completedAt) + '</div></div>' +
+'<div><div class="ml">Valid Until</div><div class="mv">' + fmtDate(enr.expiryDate) + '</div></div>' +
+'<div><div class="ml">Certificate ID</div><div class="mv" style="font-family:monospace">' + esc(enr.certId) + '</div></div>' +
+'</div>' +
+'<div class="strip"><span>Aligned to the Care Certificate 2026</span><span>Pass mark: 70% · Achieved: ' + enr.score + '%</span></div>' +
+'</div></div>' +
+'<div class="foot">Issued by Care2Learn · Verify with Certificate ID ' + esc(enr.certId) + '</div>' +
+'</body></html>';
+
+  printViaIframe(doc);
+}
+
+// ── Shared: print/save any HTML document via a hidden iframe (no pop-up needed) ──
+function printViaIframe(html) {
+  const old = document.getElementById("c2l-print-frame");
+  if (old) old.remove();
+
+  const frame = document.createElement("iframe");
+  frame.id = "c2l-print-frame";
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.position = "fixed";
+  frame.style.left = "-9999px";
+  frame.style.top = "0";
+  frame.style.width = "900px";
+  frame.style.height = "1200px";
+  frame.style.border = "0";
+  document.body.appendChild(frame);
+
+  let printed = false;
+  const triggerPrint = function () {
+    if (printed) return;
+    printed = true;
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    } catch (e) {
+      try { window.print(); } catch (e2) {}
+    }
+    setTimeout(function () { if (frame && frame.parentNode) frame.parentNode.removeChild(frame); }, 3000);
+  };
+
+  const fdoc = frame.contentWindow.document;
+  fdoc.open();
+  fdoc.write(html);
+  fdoc.close();
+  frame.onload = function () { setTimeout(triggerPrint, 150); };
+  setTimeout(triggerPrint, 500);
+}
+
+// ── Compliance status → printable label + colours ──
+function compStatusStyle(compliance) {
+  switch (compliance) {
+    case "valid":       return { label: "Valid",         fg: "#15803D", bg: "#16A34A1A" };
+    case "expiring":    return { label: "Expiring soon", fg: "#9A6700", bg: "#E67E221A" };
+    case "expired":     return { label: "Expired",       fg: "#B91C1C", bg: "#E74C3C1A" };
+    case "in_progress": return { label: "In progress",   fg: "#1D4E89", bg: "#2980B91A" };
+    case "failed":      return { label: "Failed",        fg: "#B91C1C", bg: "#E74C3C1A" };
+    default:            return { label: "Not started",   fg: "#4B5563", bg: "#9CA3AF1A" };
+  }
+}
+
+// ── Build + print the organisation's compliance report as a PDF ──
+async function downloadComplianceReport() {
+  toast("Preparing compliance report…");
+  let me, staffResp;
+  try {
+    me = await api("/org/me");
+    staffResp = await api("/org/staff");
+  } catch (e) {
+    toast("Could not build the report — please try again.");
+    return;
+  }
+  const org = me.org;
+  const sum = me.summary;
+  const active = staffResp.staff.filter(s => s.active);
+
+  const now = new Date();
+  const generated = now.toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+  const sumCard = (n, l) => '<div class="sum"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>';
+
+  const staffBlocks = active.map(s => {
+    const rows = (s.enrolments || []).map(e => {
+      const st = compStatusStyle(e.compliance);
+      return '<tr>'
+        + '<td>' + esc(e.courseTitle) + '</td>'
+        + '<td><span class="badge" style="color:' + st.fg + ';background:' + st.bg + '">' + st.label + '</span></td>'
+        + '<td>' + (e.score != null ? e.score + '%' : '—') + '</td>'
+        + '<td>' + (e.completedAt ? fmtDate(e.completedAt) : '—') + '</td>'
+        + '<td>' + (e.expiryDate ? fmtDate(e.expiryDate) : '—') + '</td>'
+        + '</tr>';
+    }).join("");
+    const overall = (s.assignedCount > 0 && s.compliant)
+      ? '<span class="badge" style="color:#15803D;background:#16A34A1A">Fully compliant</span>'
+      : (s.assignedCount === 0
+        ? '<span class="badge" style="color:#4B5563;background:#9CA3AF1A">No courses assigned</span>'
+        : '<span class="badge" style="color:#9A6700;background:#E67E221A">Action required</span>');
+    const table = (s.enrolments && s.enrolments.length)
+      ? '<table><thead><tr><th>Course</th><th>Status</th><th>Score</th><th>Completed</th><th>Expires</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<div class="none">No courses assigned.</div>';
+    return '<div class="staff">'
+      + '<div class="staff-h"><div><span class="staff-name">' + esc(s.name) + '</span> <span class="staff-role">· ' + esc(s.role) + '</span></div>' + overall + '</div>'
+      + table + '</div>';
+  }).join("");
+
+  const doc =
+'<!DOCTYPE html><html><head><meta charset="utf-8">'
++ '<title>Compliance Report — ' + esc(org.name) + '</title>'
++ '<style>'
++ '@page{size:A4 portrait;margin:14mm;}'
++ '*{box-sizing:border-box;margin:0;padding:0;}'
++ 'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1A1A2E;font-size:12px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
++ '.hd{background:#0D1B2A;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:8px;}'
++ '.hd .l{display:flex;align-items:center;gap:11px;}'
++ '.hd .ttl{font-size:18px;font-weight:700;}'
++ '.hd .sub{font-size:11px;color:#9FB0C4;}'
++ '.hd .org{font-size:13px;font-weight:700;text-align:right;}'
++ '.meta{display:flex;justify-content:space-between;margin:14px 2px;font-size:11px;color:#5A6474;}'
++ '.sumrow{display:flex;gap:10px;margin-bottom:18px;}'
++ '.sum{flex:1;border:1px solid #E5E7EB;border-radius:8px;padding:10px;text-align:center;}'
++ '.sum .n{font-size:22px;font-weight:800;}'
++ '.sum .l{font-size:9px;color:#7A8599;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}'
++ '.staff{margin-bottom:14px;page-break-inside:avoid;}'
++ '.staff-h{display:flex;justify-content:space-between;align-items:center;background:#F0F4F8;padding:8px 12px;border-radius:6px;margin-bottom:6px;}'
++ '.staff-name{font-weight:700;font-size:13px;}'
++ '.staff-role{color:#7A8599;font-size:11px;}'
++ 'table{width:100%;border-collapse:collapse;}'
++ 'th{text-align:left;color:#7A8599;font-weight:600;padding:5px 8px;border-bottom:1px solid #E5E7EB;text-transform:uppercase;font-size:9px;letter-spacing:.3px;}'
++ 'td{padding:6px 8px;border-bottom:1px solid #F0F2F5;font-size:11px;}'
++ '.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}'
++ '.none{padding:8px 12px;color:#7A8599;font-style:italic;font-size:11px;}'
++ '.legend{margin-top:6px;font-size:10px;color:#7A8599;line-height:1.6;}'
++ '.foot{margin-top:18px;padding-top:10px;border-top:1px solid #E5E7EB;text-align:center;font-size:10px;color:#9AA5B1;}'
++ '</style></head><body>'
++ '<div class="hd"><div class="l">' + logoMark(26, false) + '<div><div class="ttl">Care2Learn</div><div class="sub">Training Compliance Report</div></div></div><div class="org">' + esc(org.name) + (org.cqc_number ? '<br><span style="font-weight:400;color:#9FB0C4">CQC ' + esc(org.cqc_number) + '</span>' : '') + '</div></div>'
++ '<div class="meta"><span>Mandatory training compliance across all active staff</span><span>Generated: ' + esc(generated) + '</span></div>'
++ '<div class="sumrow">'
++ sumCard(sum.activeStaff, "Active staff")
++ sumCard(sum.fullyCompliant, "Fully compliant")
++ sumCard(sum.expiringSoon, "Expiring &le;30 days")
++ sumCard(sum.totalEnrolments, "Course assignments")
++ '</div>'
++ (active.length ? staffBlocks : '<div class="none">No active staff to report on.</div>')
++ '<div class="legend"><b>Status key:</b> Valid = completed and in date · Expiring soon = within 30 days of expiry · Expired = renewal overdue · In progress = started, assessment not yet passed · Not started = assigned but not begun.</div>'
++ '<div class="foot">Confidential · Generated by Care2Learn for ' + esc(org.name) + ' on ' + esc(generated) + '</div>'
++ '</body></html>';
+
+  printViaIframe(doc);
+}
+
+function showCertificate(enr, me) {
+  const c = state.courses.find(x => x.id === enr.courseId) || {};
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="cert">
+      <div class="cert-hdr" style="background:linear-gradient(135deg,${c.color},${c.color}cc)">
+        <div class="cert-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, false)}<span>Care2Learn</span></div>
+        <div class="cert-badge">Skills for Care · Mandatory Training</div>
+      </div>
+      <div class="cert-body">
+        <div class="cert-icon">${c.icon}</div>
+        <div class="cert-sm">This certifies that</div>
+        <div class="cert-name">${esc(me.staff.name)}</div>
+        <div class="cert-sm">has successfully completed</div>
+        <div class="cert-course" style="color:${c.color}">${esc(enr.courseTitle)}</div>
+        <div class="cert-sm">on behalf of <b>${esc(me.org.name)}</b></div>
+        <div class="cert-meta">
+          <div><div class="cm-l">Score</div><div class="cm-v" style="color:${c.color}">${enr.score}%</div></div>
+          <div><div class="cm-l">Completed</div><div class="cm-v">${fmtDate(enr.completedAt)}</div></div>
+          <div><div class="cm-l">Valid Until</div><div class="cm-v">${fmtDate(enr.expiryDate)}</div></div>
+          <div><div class="cm-l">Cert ID</div><div class="cm-v mono">${esc(enr.certId)}</div></div>
+        </div>
+        <div style="padding:12px;background:${c.color}18;border-radius:8px;display:flex;justify-content:space-between;font-size:11px;color:#5A6474"><span>Aligned to the Care Certificate 2026</span><span>Pass mark: 70% · Achieved: ${enr.score}%</span></div>
+      </div>
+      <div class="cert-actions">
+        <button class="btn-cancel" style="flex:1" id="cert-close">Close</button>
+        <button class="btn-save" style="flex:1;background:${c.color}" id="cert-print">🖨️ Print / Save as PDF</button>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#cert-close").onclick = () => overlay.remove();
+  modal.querySelector("#cert-print").onclick = () => printCertificate(enr, me);
+}
+
+// ── Go ──
+boot();
+
+</script>
+</body></html>
