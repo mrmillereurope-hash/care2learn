@@ -118,6 +118,10 @@ async function boot() {
     App.innerHTML = `<div class="spin">Could not reach the server.<br>Make sure it is running: <code>node server.js</code></div>`;
     return;
   }
+  // Password reset link (?reset=TOKEN) — always show the reset page, even if a
+  // stale session is present. Handled before session-resume below.
+  const resetToken = new URLSearchParams(location.search).get("reset");
+  if (resetToken) { renderResetPassword(resetToken); return; }
   // Super admin lives at a hidden route: /#admin
   if (location.hash === "#admin" && state.kind !== "admin") { renderAdminLogin(); return; }
   if (state.token && state.kind === "admin") {
@@ -444,11 +448,13 @@ function renderOrgLogin() {
       <div class="fg"><label>Password</label><input class="inp" id="password" type="password" placeholder="Your password"></div>
       <button class="btn-auth" id="submit">Sign In</button>
       <button class="btn-demo" id="demo">🎯 Try Demo Account</button>
+      <div class="auth-alt"><button class="linkbtn" id="forgot">Forgot your password?</button></div>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
   document.getElementById("submit").onclick = () => doOrgLogin(val("email"), val("password"));
   document.getElementById("demo").onclick = () => doOrgLogin("demo@care2learn.co.uk", "demo123");
+  document.getElementById("forgot").onclick = () => renderForgotPassword(renderOrgLogin);
 }
 async function doOrgLogin(email, password) {
   const errBox = document.getElementById("err");
@@ -491,6 +497,111 @@ async function doStaffLogin(email, pin) {
 }
 
 function val(id) { const e = document.getElementById(id); return e ? e.value.trim() : ""; }
+
+// ─── FORGOT / RESET PASSWORD (self-service) ───────────────────────────────────
+// Step 1: request a reset link by email. backFn returns to the relevant login.
+function renderForgotPassword(backFn) {
+  backFn = backFn || renderLanding;
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <button class="back-sm" id="back">← Back to login</button>
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Reset your password</div>
+      <div class="auth-sub">Enter the email address for your account and we'll send you a link to set a new password.</div>
+      <div id="err"></div>
+      <div id="ok"></div>
+      <div class="fg"><label>Email Address</label><input class="inp" id="email" type="email" placeholder="you@email.com"></div>
+      <button class="btn-auth" id="submit">Send reset link</button>
+    </div></div>
+  `));
+  document.getElementById("back").onclick = backFn;
+  const submit = document.getElementById("submit");
+  const go = async () => {
+    const errBox = document.getElementById("err"); const okBox = document.getElementById("ok");
+    errBox.innerHTML = ""; okBox.innerHTML = "";
+    const email = val("email");
+    if (!email) { errBox.innerHTML = `<div class="err">Please enter your email address.</div>`; return; }
+    submit.disabled = true; submit.textContent = "Sending…";
+    try {
+      const r = await api("/forgot-password", "POST", { email });
+      okBox.innerHTML = `<div class="ok-banner">${esc(r.message || "If that email has an account, we've sent a reset link.")}</div>`;
+      submit.textContent = "Link sent";
+    } catch (e) {
+      errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      submit.disabled = false; submit.textContent = "Send reset link";
+    }
+  };
+  submit.onclick = go;
+  document.getElementById("email").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+}
+
+// Step 2: arrived via the emailed link (?reset=TOKEN). Validate, then set a new password.
+async function renderResetPassword(token) {
+  App.innerHTML = `<div class="spin">Checking your reset link…</div>`;
+  let valid = false;
+  try { const r = await api("/reset-password/check", "POST", { token }); valid = !!r.valid; } catch (e) { valid = false; }
+
+  const stripParam = () => { try { history.replaceState(null, "", location.pathname); } catch (e) {} };
+
+  if (!valid) {
+    stripParam();
+    App.innerHTML = "";
+    App.appendChild(el(`
+      <div class="auth-page"><div class="auth-card">
+        <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+        <div class="auth-title">Link expired or invalid</div>
+        <div class="auth-sub">This password reset link has expired or has already been used. Reset links are valid for 60 minutes and can be used once.</div>
+        <button class="btn-auth" id="again">Request a new link</button>
+        <div class="auth-alt"><button class="linkbtn" id="tologin">Back to login</button></div>
+      </div></div>
+    `));
+    document.getElementById("again").onclick = () => renderForgotPassword(renderLanding);
+    document.getElementById("tologin").onclick = renderLanding;
+    return;
+  }
+
+  App.innerHTML = "";
+  App.appendChild(el(`
+    <div class="auth-page"><div class="auth-card">
+      <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+      <div class="auth-title">Choose a new password</div>
+      <div class="auth-sub">Enter a new password for your account. It must be at least 6 characters.</div>
+      <div id="err"></div>
+      <div class="fg"><label>New password</label><input class="inp" id="pw1" type="password" placeholder="New password"></div>
+      <div class="fg"><label>Confirm new password</label><input class="inp" id="pw2" type="password" placeholder="Re-enter new password"></div>
+      <button class="btn-auth" id="submit">Set new password</button>
+    </div></div>
+  `));
+  const submit = document.getElementById("submit");
+  const go = async () => {
+    const errBox = document.getElementById("err"); errBox.innerHTML = "";
+    const pw1 = val("pw1"); const pw2 = val("pw2");
+    if (pw1.length < 6) { errBox.innerHTML = `<div class="err">Password must be at least 6 characters.</div>`; return; }
+    if (pw1 !== pw2) { errBox.innerHTML = `<div class="err">The two passwords don't match.</div>`; return; }
+    submit.disabled = true; submit.textContent = "Saving…";
+    try {
+      const r = await api("/reset-password", "POST", { token, newPassword: pw1 });
+      stripParam();
+      const backFn = r.accountType === "individual" ? renderIndividualLogin : renderOrgLogin;
+      App.innerHTML = "";
+      App.appendChild(el(`
+        <div class="auth-page"><div class="auth-card">
+          <div class="auth-logo" style="display:flex;align-items:center;gap:8px">${logoMark(22, true)}<span>Care2Learn</span></div>
+          <div class="auth-title">Password updated</div>
+          <div class="ok-banner">Your password has been changed. You can now sign in with your new password.</div>
+          <button class="btn-auth" id="tologin">Go to login</button>
+        </div></div>
+      `));
+      document.getElementById("tologin").onclick = backFn;
+    } catch (e) {
+      errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      submit.disabled = false; submit.textContent = "Set new password";
+    }
+  };
+  submit.onclick = go;
+  document.getElementById("pw2").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+}
 
 // ─── ORG DASHBOARD ────────────────────────────────────────────────────────────
 let orgTab = "overview";
@@ -1771,11 +1882,13 @@ function renderIndividualLogin() {
       <div class="fg"><label>Password</label><input class="inp" id="pw" type="password" placeholder="Your password"></div>
       <button class="btn-auth" id="submit">Sign In</button>
       <div class="auth-alt">New here? <button class="linkbtn" id="toreg">Register as an individual</button></div>
+      <div class="auth-alt"><button class="linkbtn" id="forgot">Forgot your password?</button></div>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
   document.getElementById("toreg").onclick = renderIndividualRegister;
   document.getElementById("submit").onclick = doIndividualLogin;
+  document.getElementById("forgot").onclick = () => renderForgotPassword(renderIndividualLogin);
 }
 async function doIndividualLogin() {
   const errBox = document.getElementById("err"); if (errBox) errBox.innerHTML = "";

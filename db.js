@@ -137,6 +137,16 @@ export function initSchema() {
       credits         INTEGER NOT NULL,
       created_at      TEXT NOT NULL
     );
+
+    -- Self-service password reset tokens (companies + individuals). One-time use, time-limited.
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token      TEXT PRIMARY KEY,
+      org_id     TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      FOREIGN KEY (org_id) REFERENCES organisations(id) ON DELETE CASCADE
+    );
   `);
 
   // Migrations on the organisations table (idempotent — safe to re-run).

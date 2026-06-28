@@ -50,6 +50,58 @@ function authSession(req) {
   return db.prepare("SELECT * FROM sessions WHERE token = ?").get(token) || null;
 }
 
+// Minimal HTML escaping for values placed into email bodies.
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// The app's public base URL, for building links inside emails.
+// Uses APP_URL if set, otherwise derives it from the incoming request headers
+// (Render sets x-forwarded-proto / host), so reset links work on both the
+// onrender.com URL and a custom domain without any extra configuration.
+function baseUrl(req) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, "");
+  const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+  const host = req.headers["x-forwarded-host"] || req.headers["host"] || ("localhost:" + PORT);
+  return proto + "://" + host;
+}
+
+// ─── EMAIL (transactional) ─────────────────────────────────────────────────
+// Sends mail via Resend when configured (env: RESEND_API_KEY, optionally
+// EMAIL_FROM). When NOT configured, it logs the message to the server console
+// so flows can be tested end-to-end before email is wired up. Never throws.
+async function sendEmail({ to, subject, text, html }) {
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM || "Care2Learn <onboarding@resend.dev>";
+  if (!key) {
+    console.log("\n📧 EMAIL (no email provider configured — this is what WOULD be sent):");
+    console.log("   To:      " + to);
+    console.log("   Subject: " + subject);
+    console.log("   ----");
+    console.log("   " + String(text || "").replace(/\n/g, "\n   "));
+    console.log("");
+    return { sent: false, reason: "not_configured" };
+  }
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to, subject, text, html: html || undefined }),
+    });
+    if (!r.ok) {
+      const msg = await r.text().catch(() => "");
+      console.error("✉️  Email send failed (" + r.status + "): " + msg.slice(0, 300));
+      return { sent: false, reason: "provider_error" };
+    }
+    return { sent: true };
+  } catch (e) {
+    console.error("✉️  Email send threw: " + e.message);
+    return { sent: false, reason: "exception" };
+  }
+}
+
 function addYear(dateStr) {
   const d = new Date(dateStr);
   d.setFullYear(d.getFullYear() + 1);
@@ -727,6 +779,93 @@ route("POST", "/api/staff/change-pin", async (req, res) => {
   db.prepare("UPDATE staff SET pin = ? WHERE id = ?").run(newPin, member.id);
   console.log(`🔒 PIN CHANGED (self-service): ${member.name}`);
   send(res, 200, { ok: true });
+});
+
+// ── FORGOT PASSWORD: request a reset link (companies + individuals) ──
+// Always responds identically whether or not the email exists, so the form
+// can't be used to discover which emails have accounts.
+route("POST", "/api/forgot-password", async (req, res) => {
+  const b = await readBody(req);
+  const email = String(b.email || "").trim().toLowerCase();
+  const generic = { ok: true, message: "If that email has a Care2Learn account, we've sent a link to reset the password. Please check your inbox (and spam folder)." };
+  if (!email) return send(res, 400, { error: "Please enter your email address." });
+  try {
+    const org = db.prepare("SELECT id, name, email, active FROM organisations WHERE email = ?").get(email);
+    if (org && org.active !== 0) {
+      // Light anti-spam: at most one reset email per account per 60 seconds.
+      const recent = db.prepare("SELECT created_at FROM password_resets WHERE org_id = ? ORDER BY created_at DESC LIMIT 1").get(org.id);
+      const tooSoon = recent && (Date.now() - new Date(recent.created_at).getTime() < 60 * 1000);
+      if (!tooSoon) {
+        // Invalidate any earlier unused tokens, then issue one fresh single-use token.
+        db.prepare("DELETE FROM password_resets WHERE org_id = ? AND used_at IS NULL").run(org.id);
+        const token = genToken();
+        const now = new Date();
+        const expires = new Date(now.getTime() + 60 * 60 * 1000); // 60 minutes
+        db.prepare("INSERT INTO password_resets (token, org_id, created_at, expires_at, used_at) VALUES (?,?,?,?,NULL)")
+          .run(token, org.id, now.toISOString(), expires.toISOString());
+        const link = baseUrl(req) + "/?reset=" + encodeURIComponent(token);
+        const text =
+          "Hi " + org.name + ",\n\n" +
+          "We received a request to reset the password for your Care2Learn account (" + org.email + ").\n\n" +
+          "Use the link below to choose a new password. It expires in 60 minutes and can only be used once:\n\n" +
+          link + "\n\n" +
+          "If you didn't request this, you can safely ignore this email — your password won't change.\n\n" +
+          "Thanks,\nThe Care2Learn team";
+        const html =
+          "<div style=\"font-family:'Segoe UI',system-ui,sans-serif;color:#1A1A2E;line-height:1.6\">" +
+          "<p>Hi " + escapeHtml(org.name) + ",</p>" +
+          "<p>We received a request to reset the password for your Care2Learn account (" + escapeHtml(org.email) + ").</p>" +
+          "<p>Use the button below to choose a new password. It expires in 60 minutes and can only be used once.</p>" +
+          "<p><a href=\"" + escapeHtml(link) + "\" style=\"display:inline-block;padding:12px 22px;background:#1B2A4A;color:#ffffff;border-radius:10px;text-decoration:none;font-weight:700\">Reset my password</a></p>" +
+          "<p style=\"color:#5A6474;font-size:13px\">Or paste this link into your browser:<br><a href=\"" + escapeHtml(link) + "\">" + escapeHtml(link) + "</a></p>" +
+          "<p style=\"color:#5A6474;font-size:13px\">If you didn't request this, you can safely ignore this email — your password won't change.</p>" +
+          "<p>Thanks,<br>The Care2Learn team</p></div>";
+        await sendEmail({ to: org.email, subject: "Reset your Care2Learn password", text, html });
+        console.log("🔑 PASSWORD RESET requested: " + org.email);
+      }
+    }
+  } catch (e) {
+    console.error("forgot-password failed (responding generically):", e.message);
+  }
+  send(res, 200, generic); // always the same response
+});
+
+// ── Validate a reset token (lets the reset page show a friendly state up front) ──
+route("POST", "/api/reset-password/check", async (req, res) => {
+  const b = await readBody(req);
+  const token = String(b.token || "").trim();
+  const row = token ? db.prepare("SELECT expires_at, used_at FROM password_resets WHERE token = ?").get(token) : null;
+  const valid = !!row && !row.used_at && new Date(row.expires_at).getTime() > Date.now();
+  send(res, 200, { valid });
+});
+
+// ── RESET PASSWORD: set a new password using a valid one-time token ──
+route("POST", "/api/reset-password", async (req, res) => {
+  const b = await readBody(req);
+  const token = String(b.token || "").trim();
+  const newPassword = String(b.newPassword || "");
+  if (!token) return send(res, 400, { error: "This reset link is invalid." });
+  if (newPassword.length < 6) return send(res, 400, { error: "Password must be at least 6 characters." });
+  const row = db.prepare("SELECT * FROM password_resets WHERE token = ?").get(token);
+  if (!row || row.used_at) return send(res, 400, { error: "This reset link has already been used or is invalid. Please request a new one." });
+  if (new Date(row.expires_at).getTime() <= Date.now()) return send(res, 400, { error: "This reset link has expired. Please request a new one." });
+  const org = db.prepare("SELECT id, name, email, account_type FROM organisations WHERE id = ?").get(row.org_id);
+  if (!org) return send(res, 404, { error: "Account not found." });
+  const { hash, salt } = hashPassword(newPassword);
+  inTransaction(() => {
+    db.prepare("UPDATE organisations SET password_hash = ?, password_salt = ? WHERE id = ?").run(hash, salt, org.id);
+    db.prepare("UPDATE password_resets SET used_at = ? WHERE token = ?").run(new Date().toISOString(), token);
+    // Security: drop any other outstanding reset tokens for this account.
+    db.prepare("DELETE FROM password_resets WHERE org_id = ? AND used_at IS NULL").run(org.id);
+    // Security: sign out existing sessions for this account so a reset locks out anyone else.
+    if (org.account_type === "individual") {
+      db.prepare("DELETE FROM sessions WHERE kind = 'staff' AND subject_id IN (SELECT id FROM staff WHERE org_id = ?)").run(org.id);
+    } else {
+      db.prepare("DELETE FROM sessions WHERE kind = 'org' AND subject_id = ?").run(org.id);
+    }
+  });
+  console.log("🔒 PASSWORD RESET completed: " + org.email);
+  send(res, 200, { ok: true, accountType: org.account_type === "individual" ? "individual" : "company" });
 });
 
 // Super admin resets a company or individual's login password → returns a new temporary one to share.
