@@ -296,6 +296,7 @@
   .legend{display:flex;gap:6px;align-items:center;padding:12px 4px;font-size:12px;color:#7A8599;flex-wrap:wrap}
   /* Mobile: keep the compliance matrix aligned + scrollable (icons must line up with the cells below) */
   @media(max-width:640px){
+    .mh,.mr{min-width:-webkit-max-content;min-width:max-content} /* row box spans all columns so the grey header fills the full width */
     .mh{position:static}                       /* removes the iOS sticky-header paint glitch */
     .mh span,.mr span{flex-shrink:0}           /* fixed-width columns so icons align with their cells */
     .mh span:first-child,.mr .m-name{
