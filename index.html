@@ -294,6 +294,18 @@
   .cell.prog{background:#2980B918;color:#2980B9}
   .cell.none{color:#BDC3C7}
   .legend{display:flex;gap:6px;align-items:center;padding:12px 4px;font-size:12px;color:#7A8599;flex-wrap:wrap}
+  /* Mobile: keep the compliance matrix aligned + scrollable (icons must line up with the cells below) */
+  @media(max-width:640px){
+    .mh{position:static}                       /* removes the iOS sticky-header paint glitch */
+    .mh span,.mr span{flex-shrink:0}           /* fixed-width columns so icons align with their cells */
+    .mh span:first-child,.mr .m-name{
+      min-width:130px;max-width:130px;
+      position:sticky;left:0;z-index:1;        /* freeze the name column while courses scroll across */
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .mh span:first-child{background:#F4F6F9}
+    .mr .m-name{background:#fff}
+  }
 
   /* settings */
   .scard{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
