@@ -842,12 +842,13 @@ async function paintOrgTab(org) {
   if (orgTab === "staff") {
     const { staff } = await api("/org/staff");
     body.innerHTML = "";
-    const sh = el(`<div class="sh"><h2>Staff & Licences</h2><button class="btn-add" id="add">+ Add Staff Member</button></div>`);
+    const sh = el(`<div class="sh"><h2>Staff &amp; Licences</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-add" id="import" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">⬆ Import CSV</button><button class="btn-add" id="add">+ Add Staff Member</button></div></div>`);
     body.appendChild(sh);
     const formSlot = el(`<div id="formslot"></div>`);
     body.appendChild(formSlot);
 
     document.getElementById("add").onclick = () => showAddStaffForm(formSlot);
+    document.getElementById("import").onclick = () => showBulkImportForm();
 
     if (staff.length === 0) {
       body.appendChild(el(`<div class="table"><div class="empty">No staff yet. Click "Add Staff Member" to create your first licence.</div></div>`));
@@ -1011,6 +1012,166 @@ function showAddStaffForm(slot) {
       paintOrgTab(null);
     } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
+}
+
+// ─── BULK CSV IMPORT (organisations only) ─────────────────────────────────────
+// Parse a CSV string into a 2-D array (handles quoted fields and commas).
+function parseCSV(text) {
+  text = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const rows = []; let row = [], field = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+      else field += c;
+    }
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => String(c).trim() !== ""));
+}
+// Build a CSV file from a 2-D array and trigger a download.
+function csvDownload(filename, rows) {
+  const cell = (v) => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const text = rows.map(r => r.map(cell).join(",")).join("\n");
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function showBulkImportForm() {
+  // Existing emails, for a friendly heads-up in the preview (server re-checks too).
+  let existing = new Set();
+  try { const { staff } = await api("/org/staff"); existing = new Set(staff.map(s => String(s.email || "").toLowerCase())); } catch (e) {}
+
+  let parsedRows = []; // [{name,email,role,startDate}]
+  const courseChecks = state.courses.map(c =>
+    `<label class="chk" data-cid="${c.id}"><input type="checkbox" value="${c.id}"> ${c.icon} ${esc(c.title)}</label>`
+  ).join("");
+
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:780px">
+      <div class="modal-h"><div><h2>Import staff from CSV</h2><p>Bulk-add care professionals using the same details as adding them by hand.</p></div><button class="x" id="close">✕</button></div>
+      <div id="ibody" style="padding:14px 22px 20px">
+        <div class="ok-banner" style="margin-bottom:14px">Your file needs a <b>name</b> and <b>email</b> column. <b>role</b> and <b>start_date</b> (YYYY-MM-DD) are optional. <button class="linkbtn" id="tmpl">Download a blank template</button></div>
+        <div id="ierr"></div>
+        <div class="fg"><label>Choose your CSV file</label><input class="inp" id="csvfile" type="file" accept=".csv,text/csv"></div>
+        <div id="preview"></div>
+        <div id="courseg" class="hidden">
+          <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin:12px 0 6px">Assign courses to everyone imported (optional)</label>
+          <div class="chk-grid">${courseChecks}</div>
+        </div>
+        <div class="form-actions" style="margin-top:12px"><button class="btn-cancel" id="cancel">Cancel</button><button class="btn-save" id="doimport" disabled>Import</button></div>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const close = () => overlay.remove();
+  modal.querySelector("#close").onclick = close;
+  modal.querySelector("#cancel").onclick = close;
+  modal.querySelectorAll(".chk").forEach(lbl => { const cb = lbl.querySelector("input"); cb.onchange = () => lbl.classList.toggle("on", cb.checked); });
+
+  modal.querySelector("#tmpl").onclick = () => csvDownload("care2learn-staff-template.csv", [
+    ["name", "email", "role", "start_date"],
+    ["Jane Smith", "jane@example.com", "Care Assistant", "2026-01-15"],
+    ["Mohammed Ali", "mo@example.com", "Senior Carer", "2026-02-01"],
+  ]);
+
+  const importBtn = modal.querySelector("#doimport");
+  const preview = modal.querySelector("#preview");
+  const courseg = modal.querySelector("#courseg");
+
+  function colIndex(headers, names) {
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i].toLowerCase().replace(/[^a-z]/g, "");
+      if (names.includes(h)) return i;
+    }
+    return -1;
+  }
+
+  modal.querySelector("#csvfile").onchange = (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    const ierr = modal.querySelector("#ierr"); ierr.innerHTML = "";
+    preview.innerHTML = ""; importBtn.disabled = true; parsedRows = []; courseg.classList.add("hidden");
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const grid = parseCSV(reader.result);
+      if (grid.length < 2) { ierr.innerHTML = `<div class="err">That file has no data rows. Use the template as a guide.</div>`; return; }
+      const headers = grid[0].map(h => String(h).trim());
+      const iName = colIndex(headers, ["name", "fullname"]);
+      const iEmail = colIndex(headers, ["email", "emailaddress"]);
+      const iRole = colIndex(headers, ["role", "jobrole", "job"]);
+      const iStart = colIndex(headers, ["startdate", "start", "date"]);
+      if (iName < 0 || iEmail < 0) { ierr.innerHTML = `<div class="err">Couldn't find a <b>name</b> and <b>email</b> column — please use the template headers.</div>`; return; }
+      parsedRows = grid.slice(1).map(r => ({
+        name: (r[iName] || "").trim(),
+        email: (r[iEmail] || "").trim(),
+        role: iRole >= 0 ? (r[iRole] || "").trim() : "",
+        startDate: iStart >= 0 ? (r[iStart] || "").trim() : "",
+      }));
+      renderPreview();
+    };
+    reader.onerror = () => { ierr.innerHTML = `<div class="err">Couldn't read that file.</div>`; };
+    reader.readAsText(file);
+  };
+
+  function renderPreview() {
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const seen = new Set(); let ready = 0;
+    const rowsHtml = parsedRows.map((r) => {
+      const lc = r.email.toLowerCase();
+      let status, cls;
+      if (!r.name || !r.email) { status = "Missing name/email"; cls = "bad"; }
+      else if (!emailRe.test(r.email)) { status = "Invalid email"; cls = "bad"; }
+      else if (seen.has(lc)) { status = "Duplicate in file"; cls = "warn"; }
+      else if (existing.has(lc)) { status = "Already on team"; cls = "warn"; }
+      else { status = "Ready"; cls = "ok"; ready++; }
+      if (r.email) seen.add(lc);
+      return `<tr><td>${esc(r.name || "—")}</td><td>${esc(r.email || "—")}</td><td>${esc(r.role || "Care Assistant")}</td><td><span class="csv-tag ${cls}">${status}</span></td></tr>`;
+    });
+    const more = parsedRows.length > 50 ? `<div class="est-sub" style="margin-top:6px">…and ${parsedRows.length - 50} more rows</div>` : "";
+    preview.innerHTML =
+      `<div class="csv-sum">${ready} ready to import · ${parsedRows.length - ready} will be skipped</div>` +
+      `<div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>${rowsHtml.slice(0, 50).join("")}</tbody></table></div>` + more;
+    importBtn.disabled = ready === 0;
+    courseg.classList.toggle("hidden", ready === 0);
+  }
+
+  importBtn.onclick = async () => {
+    const courseIds = [...modal.querySelectorAll("#courseg .chk input:checked")].map(c => c.value);
+    importBtn.disabled = true; importBtn.textContent = "Importing…";
+    let result;
+    try { result = await api("/org/staff/bulk", "POST", { rows: parsedRows, courseIds }); }
+    catch (e) { modal.querySelector("#ierr").innerHTML = `<div class="err">${esc(e.message)}</div>`; importBtn.disabled = false; importBtn.textContent = "Import"; return; }
+    renderResults(result);
+  };
+
+  function renderResults(result) {
+    const { created, skipped, summary } = result;
+    const createdRows = created.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.email)}</td><td class="mono">${esc(c.pin)}</td></tr>`).join("");
+    const skippedRows = skipped.map(s => `<tr><td>${esc(s.name || "—")}</td><td>${esc(s.email || "—")}</td><td>${esc(s.reason)}</td></tr>`).join("");
+    modal.querySelector(".modal-h h2").textContent = "Import complete";
+    modal.querySelector(".modal-h p").textContent = `${summary.created} added · ${summary.skipped} skipped`;
+    const region = modal.querySelector("#ibody");
+    region.innerHTML =
+      `<div class="ok-banner" style="margin-bottom:14px"><b>${summary.created}</b> staff added, each with a login PIN below.${summary.skipped ? ` <b>${summary.skipped}</b> skipped.` : ""}</div>` +
+      (created.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px"><b style="font-size:14px">New login PINs</b><button class="mini-btn" id="dlpins">⬇ Download PINs (CSV)</button></div><div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>PIN</th></tr></thead><tbody>${createdRows}</tbody></table></div>` : "") +
+      (skipped.length ? `<div style="margin-top:14px"><b style="font-size:14px">Skipped rows</b><div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>Reason</th></tr></thead><tbody>${skippedRows}</tbody></table></div></div>` : "") +
+      `<div class="form-actions" style="margin-top:14px"><button class="btn-save" id="done">Done</button></div>`;
+    const dl = region.querySelector("#dlpins");
+    if (dl) dl.onclick = () => csvDownload("care2learn-new-pins.csv", [["name", "email", "pin"], ...created.map(c => [c.name, c.email, c.pin])]);
+    region.querySelector("#done").onclick = () => { overlay.remove(); paintOrgTab(null); };
+  }
 }
 
 // ── Staff management modal (assign/remove courses, view progress) ──

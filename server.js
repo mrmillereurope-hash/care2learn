@@ -582,6 +582,66 @@ route("POST", "/api/org/staff", async (req, res) => {
   send(res, 201, { staff: { ...member, active: !!member.active }, pin });
 });
 
+// ── ORG: bulk-create staff from a CSV import (same fields as the manual add) ──
+// Accepts { rows: [{name,email,role,startDate}], courseIds? } and creates each
+// staff member exactly as the single add would (auto PIN, active=1), while
+// skipping rows that are invalid, duplicated in the file, or already on the team.
+route("POST", "/api/org/staff/bulk", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
+  const b = await readBody(req);
+  const rows = Array.isArray(b.rows) ? b.rows : [];
+  if (rows.length === 0) return send(res, 400, { error: "There are no rows to import." });
+  if (rows.length > 1000) return send(res, 400, { error: "Please import 1000 rows or fewer at a time." });
+  const courseIds = Array.isArray(b.courseIds) ? b.courseIds.filter((c) => COURSE_IDS.includes(c)) : [];
+
+  // Existing emails on this org (lower-cased) so we never create a duplicate.
+  const existing = new Set(
+    db.prepare("SELECT email FROM staff WHERE org_id = ?").all(s.subject_id).map((r) => String(r.email || "").toLowerCase())
+  );
+  const seen = new Set(); // catches duplicates within the uploaded file itself
+
+  const created = [];
+  const skipped = [];
+  const today = new Date().toISOString().split("T")[0];
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const insStaff = db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at) VALUES (?,?,?,?,?,?,?,1,?)`);
+  const insEnr = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts) VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
+
+  rows.forEach((row, i) => {
+    const rowNum = i + 1;
+    const name = String(row.name || "").trim();
+    const email = String(row.email || "").trim();
+    const emailLc = email.toLowerCase();
+    const role = String(row.role || "").trim() || "Care Assistant";
+    let startDate = String(row.startDate || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) startDate = today;
+
+    if (!name || !email) { skipped.push({ row: rowNum, name, email, reason: "Missing name or email" }); return; }
+    if (!emailRe.test(email)) { skipped.push({ row: rowNum, name, email, reason: "Invalid email address" }); return; }
+    if (seen.has(emailLc)) { skipped.push({ row: rowNum, name, email, reason: "Duplicate email in file" }); return; }
+    if (existing.has(emailLc)) { skipped.push({ row: rowNum, name, email, reason: "Already on your team" }); return; }
+
+    const id = genId("STF");
+    const pin = genPin();
+    try {
+      inTransaction(() => {
+        insStaff.run(id, s.subject_id, name, email, role, pin, startDate, new Date().toISOString());
+        for (const cid of courseIds) insEnr.run(genId("ENR"), id, cid, new Date().toISOString(), null);
+      });
+      seen.add(emailLc);
+      existing.add(emailLc);
+      created.push({ name, email, role, pin });
+    } catch (e) {
+      skipped.push({ row: rowNum, name, email, reason: "Could not be created" });
+    }
+  });
+
+  console.log(`📥 BULK IMPORT: org ${s.subject_id} — created ${created.length}, skipped ${skipped.length}`);
+  send(res, 200, { created, skipped, summary: { total: rows.length, created: created.length, skipped: skipped.length } });
+});
+
 // ── ORG: update staff (deactivate/reactivate, edit) ──
 route("PATCH", "/api/org/staff/:id", async (req, res) => {
   const s = authSession(req);
