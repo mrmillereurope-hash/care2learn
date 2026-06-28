@@ -765,7 +765,7 @@ async function paintStaffTab() {
             <div class="sc-body">
               <div style="font-size:10px;font-weight:700;color:#2980B9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
               <div class="sc-title">${esc(e.courseTitle)}</div>
-              <div class="sc-meta">⏱ ${c.duration||""} · ${(c.quiz||[]).length} questions${e.dueDate?` · due ${fmtDate(e.dueDate)}`:""}</div>
+              <div class="sc-meta">⏱ ${c.duration||""} · ${c.modules ? c.modules.length + " modules" : (c.quiz||[]).length + " questions"}${e.dueDate?` · due ${fmtDate(e.dueDate)}`:""}</div>
               ${e.compliance==="in_progress" ? `<div class="obar-mini" style="margin-bottom:11px"><div class="obar-mini-f" style="width:${e.progress}%;background:${c.color}"></div></div>` : ""}
               ${(e.compliance==="valid"||e.compliance==="expiring")
                 ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#2980B9"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
@@ -773,7 +773,7 @@ async function paintStaffTab() {
             </div>
           </div>
         `);
-        card.onclick = () => openCoursePlayer(e.courseId, me);
+        card.onclick = () => (c.modules ? openCareCertificate(e.courseId, me) : openCoursePlayer(e.courseId, me));
         grid.appendChild(card);
       });
       body.appendChild(grid);
@@ -981,6 +981,169 @@ async function openCoursePlayer(courseId, me, opts) {
   }
 
   render();
+}
+
+// ── Modular player (Care Certificate) ──
+async function openCareCertificate(courseId, me) {
+  const course = state.courses.find(c => c.id === courseId);
+  if (!course || !Array.isArray(course.modules)) return openCoursePlayer(courseId, me);
+  const enr = (me.enrolments || []).find(e => e.courseId === courseId) || { courseId, courseTitle: course.title };
+  const completed = new Set(enr.modulesCompleted || []);
+
+  function renderMenu() {
+    App.innerHTML = "";
+    const wrap = el(`<div></div>`);
+    const total = course.modules.length;
+    const doneCount = course.modules.filter(m => completed.has(m.id)).length;
+    const pct = Math.round((doneCount / total) * 100);
+    wrap.appendChild(el(`
+      <div class="player-hdr" style="background:${course.color}">
+        <button class="back-btn" id="pback">← Back to my courses</button>
+        <div class="player-title"><span>${course.icon}</span><span>${esc(course.title)}</span></div>
+        <div class="player-prog">${doneCount}/${total} complete</div>
+      </div>`));
+    const menu = el(`<div class="cc-menu"></div>`);
+    menu.appendChild(el(`
+      <div class="cc-head">
+        <h2>${esc(course.title)}</h2>
+        <p>${esc(course.summary)}</p>
+        <div class="cc-prog"><div class="cc-prog-f" style="width:${pct}%;background:${course.color}"></div></div>
+        <div class="cc-prog-l">${doneCount} of ${total} modules complete${doneCount === total ? " — all done! 🎉" : ""}</div>
+      </div>`));
+    if (doneCount === total) {
+      const certBox = el(`<div class="cc-cert"><b>🎓 Care Certificate complete!</b><p>You've finished all 16 standards.</p></div>`);
+      menu.appendChild(certBox);
+      if (enr.certId) {
+        const cb = el(`<button class="intro-start" style="background:${course.color};max-width:300px;margin:0 auto 6px">View Certificate →</button>`);
+        cb.onclick = () => printCertificate(enr, me);
+        menu.appendChild(cb);
+      }
+    }
+    const list = el(`<div class="cc-mods"></div>`);
+    course.modules.forEach((m, i) => {
+      const isDone = completed.has(m.id);
+      const item = el(`
+        <button class="cc-mod ${isDone ? "done" : ""}" style="--c:${course.color}">
+          <span class="cc-num" style="background:${isDone ? course.color : "#E0E6ED"};color:${isDone ? "#fff" : "#5A6474"}">${isDone ? "✓" : i + 1}</span>
+          <span class="cc-mod-body"><span class="cc-mod-title">${esc(m.title)}</span><span class="cc-mod-sum">${esc(m.summary || "")}</span></span>
+          <span class="cc-mod-cta" style="color:${course.color}">${isDone ? "Review" : "Start"} →</span>
+        </button>`);
+      item.onclick = () => openModule(i);
+      list.appendChild(item);
+    });
+    menu.appendChild(list);
+    wrap.appendChild(menu);
+    App.appendChild(wrap);
+    document.getElementById("pback").onclick = () => renderStaffPortal();
+  }
+
+  function openModule(idx) {
+    const m = course.modules[idx];
+    let slideIdx = 0, inQuiz = false;
+    function render() {
+      App.innerHTML = "";
+      const wrap = el(`<div></div>`);
+      wrap.appendChild(el(`
+        <div class="player-hdr" style="background:${course.color}">
+          <button class="back-btn" id="mback">← Modules</button>
+          <div class="player-title"><span>${course.icon}</span><span>${esc(m.title)}</span></div>
+          <div class="player-prog">${inQuiz ? "Quiz" : `Step ${slideIdx + 1} of ${m.slides.length}`}</div>
+        </div>`));
+      if (!inQuiz) {
+        const dots = el(`<div class="dots"></div>`);
+        m.slides.forEach((_, i) => dots.appendChild(el(`<div class="dot" style="background:${i <= slideIdx ? course.color : "#E0E0E0"}"></div>`)));
+        wrap.appendChild(dots);
+        const s = m.slides[slideIdx];
+        const pbody = el(`<div class="pbody"></div>`);
+        pbody.appendChild(el(`
+          <div class="slide">
+            <div class="svis">${renderSlideVisual(s, course)}</div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:${course.color};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${esc(m.title)}</div>
+              <h2 style="color:${course.color}">${esc(s.heading)}</h2>
+              <p class="slide-body-txt">${esc(s.body)}</p>
+              <ul class="plist">${s.points.map(p => `<li><span class="pdot" style="background:${course.color}"></span>${esc(p)}</li>`).join("")}</ul>
+            </div>
+          </div>`));
+        const nav = el(`<div class="snav"></div>`);
+        if (slideIdx > 0) { const b = el(`<button class="btn-out" style="border-color:${course.color};color:${course.color}">← Previous</button>`); b.onclick = () => { slideIdx--; render(); }; nav.appendChild(b); }
+        else { const b = el(`<button class="btn-out" style="border-color:#BDC3C7;color:#7A8599">← Modules</button>`); b.onclick = () => renderMenu(); nav.appendChild(b); }
+        nav.appendChild(el(`<div style="flex:1"></div>`));
+        if (slideIdx < m.slides.length - 1) { const b = el(`<button class="btn-go" style="background:${course.color}">Next →</button>`); b.onclick = () => { slideIdx++; render(); }; nav.appendChild(b); }
+        else { const b = el(`<button class="btn-go" style="background:${course.color}">📝 Take the quiz</button>`); b.onclick = () => { inQuiz = true; render(); }; nav.appendChild(b); }
+        pbody.appendChild(nav);
+        wrap.appendChild(pbody);
+      } else {
+        wrap.appendChild(renderModuleQuiz(course, m,
+          () => { slideIdx = 0; inQuiz = false; render(); },
+          async (score) => {
+            completed.add(m.id);
+            enr.modulesCompleted = [...completed];
+            try {
+              const r = await api("/staff/module-complete", "POST", { courseId, moduleId: m.id, score });
+              if (r && r.enrolment) Object.assign(enr, r.enrolment, { modulesCompleted: [...completed] });
+            } catch (e) { /* offline/demo: keep the optimistic local completion */ }
+            renderMenu();
+          }));
+      }
+      App.appendChild(wrap);
+      document.getElementById("mback").onclick = () => renderMenu();
+    }
+    render();
+  }
+
+  renderMenu();
+}
+
+// Compact per-module quiz: pass is two-thirds correct. Calls onPass(score) or onRetry().
+function renderModuleQuiz(course, module, onRetry, onPass) {
+  const wrap = el(`<div class="pbody"></div>`);
+  const quiz = module.quiz;
+  const passNeed = Math.max(1, Math.ceil(quiz.length * 0.66));
+  let cur = 0, selected = null, answered = false, correct = 0;
+  function paint() {
+    if (cur >= quiz.length) return showResult();
+    wrap.innerHTML = "";
+    const q = quiz[cur];
+    const inner = el(`<div class="quiz"></div>`);
+    inner.appendChild(el(`<div class="qbar"><div class="qbar-f" style="width:${(cur / quiz.length) * 100}%;background:${course.color}"></div></div>`));
+    inner.appendChild(el(`<div class="qmeta"><span style="color:${course.color};font-weight:700">Question ${cur + 1} of ${quiz.length}</span><span style="color:#7A8599">Pass: ${passNeed} of ${quiz.length}</span></div>`));
+    inner.appendChild(el(`<div class="qq">${esc(q.q)}</div>`));
+    const opts = el(`<div class="qopts"></div>`);
+    q.options.forEach((opt, i) => {
+      let cls = "qopt";
+      if (answered) { if (i === q.answer) cls += " correct"; else if (i === selected) cls += " wrong"; }
+      const b = el(`<button class="${cls}"><span class="qletter">${["A", "B", "C", "D"][i]}</span>${esc(opt)}</button>`);
+      if (answered && i === q.answer) { b.style.borderColor = course.color; b.style.background = course.color + "15"; }
+      b.onclick = () => { if (answered) return; selected = i; answered = true; if (i === q.answer) correct++; paint(); };
+      opts.appendChild(b);
+    });
+    inner.appendChild(opts);
+    if (answered) {
+      inner.appendChild(el(`<div class="qexp" style="border-left:3px solid ${course.color}"><b style="color:${selected === q.answer ? course.color : "#E74C3C"}">${selected === q.answer ? "✓ Correct!" : "✗ Incorrect"}</b><p>${esc(q.explanation || "")}</p></div>`));
+      const nb = el(`<button class="qnext" style="background:${course.color}">${cur + 1 >= quiz.length ? "See result" : "Next →"}</button>`);
+      nb.onclick = () => { cur++; selected = null; answered = false; paint(); };
+      inner.appendChild(nb);
+    }
+    wrap.appendChild(inner);
+  }
+  function showResult() {
+    wrap.innerHTML = "";
+    const score = Math.round((correct / quiz.length) * 100);
+    const passed = correct >= passNeed;
+    const box = el(`<div class="quiz" style="text-align:center">
+      <div style="font-size:54px;margin-bottom:6px">${passed ? "🎉" : "📘"}</div>
+      <h2 style="color:${passed ? course.color : "#E67E22"};margin-bottom:6px">${passed ? "Module complete!" : "Not quite there"}</h2>
+      <p style="color:#5A6474;margin-bottom:4px">You scored ${correct} of ${quiz.length} (${score}%).</p>
+      <p style="color:#7A8599;font-size:13px;margin-bottom:20px">${passed ? "This module is now ticked off." : `You need ${passNeed} of ${quiz.length} to pass.`}</p>
+    </div>`);
+    const btn = el(`<button class="qnext" style="background:${passed ? course.color : "#E67E22"};max-width:320px;margin:0 auto">${passed ? "Back to modules →" : "Try again"}</button>`);
+    btn.onclick = () => { if (passed) onPass(score); else onRetry(); };
+    box.appendChild(btn);
+    wrap.appendChild(box);
+  }
+  paint();
+  return wrap;
 }
 
 // ── Quiz ──

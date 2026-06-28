@@ -84,6 +84,17 @@ export function initSchema() {
       kind       TEXT NOT NULL,   -- 'org' | 'staff'
       created_at TEXT NOT NULL
     );
+
+    -- Per-module completion for modular courses (e.g. the Care Certificate)
+    CREATE TABLE IF NOT EXISTS module_progress (
+      staff_id     TEXT NOT NULL,
+      course_id    TEXT NOT NULL,
+      module_id    TEXT NOT NULL,
+      score        INTEGER,
+      completed_at TEXT NOT NULL,
+      PRIMARY KEY (staff_id, course_id, module_id),
+      FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
+    );
   `);
 }
 

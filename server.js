@@ -393,6 +393,9 @@ route("GET", "/api/staff/me", async (req, res) => {
   if (!member) return send(res, 404, { error: "Staff not found." });
   const org = db.prepare("SELECT id,name FROM organisations WHERE id = ?").get(member.org_id);
   const enrolments = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
+  // Attach completed module ids (for modular courses such as the Care Certificate)
+  const modRows = db.prepare("SELECT course_id, module_id FROM module_progress WHERE staff_id = ?").all(member.id);
+  for (const e of enrolments) e.modulesCompleted = modRows.filter(m => m.course_id === e.courseId).map(m => m.module_id);
 
   send(res, 200, {
     staff: { id: member.id, name: member.name, email: member.email, role: member.role, startDate: member.start_date, pin: member.pin },
@@ -442,6 +445,47 @@ route("POST", "/api/staff/quiz", async (req, res) => {
   }
   const updated = db.prepare("SELECT * FROM enrolments WHERE id = ?").get(enr.id);
   send(res, 200, { passed, score, enrolment: shapeEnrolment(updated) });
+});
+
+// ── STAFF: mark one module of a modular course complete ──
+route("POST", "/api/staff/module-complete", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "staff") return send(res, 401, { error: "Not authenticated as staff." });
+  const b = await readBody(req);
+  if (!b.courseId || !b.moduleId) return send(res, 400, { error: "courseId and moduleId are required." });
+  const course = COURSE_MAP[b.courseId];
+  if (!course || !Array.isArray(course.modules) || !course.modules.length)
+    return send(res, 400, { error: "Not a modular course." });
+  if (!course.modules.some(m => m.id === b.moduleId)) return send(res, 400, { error: "Unknown module." });
+  const enr = db.prepare("SELECT * FROM enrolments WHERE staff_id = ? AND course_id = ?").get(s.subject_id, b.courseId);
+  if (!enr) return send(res, 404, { error: "You are not enrolled on this course." });
+
+  const score = (typeof b.score === "number") ? Math.max(0, Math.min(100, Math.round(b.score))) : null;
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO module_progress (staff_id, course_id, module_id, score, completed_at)
+              VALUES (?,?,?,?,?)
+              ON CONFLICT(staff_id, course_id, module_id) DO UPDATE SET score=excluded.score, completed_at=excluded.completed_at`)
+    .run(s.subject_id, b.courseId, b.moduleId, score, now);
+
+  const done = db.prepare("SELECT module_id, score FROM module_progress WHERE staff_id = ? AND course_id = ?").all(s.subject_id, b.courseId);
+  const total = course.modules.length;
+  const allDone = done.length >= total;
+  const progress = Math.round((done.length / total) * 100);
+
+  if (allDone) {
+    const avg = Math.round(done.reduce((a, d) => a + (d.score || 0), 0) / total);
+    const expiry = addYear(now);
+    const certId = enr.cert_id || genId("CERT");
+    db.prepare(`UPDATE enrolments SET status='completed', progress=100, score=?, completed_at=?, expiry_date=?, cert_id=? WHERE id=?`)
+      .run(avg, now, expiry, certId, enr.id);
+  } else {
+    db.prepare("UPDATE enrolments SET status='in_progress', progress=? WHERE id=?").run(progress, enr.id);
+  }
+  send(res, 200, {
+    ok: true, allDone, progress,
+    completed: done.map(d => d.module_id),
+    enrolment: shapeEnrolment(db.prepare("SELECT * FROM enrolments WHERE id = ?").get(enr.id)),
+  });
 });
 
 // ── Logout (any) ──
