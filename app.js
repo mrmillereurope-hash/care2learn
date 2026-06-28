@@ -162,7 +162,7 @@ async function startPaygCheckout(learners, courses) {
   try {
     const res = await fetch("/api/checkout/payg", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(state.token ? { "Authorization": "Bearer " + state.token } : {}) },
       body: JSON.stringify({ learners, courses }),
     });
     if (res.ok) {
@@ -648,6 +648,7 @@ async function paintOrgTab(org) {
     body.innerHTML = "";
     body.appendChild(el(`<h2 style="margin-bottom:18px">Organisation Settings</h2>`));
     body.appendChild(el(`
+      <div>
       <div class="scard">
         <div class="srow"><label>Organisation Name</label><span>${esc(o.name)}</span></div>
         <div class="srow"><label>Email Address</label><span>${esc(o.email)}</span></div>
@@ -661,7 +662,10 @@ async function paintOrgTab(org) {
         <h3>Subscription</h3>
         <div style="padding:0 20px 16px"><span class="pill" style="background:#2980B918;color:#1A5276">Standard Plan</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Unlimited staff licences · All ${state.courses.length} mandatory courses · Course assignment · Progress tracking · Certificate generation · CQC compliance report</p></div>
       </div>
+      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the password you use to sign in.</p><button class="mini-btn" id="orgchgpw">🔒 Change password</button></div></div>
+      </div>
     `));
+    document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
   }
 }
 
@@ -936,7 +940,7 @@ async function renderAdminDash() {
   wrap.appendChild(el(`<div class="body" id="abody"></div>`));
   App.appendChild(wrap);
   const nav = document.getElementById("anav");
-  [["companies", "🏢 Companies"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
+  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
     const b = el(`<button class="nav-btn ${adminTab === k ? "active" : ""}">${label}</button>`);
     b.onclick = () => { adminTab = k; paintAdminTab(data); };
     nav.appendChild(b);
@@ -946,54 +950,87 @@ async function renderAdminDash() {
 }
 
 function paintAdminTab(data) {
-  const tabs = ["companies", "feedback"];
+  const tabs = ["companies", "payments", "feedback"];
   document.querySelectorAll("#anav .nav-btn").forEach((b, i) => b.classList.toggle("active", tabs[i] === adminTab));
   const body = document.getElementById("abody");
   body.innerHTML = "";
   if (adminTab === "companies") return paintAdminCompanies(body, data);
+  if (adminTab === "payments") return paintAdminPayments(body);
   return paintAdminFeedback(body);
+}
+
+function adminOrgRow(o) {
+  const initials = (o.name || "?").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+  const row = el(`
+    <button class="org-row${o.active ? "" : " inactive"}">
+      <span class="org-ava">${esc(initials)}</span>
+      <span class="org-row-body">
+        <span class="org-row-name">${esc(o.name)}${o.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
+        <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
+      </span>
+      <span class="org-row-stats">
+        <span class="org-stat"><span class="org-stat-n">${o.activeStaff}</span><span class="org-stat-l">${o.accountType === "individual" ? "Learner" : "Staff"}</span></span>
+        <span class="org-stat"><span class="org-stat-n">${o.fullyCompliant}</span><span class="org-stat-l">Compliant</span></span>
+        <span class="org-stat"><span class="org-stat-n">${o.enrolments}</span><span class="org-stat-l">Courses</span></span>
+        <span class="org-stat"><span class="org-stat-n" style="color:#7C3AED">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
+      </span>
+    </button>`);
+  row.onclick = () => renderAdminOrg(o.id);
+  return row;
 }
 
 function paintAdminCompanies(body, data) {
   const t = data.totals;
-  const intro = el(`
+  const companies = data.orgs.filter(o => o.accountType !== "individual");
+  const individuals = data.orgs.filter(o => o.accountType === "individual");
+  body.appendChild(el(`
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
-        <h1 style="margin:0">All Companies</h1>
-        <button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#7C3AED">+ New Company</button>
-      </div>
-      <p style="color:#5A6474;margin-bottom:18px">Every organisation registered on Care2Learn. Tap one to view and support it.</p>
+      <h1 style="margin:0 0 4px">Accounts</h1>
+      <p style="color:#5A6474;margin-bottom:18px">Every organisation and self-employed carer on Care2Learn. Tap one to view and support it.</p>
       <div class="astats">
-        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${t.organisations}</div><div class="metric-l">Companies</div></div>
-        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${t.staff}</div><div class="metric-l">Staff Licences</div></div>
-        <div class="metric"><div class="metric-i">📋</div><div class="metric-v" style="color:#9B59B6">${t.enrolments}</div><div class="metric-l">Course Assignments</div></div>
+        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${companies.length}</div><div class="metric-l">Companies</div></div>
+        <div class="metric"><div class="metric-i">🧑‍⚕️</div><div class="metric-v" style="color:#7C3AED">${individuals.length}</div><div class="metric-l">Self-employed</div></div>
+        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${t.staff}</div><div class="metric-l">Learners</div></div>
         <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#16A34A">${t.credits || 0}</div><div class="metric-l">Total Credits</div></div>
       </div>
-    </div>`);
-  body.appendChild(intro);
-  intro.querySelector("#newco").onclick = () => openAdminNewCompany(() => renderAdminDash());
-  if (!data.orgs.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`)); return; }
-  const grid = el(`<div class="org-grid"></div>`);
-  data.orgs.forEach(o => {
-    const initials = (o.name || "?").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
-    const row = el(`
-      <button class="org-row${o.active ? "" : " inactive"}">
-        <span class="org-ava">${esc(initials)}</span>
-        <span class="org-row-body">
-          <span class="org-row-name">${esc(o.name)}${o.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
-          <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
-        </span>
-        <span class="org-row-stats">
-          <span class="org-stat"><span class="org-stat-n">${o.activeStaff}</span><span class="org-stat-l">Staff</span></span>
-          <span class="org-stat"><span class="org-stat-n">${o.fullyCompliant}</span><span class="org-stat-l">Compliant</span></span>
-          <span class="org-stat"><span class="org-stat-n">${o.enrolments}</span><span class="org-stat-l">Courses</span></span>
-          <span class="org-stat"><span class="org-stat-n" style="color:#7C3AED">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
-        </span>
-      </button>`);
-    row.onclick = () => renderAdminOrg(o.id);
-    grid.appendChild(row);
+    </div>`));
+
+  const cHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:6px 0 12px"><h2 style="margin:0">🏢 Companies (${companies.length})</h2><button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#7C3AED">+ New Company</button></div>`);
+  body.appendChild(cHead);
+  cHead.querySelector("#newco").onclick = () => openAdminNewCompany(() => renderAdminDash());
+  if (!companies.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`));
+  else { const g = el(`<div class="org-grid"></div>`); companies.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
+
+  body.appendChild(el(`<h2 style="margin:28px 0 12px">🧑‍⚕️ Self-employed carers (${individuals.length})</h2>`));
+  if (!individuals.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No self-employed carers have registered yet. They sign up from the home page.</div>`));
+  else { const g = el(`<div class="org-grid"></div>`); individuals.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
+}
+
+async function paintAdminPayments(body) {
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Payments</h1><p style="color:#5A6474;margin-bottom:16px">Card payments received via Stripe — each one automatically tops up the account's credit balance.</p></div>`));
+  let data;
+  try { data = await api("/admin/payments"); }
+  catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
+  const pounds = (p) => "£" + (p / 100).toLocaleString(undefined, Number.isInteger(p / 100) ? {} : { minimumFractionDigits: 2 });
+  body.appendChild(el(`<div class="astats">
+    <div class="metric"><div class="metric-i">💷</div><div class="metric-v" style="color:#16A34A">${pounds(data.totalPence || 0)}</div><div class="metric-l">Total received</div></div>
+    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${data.totalCredits || 0}</div><div class="metric-l">Credits sold</div></div>
+    <div class="metric"><div class="metric-i">🧾</div><div class="metric-v" style="color:#2980B9">${data.count || 0}</div><div class="metric-l">Payments</div></div>
+  </div>`));
+  if (!data.payments || !data.payments.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No payments yet. When a company or carer buys credits, it'll appear here automatically.</div>`)); return; }
+  const table = el(`<div class="pay-table"></div>`);
+  table.appendChild(el(`<div class="pay-row pay-head"><span>Date</span><span>Account</span><span style="text-align:right">Credits</span><span style="text-align:right">Amount</span></div>`));
+  data.payments.forEach(p => {
+    const row = el(`<button class="pay-row">
+      <span class="pay-date">${fmtDate(p.createdAt)}</span>
+      <span class="pay-acct">${esc(p.orgName)}${p.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}</span>
+      <span style="text-align:right;font-weight:700;color:#7C3AED">+${p.credits}</span>
+      <span style="text-align:right;font-weight:800;color:#16A34A">${pounds(p.amountPence)}</span>
+    </button>`);
+    if (p.orgId) row.onclick = () => renderAdminOrg(p.orgId);
+    table.appendChild(row);
   });
-  body.appendChild(grid);
+  body.appendChild(table);
 }
 
 async function paintAdminFeedback(body) {
@@ -1049,7 +1086,10 @@ async function renderAdminOrg(orgId) {
           </div>
           ${org.address ? `<div style="font-size:13px;color:#7A8599;margin-top:8px">${esc(org.address)}</div>` : ""}
         </div>
-        <button class="mini-btn ${org.active ? "danger" : ""}" id="togglecompany">${org.active ? "Deactivate company" : "Reactivate company"}</button>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;flex-shrink:0">
+          <button class="mini-btn" id="resetpw">🔑 Reset password</button>
+          <button class="mini-btn ${org.active ? "danger" : ""}" id="togglecompany">${org.active ? "Deactivate" : "Reactivate"}</button>
+        </div>
       </div>
       ${org.active ? "" : `<div style="margin-top:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 12px;font-size:12px;color:#B91C1C">This company is deactivated — it and its staff cannot log in.</div>`}
     </div>`);
@@ -1061,6 +1101,7 @@ async function renderAdminOrg(orgId) {
     toast(deact ? `${org.name} deactivated.` : `${org.name} reactivated.`);
     renderAdminOrg(orgId);
   };
+  infoCard.querySelector("#resetpw").onclick = () => openAdminResetPassword(orgId, org.name, org.email);
   const creditsCard = el(`
     <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
@@ -1145,6 +1186,91 @@ function openAdminAddStaff(orgId, onAdded) {
     } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
   setTimeout(() => modal.querySelector("#asn")?.focus(), 50);
+}
+
+function openAdminResetPassword(orgId, name, email) {
+  if (!confirm(`Reset the login password for ${name}? Their current password stops working immediately.`)) return;
+  api(`/admin/orgs/${orgId}/reset-password`, "POST").then(r => {
+    const overlay = el(`<div class="overlay"></div>`);
+    const modal = el(`
+      <div class="modal" style="max-width:440px">
+        <div class="modal-h"><div><h2>New password</h2><p>Share this with ${esc(name)} — it replaces their old one.</p></div><button class="x" id="close">✕</button></div>
+        <div style="padding:22px;text-align:center">
+          <div style="font-size:30px;font-weight:900;letter-spacing:3px;color:#7C3AED;margin-bottom:16px">${esc(r.password)}</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="mini-btn" id="copy">📋 Copy</button>
+            <button class="mini-btn" id="emailit">✉️ Email it</button>
+          </div>
+          <p class="fb-note">They can change it themselves any time from their account settings.</p>
+        </div>
+      </div>`);
+    overlay.appendChild(modal); document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    modal.querySelector("#close").onclick = () => overlay.remove();
+    modal.querySelector("#copy").onclick = () => { try { navigator.clipboard.writeText(r.password); toast("Password copied."); } catch { toast(r.password); } };
+    modal.querySelector("#emailit").onclick = () => {
+      const subj = encodeURIComponent("Your Care2Learn password has been reset");
+      const bdy = encodeURIComponent(`Hi ${name},\n\nYour Care2Learn login password has been reset to:\n\n${r.password}\n\nPlease sign in at ${window.location.origin} and change it from your account settings.\n\nThanks,\nThe Care2Learn team`);
+      window.location.href = `mailto:${email}?subject=${subj}&body=${bdy}`;
+    };
+  }).catch(e => toast(e.message));
+}
+
+// Self-service "change password" for organisations and self-employed carers.
+function openChangePassword(endpoint) {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:420px">
+      <div class="modal-h"><div><h2>Change password</h2><p>Choose a new password for your account</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="cperr"></div>
+        <div class="fg"><label>Current password</label><input class="inp" id="cpcur" type="password" placeholder="Current password"></div>
+        <div class="fg"><label>New password</label><input class="inp" id="cpnew" type="password" placeholder="At least 6 characters"></div>
+        <div class="fg"><label>Confirm new password</label><input class="inp" id="cpconf" type="password" placeholder="Re-enter new password"></div>
+        <button class="btn-auth" id="cpsave">Update password</button>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#cpsave").onclick = async () => {
+    const errBox = modal.querySelector("#cperr"); errBox.innerHTML = "";
+    const cur = val("cpcur"), nw = val("cpnew"), cf = val("cpconf");
+    if (!cur || !nw) { errBox.innerHTML = `<div class="err">Enter your current and new password.</div>`; return; }
+    if (nw.length < 6) { errBox.innerHTML = `<div class="err">New password must be at least 6 characters.</div>`; return; }
+    if (nw !== cf) { errBox.innerHTML = `<div class="err">New passwords don't match.</div>`; return; }
+    try { await api(endpoint, "POST", { currentPassword: cur, newPassword: nw }); overlay.remove(); toast("Password updated."); }
+    catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  setTimeout(() => modal.querySelector("#cpcur")?.focus(), 50);
+}
+
+// Self-service "change PIN" for carers.
+function openChangePin() {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:420px">
+      <div class="modal-h"><div><h2>Change PIN</h2><p>Choose a new 4-digit login PIN</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="cperr"></div>
+        <div class="fg"><label>Current PIN</label><input class="inp" id="cpcur" type="password" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+        <div class="fg"><label>New PIN</label><input class="inp" id="cpnew" type="password" maxlength="4" inputmode="numeric" placeholder="4 digits"></div>
+        <div class="fg"><label>Confirm new PIN</label><input class="inp" id="cpconf" type="password" maxlength="4" inputmode="numeric" placeholder="Re-enter new PIN"></div>
+        <button class="btn-auth" id="cpsave">Update PIN</button>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#cpsave").onclick = async () => {
+    const errBox = modal.querySelector("#cperr"); errBox.innerHTML = "";
+    const cur = val("cpcur"), nw = val("cpnew"), cf = val("cpconf");
+    if (!/^\d{4}$/.test(nw)) { errBox.innerHTML = `<div class="err">Your new PIN must be 4 digits.</div>`; return; }
+    if (nw !== cf) { errBox.innerHTML = `<div class="err">New PINs don't match.</div>`; return; }
+    try { await api("/staff/change-pin", "POST", { currentPin: cur, newPin: nw }); overlay.remove(); toast("PIN updated."); }
+    catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  setTimeout(() => modal.querySelector("#cpcur")?.focus(), 50);
 }
 
 function openAdminCredits(orgId, currentBalance, onChange) {
@@ -1451,6 +1577,16 @@ async function renderIndividualPortal() {
     });
     body.appendChild(cgrid);
   }
+
+  body.appendChild(el(`<h2 style="margin:26px 0 12px">Account</h2>`));
+  const acct = el(`
+    <div class="scard">
+      <div class="srow"><label>Name</label><span>${esc(me.staff.name)}</span></div>
+      <div class="srow"><label>Email</label><span>${esc(me.staff.email)}</span></div>
+      <div style="padding:12px 20px 16px"><button class="mini-btn" id="indchgpw">🔒 Change password</button></div>
+    </div>`);
+  body.appendChild(acct);
+  acct.querySelector("#indchgpw").onclick = () => openChangePassword("/individual/change-password");
 }
 
 function openBuyCredits() {
@@ -1634,6 +1770,7 @@ async function paintStaffTab() {
   if (staffTab === "profile") {
     body.appendChild(el(`<h2 style="margin-bottom:18px">My Profile</h2>`));
     body.appendChild(el(`
+      <div>
       <div class="scard">
         <div class="srow"><label>Full Name</label><span>${esc(me.staff.name)}</span></div>
         <div class="srow"><label>Email Address</label><span>${esc(me.staff.email)}</span></div>
@@ -1647,7 +1784,10 @@ async function paintStaffTab() {
         <div class="srow"><label>Courses Completed</label><span style="color:#27AE60;font-weight:700">${doneCount} / ${total}</span></div>
         <div class="srow"><label>Compliance</label><span class="pill ${doneCount===total&&total>0?"green":"amber"}">${doneCount===total&&total>0?"✓ Fully Compliant":"In Progress"}</span></div>
       </div>
+      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the 4-digit PIN you use to sign in.</p><button class="mini-btn" id="chgpin">🔒 Change PIN</button></div></div>
+      </div>
     `));
+    document.getElementById("chgpin").onclick = () => openChangePin();
   }
 }
 

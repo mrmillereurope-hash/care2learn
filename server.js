@@ -4,12 +4,13 @@
 
 import http from "node:http";
 import https from "node:https";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   db, initSchema, seedDemo, hashPassword, verifyPassword,
-  genId, genToken, genPin,
+  genId, genToken, genPin, genPassword,
 } from "./db.js";
 import { COURSES, COURSE_IDS, COURSE_MAP } from "./courses.js";
 
@@ -173,6 +174,24 @@ route("POST", "/api/checkout/payg", async (req, res) => {
   form.set("metadata[learners]", String(learners));
   form.set("metadata[courses]", String(courses));
 
+  // If the buyer is signed in (a company or a self-employed individual), tag the session
+  // with their account id and the number of credits to grant, so the Stripe webhook can
+  // top up their balance automatically once payment succeeds.
+  let accountId = null;
+  const sess = authSession(req);
+  if (sess) {
+    if (sess.kind === "org") accountId = sess.subject_id;
+    else if (sess.kind === "staff") {
+      const st = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(sess.subject_id);
+      if (st) accountId = st.org_id;
+    }
+  }
+  if (accountId) {
+    form.set("client_reference_id", accountId);
+    form.set("metadata[account_id]", accountId);
+    form.set("metadata[credits]", String(quantity));
+  }
+
   try {
     const session = await createStripeCheckout(form);
     if (!session.url) return send(res, 502, { error: "Stripe did not return a checkout URL." });
@@ -181,6 +200,102 @@ route("POST", "/api/checkout/payg", async (req, res) => {
     console.error("Stripe checkout error:", e.message);
     send(res, 502, { error: "Could not start checkout. Please try again." });
   }
+});
+
+// ── Stripe webhook: auto-credit accounts when a payment succeeds ──
+// Configure in Stripe → Developers → Webhooks → "Add endpoint":
+//   URL:    https://<your-domain>/api/webhooks/stripe
+//   Events: checkout.session.completed
+// Then set STRIPE_WEBHOOK_SECRET (the "whsec_…" signing secret) on the server.
+
+// Read the raw request body — the signature is computed over the exact bytes.
+function readRawBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+}
+
+// Verify a Stripe-Signature header (HMAC-SHA256 over "timestamp.payload"), with replay tolerance.
+function verifyStripeSignature(rawBuf, sigHeader, secret, toleranceSec = 300) {
+  if (!sigHeader || !secret) return false;
+  let t = null; const v1s = [];
+  for (const part of String(sigHeader).split(",")) {
+    const i = part.indexOf("=");
+    if (i === -1) continue;
+    const k = part.slice(0, i).trim(), v = part.slice(i + 1).trim();
+    if (k === "t") t = v;
+    else if (k === "v1") v1s.push(v);
+  }
+  if (!t || v1s.length === 0) return false;
+  const age = Math.abs(Math.floor(Date.now() / 1000) - Number(t));
+  if (!Number.isFinite(age) || age > toleranceSec) return false;
+  const expected = crypto.createHmac("sha256", secret).update(t + "." + rawBuf.toString("utf8"), "utf8").digest("hex");
+  const expBuf = Buffer.from(expected, "hex");
+  return v1s.some((v) => {
+    let vBuf; try { vBuf = Buffer.from(v, "hex"); } catch { return false; }
+    return vBuf.length === expBuf.length && crypto.timingSafeEqual(vBuf, expBuf);
+  });
+}
+
+// Run a set of DB writes atomically (works on better-sqlite3 and node:sqlite).
+function inTransaction(fn) {
+  db.exec("BEGIN");
+  try { const r = fn(); db.exec("COMMIT"); return r; }
+  catch (e) { try { db.exec("ROLLBACK"); } catch {} throw e; }
+}
+
+// Grant credits for a completed checkout session — idempotent (one grant per session id).
+function grantStripeCredits(sessionId, orgId, credits) {
+  if (db.prepare("SELECT id FROM stripe_events WHERE id = ?").get(sessionId)) {
+    console.log(`↩ Stripe session ${sessionId} already processed — skipping.`);
+    return;
+  }
+  const now = new Date().toISOString();
+  const org = db.prepare("SELECT id, credits FROM organisations WHERE id = ?").get(orgId);
+  if (!org) {
+    db.prepare("INSERT OR IGNORE INTO stripe_events (id,org_id,credits,created_at) VALUES (?,?,?,?)").run(sessionId, orgId, 0, now);
+    console.warn(`⚠ Stripe payment ${sessionId} references unknown account ${orgId} — no credit applied.`);
+    return;
+  }
+  const newBalance = (org.credits || 0) + credits;
+  inTransaction(() => {
+    db.prepare("INSERT OR IGNORE INTO stripe_events (id,org_id,credits,created_at) VALUES (?,?,?,?)").run(sessionId, orgId, credits, now);
+    db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(newBalance, orgId);
+    db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+      .run(genId("CR"), orgId, credits, newBalance, `Stripe payment — ${credits} credit${credits === 1 ? "" : "s"}`, now);
+  });
+  console.log(`💳 STRIPE AUTO-CREDIT: +${credits} to ${orgId} → balance ${newBalance} (session ${sessionId})`);
+}
+
+route("POST", "/api/webhooks/stripe", async (req, res) => {
+  const raw = await readRawBody(req);
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.warn("⚠ Stripe webhook received but STRIPE_WEBHOOK_SECRET is not set — ignoring.");
+    return send(res, 503, { error: "not_configured" });
+  }
+  if (!verifyStripeSignature(raw, req.headers["stripe-signature"], process.env.STRIPE_WEBHOOK_SECRET)) {
+    console.warn("⚠ Stripe webhook signature verification failed.");
+    return send(res, 400, { error: "invalid signature" });
+  }
+  let event;
+  try { event = JSON.parse(raw.toString("utf8")); } catch { return send(res, 400, { error: "invalid payload" }); }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data && event.data.object ? event.data.object : {};
+    const paid = session.payment_status === "paid" || session.status === "complete";
+    const accountId = session.metadata && session.metadata.account_id;
+    const credits = parseInt((session.metadata && session.metadata.credits) || "0", 10);
+    if (paid && accountId && Number.isFinite(credits) && credits > 0) {
+      try { grantStripeCredits(session.id, accountId, credits); }
+      catch (e) { console.error("Stripe auto-credit failed:", e.message); }
+    } else if (paid && !accountId) {
+      console.log(`ℹ Stripe payment ${session.id} completed without an account_id — no credits granted (untagged purchase).`);
+    }
+  }
+  // Always acknowledge so Stripe doesn't keep retrying events we've already seen.
+  send(res, 200, { received: true });
 });
 
 // ── ORG: register ──
@@ -465,6 +580,93 @@ route("POST", "/api/individual/enrol", async (req, res) => {
               VALUES (?,?,?,?,?, 'assigned', 0, 0)`)
     .run(genId("ENR"), member.id, b.courseId, new Date().toISOString(), null);
   send(res, 201, { ok: true, creditUsed: true, credits: newBal });
+});
+
+// ─── ACCOUNT SECURITY: self-service password / PIN, admin reset, payments feed ─
+
+// Organisation changes its own login password (must supply the current one).
+route("POST", "/api/org/change-password", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated." });
+  const b = await readBody(req);
+  if (!b.currentPassword || !b.newPassword) return send(res, 400, { error: "Enter your current and new password." });
+  if (b.newPassword.length < 6) return send(res, 400, { error: "New password must be at least 6 characters." });
+  const org = db.prepare("SELECT * FROM organisations WHERE id = ?").get(s.subject_id);
+  if (!org) return send(res, 404, { error: "Account not found." });
+  if (!verifyPassword(b.currentPassword, org.password_salt, org.password_hash)) return send(res, 401, { error: "Your current password is incorrect." });
+  const { hash, salt } = hashPassword(b.newPassword);
+  db.prepare("UPDATE organisations SET password_hash = ?, password_salt = ? WHERE id = ?").run(hash, salt, org.id);
+  console.log(`🔒 PASSWORD CHANGED (self-service): ${org.name} (${org.email})`);
+  send(res, 200, { ok: true });
+});
+
+// Self-employed individual changes its own login password (authenticated via its staff session).
+route("POST", "/api/individual/change-password", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "staff") return send(res, 401, { error: "Not authenticated." });
+  const member = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(s.subject_id);
+  if (!member) return send(res, 404, { error: "Account not found." });
+  const org = db.prepare("SELECT * FROM organisations WHERE id = ?").get(member.org_id);
+  if (!org || org.account_type !== "individual") return send(res, 403, { error: "Not an individual account." });
+  const b = await readBody(req);
+  if (!b.currentPassword || !b.newPassword) return send(res, 400, { error: "Enter your current and new password." });
+  if (b.newPassword.length < 6) return send(res, 400, { error: "New password must be at least 6 characters." });
+  if (!verifyPassword(b.currentPassword, org.password_salt, org.password_hash)) return send(res, 401, { error: "Your current password is incorrect." });
+  const { hash, salt } = hashPassword(b.newPassword);
+  db.prepare("UPDATE organisations SET password_hash = ?, password_salt = ? WHERE id = ?").run(hash, salt, org.id);
+  console.log(`🔒 PASSWORD CHANGED (self-service): ${org.name} (individual)`);
+  send(res, 200, { ok: true });
+});
+
+// Carer (staff) changes their own 4-digit PIN (must supply the current one).
+route("POST", "/api/staff/change-pin", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "staff") return send(res, 401, { error: "Not authenticated." });
+  const member = db.prepare("SELECT * FROM staff WHERE id = ?").get(s.subject_id);
+  if (!member) return send(res, 404, { error: "Account not found." });
+  const b = await readBody(req);
+  const newPin = String(b.newPin || "").trim();
+  if (!b.currentPin || !newPin) return send(res, 400, { error: "Enter your current and new PIN." });
+  if (!/^\d{4}$/.test(newPin)) return send(res, 400, { error: "Your new PIN must be 4 digits." });
+  if (String(member.pin) !== String(b.currentPin)) return send(res, 401, { error: "Your current PIN is incorrect." });
+  db.prepare("UPDATE staff SET pin = ? WHERE id = ?").run(newPin, member.id);
+  console.log(`🔒 PIN CHANGED (self-service): ${member.name}`);
+  send(res, 200, { ok: true });
+});
+
+// Super admin resets a company or individual's login password → returns a new temporary one to share.
+route("POST", "/api/admin/orgs/:id/reset-password", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const org = db.prepare("SELECT id, name, email FROM organisations WHERE id = ?").get(req.params.id);
+  if (!org) return send(res, 404, { error: "Account not found." });
+  const password = genPassword();
+  const { hash, salt } = hashPassword(password);
+  db.prepare("UPDATE organisations SET password_hash = ?, password_salt = ? WHERE id = ?").run(hash, salt, org.id);
+  console.log(`🔑 PASSWORD RESET by admin: ${org.name} (${org.email})`);
+  send(res, 200, { ok: true, password, email: org.email });
+});
+
+// Super admin: recent Stripe payments (auto-credit top-ups) across all accounts.
+route("GET", "/api/admin/payments", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const rows = db.prepare(`
+    SELECT ct.id, ct.org_id, ct.amount, ct.balance_after, ct.note, ct.created_at,
+           o.name AS org_name, o.account_type
+    FROM credit_transactions ct
+    LEFT JOIN organisations o ON o.id = ct.org_id
+    WHERE ct.note LIKE 'Stripe payment%'
+    ORDER BY ct.created_at DESC
+    LIMIT 100
+  `).all();
+  const pencePer = PAYG_PENCE_PER_COURSE_PER_LEARNER;
+  const payments = rows.map(r => ({
+    id: r.id, orgId: r.org_id, orgName: r.org_name || "(deleted account)",
+    accountType: r.account_type || "company",
+    credits: r.amount, amountPence: r.amount * pencePer, note: r.note, createdAt: r.created_at,
+  }));
+  const totalPence = payments.reduce((s, p) => s + p.amountPence, 0);
+  const totalCredits = payments.reduce((s, p) => s + p.credits, 0);
+  send(res, 200, { payments, totalPence, totalCredits, count: payments.length });
 });
 
 route("POST", "/api/staff/login", async (req, res) => {

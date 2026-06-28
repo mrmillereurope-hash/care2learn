@@ -228,6 +228,14 @@
   .org-stat{text-align:center;display:flex;flex-direction:column}
   .org-stat-n{font-size:18px;font-weight:800;color:#1B2A4A}
   .org-stat-l{font-size:10px;color:#9AA5B1;text-transform:uppercase;letter-spacing:.3px}
+  .pay-table{display:flex;flex-direction:column;gap:8px}
+  .pay-row{display:grid;grid-template-columns:120px 1fr 90px 110px;align-items:center;gap:12px;background:#fff;border:1px solid #E8ECF0;border-radius:10px;padding:13px 16px;text-align:left;width:100%;cursor:pointer;transition:all .15s;font-size:14px}
+  .pay-row:hover{border-color:#7C3AED;box-shadow:0 3px 12px rgba(13,27,42,.07);transform:translateY(-1px)}
+  .pay-head{background:transparent;border:none;cursor:default;padding:2px 16px;font-size:11px;font-weight:800;color:#9AA5B1;text-transform:uppercase;letter-spacing:.4px}
+  .pay-head:hover{border:none;box-shadow:none;transform:none}
+  .pay-date{color:#7A8599;font-size:13px;white-space:nowrap}
+  .pay-acct{color:#1B2A4A;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(max-width:560px){.pay-row{grid-template-columns:1fr 70px 90px;gap:8px;font-size:13px}.pay-date{display:none}.pay-head{grid-template-columns:1fr 70px 90px}.pay-head span:first-child{display:none}}
   .mini-btn{background:#fff;border:1px solid #D5DCE4;color:#5A6474;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
   .mini-btn:hover{border-color:#94A3B8}
   .mini-btn.danger{border-color:#F0C4C0;color:#C0392B}
@@ -1325,6 +1333,7 @@ function rndHex(n) {
 function genId(prefix) { return (prefix ? prefix + "-" : "") + rndHex(10); }
 function genToken() { return rndHex(48); }
 function genPin() { return String(Math.floor(1000 + Math.random() * 9000)); }
+function genPassword() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 8; i++) s += a[Math.floor(Math.random() * a.length)]; return s.slice(0, 4) + "-" + s.slice(4); }
 
 function addYear(dateStr) {
   const d = new Date(dateStr);
@@ -1408,6 +1417,13 @@ function seedDemo() {
   // Marcus — assigned only
   enr("STF-DEMO002", "safeguarding", { due_date: "2026-01-31" });
   enr("STF-DEMO002", "manual-handling", { due_date: "2026-01-31" });
+
+  // Example Stripe auto-credit so the super-admin "Payments" view is populated in the preview
+  const demoOrgRef = DB.organisations.find(o => o.id === orgId);
+  if (demoOrgRef) {
+    demoOrgRef.credits = (demoOrgRef.credits || 0) + 10;
+    (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: orgId, amount: 10, balance_after: demoOrgRef.credits, note: "Stripe payment — 10 credits", created_at: monthsAgo(0) + "T09:15:00Z" });
+  }
 
   persist();
 }
@@ -1658,6 +1674,51 @@ async function api(path, method = "GET", body) {
     return { ok: true, creditUsed: true, credits: org.credits };
   }
 
+  // ── Org: change own password ──
+  if (path === "/org/change-password" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "org") err("Not authenticated.");
+    const org = DB.organisations.find(o => o.id === s.subject_id);
+    if (!org) err("Account not found.");
+    if (!body.currentPassword || !body.newPassword) err("Enter your current and new password.");
+    if (body.newPassword.length < 6) err("New password must be at least 6 characters.");
+    if (org.password !== body.currentPassword) err("Your current password is incorrect.");
+    org.password = body.newPassword;
+    persist();
+    return { ok: true };
+  }
+
+  // ── Individual: change own password ──
+  if (path === "/individual/change-password" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "staff") err("Not authenticated.");
+    const member = DB.staff.find(x => x.id === s.subject_id);
+    if (!member) err("Account not found.");
+    const org = DB.organisations.find(o => o.id === member.org_id);
+    if (!org || org.account_type !== "individual") err("Not an individual account.");
+    if (!body.currentPassword || !body.newPassword) err("Enter your current and new password.");
+    if (body.newPassword.length < 6) err("New password must be at least 6 characters.");
+    if (org.password !== body.currentPassword) err("Your current password is incorrect.");
+    org.password = body.newPassword;
+    persist();
+    return { ok: true };
+  }
+
+  // ── Staff: change own PIN ──
+  if (path === "/staff/change-pin" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s || s.kind !== "staff") err("Not authenticated.");
+    const member = DB.staff.find(x => x.id === s.subject_id);
+    if (!member) err("Account not found.");
+    const newPin = String(body.newPin || "").trim();
+    if (!body.currentPin || !newPin) err("Enter your current and new PIN.");
+    if (!/^\d{4}$/.test(newPin)) err("Your new PIN must be 4 digits.");
+    if (String(member.pin) !== String(body.currentPin)) err("Your current PIN is incorrect.");
+    member.pin = newPin;
+    persist();
+    return { ok: true };
+  }
+
   // ── Staff login ──
   if (path === "/staff/login" && method === "POST") {
     if (!body.email || !body.pin) err("Email and PIN are required.");
@@ -1765,6 +1826,29 @@ async function api(path, method = "GET", body) {
       });
     return { totals: { organisations: DB.organisations.length, staff: result.reduce((a, r) => a + r.staffCount, 0), enrolments: result.reduce((a, r) => a + r.enrolments, 0), credits: result.reduce((a, r) => a + r.credits, 0) }, orgs: result };
   }
+  // ── Admin: reset a company/individual login password ──
+  m = path.match(/^\/admin\/orgs\/([^/]+)\/reset-password$/);
+  if (m && method === "POST") {
+    if (!admin()) err("Not authenticated as super admin.");
+    const o = DB.organisations.find(x => x.id === m[1]);
+    if (!o) err("Account not found.");
+    const password = genPassword();
+    o.password = password;
+    persist();
+    return { ok: true, password, email: o.email };
+  }
+
+  // ── Admin: recent Stripe payments ──
+  if (path === "/admin/payments" && method === "GET") {
+    if (!admin()) err("Not authenticated as super admin.");
+    const pencePer = 400;
+    const payments = (DB.credit_transactions || [])
+      .filter(t => /^Stripe payment/.test(t.note || ""))
+      .slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+      .map(t => { const o = DB.organisations.find(x => x.id === t.org_id); return { id: t.id, orgId: t.org_id, orgName: o ? o.name : "(deleted account)", accountType: o ? (o.account_type || "company") : "company", credits: t.amount, amountPence: t.amount * pencePer, note: t.note, createdAt: t.created_at }; });
+    return { payments, totalPence: payments.reduce((s, p) => s + p.amountPence, 0), totalCredits: payments.reduce((s, p) => s + p.credits, 0), count: payments.length };
+  }
+
   if (path === "/admin/orgs" && method === "POST") {
     if (!admin()) err("Not authenticated as super admin.");
     if (!body.name || !body.email || !body.password) err("Company name, email and password are required.");
@@ -2061,7 +2145,7 @@ async function startPaygCheckout(learners, courses) {
   try {
     const res = await fetch("/api/checkout/payg", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(state.token ? { "Authorization": "Bearer " + state.token } : {}) },
       body: JSON.stringify({ learners, courses }),
     });
     if (res.ok) {
@@ -2547,6 +2631,7 @@ async function paintOrgTab(org) {
     body.innerHTML = "";
     body.appendChild(el(`<h2 style="margin-bottom:18px">Organisation Settings</h2>`));
     body.appendChild(el(`
+      <div>
       <div class="scard">
         <div class="srow"><label>Organisation Name</label><span>${esc(o.name)}</span></div>
         <div class="srow"><label>Email Address</label><span>${esc(o.email)}</span></div>
@@ -2560,7 +2645,10 @@ async function paintOrgTab(org) {
         <h3>Subscription</h3>
         <div style="padding:0 20px 16px"><span class="pill" style="background:#2980B918;color:#1A5276">Standard Plan</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Unlimited staff licences · All ${state.courses.length} mandatory courses · Course assignment · Progress tracking · Certificate generation · CQC compliance report</p></div>
       </div>
+      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the password you use to sign in.</p><button class="mini-btn" id="orgchgpw">🔒 Change password</button></div></div>
+      </div>
     `));
+    document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
   }
 }
 
@@ -2835,7 +2923,7 @@ async function renderAdminDash() {
   wrap.appendChild(el(`<div class="body" id="abody"></div>`));
   App.appendChild(wrap);
   const nav = document.getElementById("anav");
-  [["companies", "🏢 Companies"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
+  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
     const b = el(`<button class="nav-btn ${adminTab === k ? "active" : ""}">${label}</button>`);
     b.onclick = () => { adminTab = k; paintAdminTab(data); };
     nav.appendChild(b);
@@ -2845,54 +2933,87 @@ async function renderAdminDash() {
 }
 
 function paintAdminTab(data) {
-  const tabs = ["companies", "feedback"];
+  const tabs = ["companies", "payments", "feedback"];
   document.querySelectorAll("#anav .nav-btn").forEach((b, i) => b.classList.toggle("active", tabs[i] === adminTab));
   const body = document.getElementById("abody");
   body.innerHTML = "";
   if (adminTab === "companies") return paintAdminCompanies(body, data);
+  if (adminTab === "payments") return paintAdminPayments(body);
   return paintAdminFeedback(body);
+}
+
+function adminOrgRow(o) {
+  const initials = (o.name || "?").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+  const row = el(`
+    <button class="org-row${o.active ? "" : " inactive"}">
+      <span class="org-ava">${esc(initials)}</span>
+      <span class="org-row-body">
+        <span class="org-row-name">${esc(o.name)}${o.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
+        <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
+      </span>
+      <span class="org-row-stats">
+        <span class="org-stat"><span class="org-stat-n">${o.activeStaff}</span><span class="org-stat-l">${o.accountType === "individual" ? "Learner" : "Staff"}</span></span>
+        <span class="org-stat"><span class="org-stat-n">${o.fullyCompliant}</span><span class="org-stat-l">Compliant</span></span>
+        <span class="org-stat"><span class="org-stat-n">${o.enrolments}</span><span class="org-stat-l">Courses</span></span>
+        <span class="org-stat"><span class="org-stat-n" style="color:#7C3AED">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
+      </span>
+    </button>`);
+  row.onclick = () => renderAdminOrg(o.id);
+  return row;
 }
 
 function paintAdminCompanies(body, data) {
   const t = data.totals;
-  const intro = el(`
+  const companies = data.orgs.filter(o => o.accountType !== "individual");
+  const individuals = data.orgs.filter(o => o.accountType === "individual");
+  body.appendChild(el(`
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
-        <h1 style="margin:0">All Companies</h1>
-        <button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#7C3AED">+ New Company</button>
-      </div>
-      <p style="color:#5A6474;margin-bottom:18px">Every organisation registered on Care2Learn. Tap one to view and support it.</p>
+      <h1 style="margin:0 0 4px">Accounts</h1>
+      <p style="color:#5A6474;margin-bottom:18px">Every organisation and self-employed carer on Care2Learn. Tap one to view and support it.</p>
       <div class="astats">
-        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${t.organisations}</div><div class="metric-l">Companies</div></div>
-        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${t.staff}</div><div class="metric-l">Staff Licences</div></div>
-        <div class="metric"><div class="metric-i">📋</div><div class="metric-v" style="color:#9B59B6">${t.enrolments}</div><div class="metric-l">Course Assignments</div></div>
+        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${companies.length}</div><div class="metric-l">Companies</div></div>
+        <div class="metric"><div class="metric-i">🧑‍⚕️</div><div class="metric-v" style="color:#7C3AED">${individuals.length}</div><div class="metric-l">Self-employed</div></div>
+        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${t.staff}</div><div class="metric-l">Learners</div></div>
         <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#16A34A">${t.credits || 0}</div><div class="metric-l">Total Credits</div></div>
       </div>
-    </div>`);
-  body.appendChild(intro);
-  intro.querySelector("#newco").onclick = () => openAdminNewCompany(() => renderAdminDash());
-  if (!data.orgs.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`)); return; }
-  const grid = el(`<div class="org-grid"></div>`);
-  data.orgs.forEach(o => {
-    const initials = (o.name || "?").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
-    const row = el(`
-      <button class="org-row${o.active ? "" : " inactive"}">
-        <span class="org-ava">${esc(initials)}</span>
-        <span class="org-row-body">
-          <span class="org-row-name">${esc(o.name)}${o.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}${o.active ? "" : ` <span class="off-badge">Inactive</span>`}</span>
-          <span class="org-row-meta">${esc(o.email)}${o.cqcNumber ? " · CQC " + esc(o.cqcNumber) : ""} · joined ${fmtDate(o.createdAt)}</span>
-        </span>
-        <span class="org-row-stats">
-          <span class="org-stat"><span class="org-stat-n">${o.activeStaff}</span><span class="org-stat-l">Staff</span></span>
-          <span class="org-stat"><span class="org-stat-n">${o.fullyCompliant}</span><span class="org-stat-l">Compliant</span></span>
-          <span class="org-stat"><span class="org-stat-n">${o.enrolments}</span><span class="org-stat-l">Courses</span></span>
-          <span class="org-stat"><span class="org-stat-n" style="color:#7C3AED">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
-        </span>
-      </button>`);
-    row.onclick = () => renderAdminOrg(o.id);
-    grid.appendChild(row);
+    </div>`));
+
+  const cHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:6px 0 12px"><h2 style="margin:0">🏢 Companies (${companies.length})</h2><button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#7C3AED">+ New Company</button></div>`);
+  body.appendChild(cHead);
+  cHead.querySelector("#newco").onclick = () => openAdminNewCompany(() => renderAdminDash());
+  if (!companies.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`));
+  else { const g = el(`<div class="org-grid"></div>`); companies.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
+
+  body.appendChild(el(`<h2 style="margin:28px 0 12px">🧑‍⚕️ Self-employed carers (${individuals.length})</h2>`));
+  if (!individuals.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No self-employed carers have registered yet. They sign up from the home page.</div>`));
+  else { const g = el(`<div class="org-grid"></div>`); individuals.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
+}
+
+async function paintAdminPayments(body) {
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Payments</h1><p style="color:#5A6474;margin-bottom:16px">Card payments received via Stripe — each one automatically tops up the account's credit balance.</p></div>`));
+  let data;
+  try { data = await api("/admin/payments"); }
+  catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
+  const pounds = (p) => "£" + (p / 100).toLocaleString(undefined, Number.isInteger(p / 100) ? {} : { minimumFractionDigits: 2 });
+  body.appendChild(el(`<div class="astats">
+    <div class="metric"><div class="metric-i">💷</div><div class="metric-v" style="color:#16A34A">${pounds(data.totalPence || 0)}</div><div class="metric-l">Total received</div></div>
+    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${data.totalCredits || 0}</div><div class="metric-l">Credits sold</div></div>
+    <div class="metric"><div class="metric-i">🧾</div><div class="metric-v" style="color:#2980B9">${data.count || 0}</div><div class="metric-l">Payments</div></div>
+  </div>`));
+  if (!data.payments || !data.payments.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No payments yet. When a company or carer buys credits, it'll appear here automatically.</div>`)); return; }
+  const table = el(`<div class="pay-table"></div>`);
+  table.appendChild(el(`<div class="pay-row pay-head"><span>Date</span><span>Account</span><span style="text-align:right">Credits</span><span style="text-align:right">Amount</span></div>`));
+  data.payments.forEach(p => {
+    const row = el(`<button class="pay-row">
+      <span class="pay-date">${fmtDate(p.createdAt)}</span>
+      <span class="pay-acct">${esc(p.orgName)}${p.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}</span>
+      <span style="text-align:right;font-weight:700;color:#7C3AED">+${p.credits}</span>
+      <span style="text-align:right;font-weight:800;color:#16A34A">${pounds(p.amountPence)}</span>
+    </button>`);
+    if (p.orgId) row.onclick = () => renderAdminOrg(p.orgId);
+    table.appendChild(row);
   });
-  body.appendChild(grid);
+  body.appendChild(table);
 }
 
 async function paintAdminFeedback(body) {
@@ -2948,7 +3069,10 @@ async function renderAdminOrg(orgId) {
           </div>
           ${org.address ? `<div style="font-size:13px;color:#7A8599;margin-top:8px">${esc(org.address)}</div>` : ""}
         </div>
-        <button class="mini-btn ${org.active ? "danger" : ""}" id="togglecompany">${org.active ? "Deactivate company" : "Reactivate company"}</button>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;flex-shrink:0">
+          <button class="mini-btn" id="resetpw">🔑 Reset password</button>
+          <button class="mini-btn ${org.active ? "danger" : ""}" id="togglecompany">${org.active ? "Deactivate" : "Reactivate"}</button>
+        </div>
       </div>
       ${org.active ? "" : `<div style="margin-top:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 12px;font-size:12px;color:#B91C1C">This company is deactivated — it and its staff cannot log in.</div>`}
     </div>`);
@@ -2960,6 +3084,7 @@ async function renderAdminOrg(orgId) {
     toast(deact ? `${org.name} deactivated.` : `${org.name} reactivated.`);
     renderAdminOrg(orgId);
   };
+  infoCard.querySelector("#resetpw").onclick = () => openAdminResetPassword(orgId, org.name, org.email);
   const creditsCard = el(`
     <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
@@ -3044,6 +3169,91 @@ function openAdminAddStaff(orgId, onAdded) {
     } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
   setTimeout(() => modal.querySelector("#asn")?.focus(), 50);
+}
+
+function openAdminResetPassword(orgId, name, email) {
+  if (!confirm(`Reset the login password for ${name}? Their current password stops working immediately.`)) return;
+  api(`/admin/orgs/${orgId}/reset-password`, "POST").then(r => {
+    const overlay = el(`<div class="overlay"></div>`);
+    const modal = el(`
+      <div class="modal" style="max-width:440px">
+        <div class="modal-h"><div><h2>New password</h2><p>Share this with ${esc(name)} — it replaces their old one.</p></div><button class="x" id="close">✕</button></div>
+        <div style="padding:22px;text-align:center">
+          <div style="font-size:30px;font-weight:900;letter-spacing:3px;color:#7C3AED;margin-bottom:16px">${esc(r.password)}</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="mini-btn" id="copy">📋 Copy</button>
+            <button class="mini-btn" id="emailit">✉️ Email it</button>
+          </div>
+          <p class="fb-note">They can change it themselves any time from their account settings.</p>
+        </div>
+      </div>`);
+    overlay.appendChild(modal); document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    modal.querySelector("#close").onclick = () => overlay.remove();
+    modal.querySelector("#copy").onclick = () => { try { navigator.clipboard.writeText(r.password); toast("Password copied."); } catch { toast(r.password); } };
+    modal.querySelector("#emailit").onclick = () => {
+      const subj = encodeURIComponent("Your Care2Learn password has been reset");
+      const bdy = encodeURIComponent(`Hi ${name},\n\nYour Care2Learn login password has been reset to:\n\n${r.password}\n\nPlease sign in at ${window.location.origin} and change it from your account settings.\n\nThanks,\nThe Care2Learn team`);
+      window.location.href = `mailto:${email}?subject=${subj}&body=${bdy}`;
+    };
+  }).catch(e => toast(e.message));
+}
+
+// Self-service "change password" for organisations and self-employed carers.
+function openChangePassword(endpoint) {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:420px">
+      <div class="modal-h"><div><h2>Change password</h2><p>Choose a new password for your account</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="cperr"></div>
+        <div class="fg"><label>Current password</label><input class="inp" id="cpcur" type="password" placeholder="Current password"></div>
+        <div class="fg"><label>New password</label><input class="inp" id="cpnew" type="password" placeholder="At least 6 characters"></div>
+        <div class="fg"><label>Confirm new password</label><input class="inp" id="cpconf" type="password" placeholder="Re-enter new password"></div>
+        <button class="btn-auth" id="cpsave">Update password</button>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#cpsave").onclick = async () => {
+    const errBox = modal.querySelector("#cperr"); errBox.innerHTML = "";
+    const cur = val("cpcur"), nw = val("cpnew"), cf = val("cpconf");
+    if (!cur || !nw) { errBox.innerHTML = `<div class="err">Enter your current and new password.</div>`; return; }
+    if (nw.length < 6) { errBox.innerHTML = `<div class="err">New password must be at least 6 characters.</div>`; return; }
+    if (nw !== cf) { errBox.innerHTML = `<div class="err">New passwords don't match.</div>`; return; }
+    try { await api(endpoint, "POST", { currentPassword: cur, newPassword: nw }); overlay.remove(); toast("Password updated."); }
+    catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  setTimeout(() => modal.querySelector("#cpcur")?.focus(), 50);
+}
+
+// Self-service "change PIN" for carers.
+function openChangePin() {
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:420px">
+      <div class="modal-h"><div><h2>Change PIN</h2><p>Choose a new 4-digit login PIN</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="cperr"></div>
+        <div class="fg"><label>Current PIN</label><input class="inp" id="cpcur" type="password" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+        <div class="fg"><label>New PIN</label><input class="inp" id="cpnew" type="password" maxlength="4" inputmode="numeric" placeholder="4 digits"></div>
+        <div class="fg"><label>Confirm new PIN</label><input class="inp" id="cpconf" type="password" maxlength="4" inputmode="numeric" placeholder="Re-enter new PIN"></div>
+        <button class="btn-auth" id="cpsave">Update PIN</button>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#cpsave").onclick = async () => {
+    const errBox = modal.querySelector("#cperr"); errBox.innerHTML = "";
+    const cur = val("cpcur"), nw = val("cpnew"), cf = val("cpconf");
+    if (!/^\d{4}$/.test(nw)) { errBox.innerHTML = `<div class="err">Your new PIN must be 4 digits.</div>`; return; }
+    if (nw !== cf) { errBox.innerHTML = `<div class="err">New PINs don't match.</div>`; return; }
+    try { await api("/staff/change-pin", "POST", { currentPin: cur, newPin: nw }); overlay.remove(); toast("PIN updated."); }
+    catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  setTimeout(() => modal.querySelector("#cpcur")?.focus(), 50);
 }
 
 function openAdminCredits(orgId, currentBalance, onChange) {
@@ -3350,6 +3560,16 @@ async function renderIndividualPortal() {
     });
     body.appendChild(cgrid);
   }
+
+  body.appendChild(el(`<h2 style="margin:26px 0 12px">Account</h2>`));
+  const acct = el(`
+    <div class="scard">
+      <div class="srow"><label>Name</label><span>${esc(me.staff.name)}</span></div>
+      <div class="srow"><label>Email</label><span>${esc(me.staff.email)}</span></div>
+      <div style="padding:12px 20px 16px"><button class="mini-btn" id="indchgpw">🔒 Change password</button></div>
+    </div>`);
+  body.appendChild(acct);
+  acct.querySelector("#indchgpw").onclick = () => openChangePassword("/individual/change-password");
 }
 
 function openBuyCredits() {
@@ -3533,6 +3753,7 @@ async function paintStaffTab() {
   if (staffTab === "profile") {
     body.appendChild(el(`<h2 style="margin-bottom:18px">My Profile</h2>`));
     body.appendChild(el(`
+      <div>
       <div class="scard">
         <div class="srow"><label>Full Name</label><span>${esc(me.staff.name)}</span></div>
         <div class="srow"><label>Email Address</label><span>${esc(me.staff.email)}</span></div>
@@ -3546,7 +3767,10 @@ async function paintStaffTab() {
         <div class="srow"><label>Courses Completed</label><span style="color:#27AE60;font-weight:700">${doneCount} / ${total}</span></div>
         <div class="srow"><label>Compliance</label><span class="pill ${doneCount===total&&total>0?"green":"amber"}">${doneCount===total&&total>0?"✓ Fully Compliant":"In Progress"}</span></div>
       </div>
+      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the 4-digit PIN you use to sign in.</p><button class="mini-btn" id="chgpin">🔒 Change PIN</button></div></div>
+      </div>
     `));
+    document.getElementById("chgpin").onclick = () => openChangePin();
   }
 }
 

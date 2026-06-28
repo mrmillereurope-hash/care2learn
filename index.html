@@ -231,6 +231,14 @@
   .org-stat{text-align:center;display:flex;flex-direction:column}
   .org-stat-n{font-size:18px;font-weight:800;color:#1B2A4A}
   .org-stat-l{font-size:10px;color:#9AA5B1;text-transform:uppercase;letter-spacing:.3px}
+  .pay-table{display:flex;flex-direction:column;gap:8px}
+  .pay-row{display:grid;grid-template-columns:120px 1fr 90px 110px;align-items:center;gap:12px;background:#fff;border:1px solid #E8ECF0;border-radius:10px;padding:13px 16px;text-align:left;width:100%;cursor:pointer;transition:all .15s;font-size:14px}
+  .pay-row:hover{border-color:#7C3AED;box-shadow:0 3px 12px rgba(13,27,42,.07);transform:translateY(-1px)}
+  .pay-head{background:transparent;border:none;cursor:default;padding:2px 16px;font-size:11px;font-weight:800;color:#9AA5B1;text-transform:uppercase;letter-spacing:.4px}
+  .pay-head:hover{border:none;box-shadow:none;transform:none}
+  .pay-date{color:#7A8599;font-size:13px;white-space:nowrap}
+  .pay-acct{color:#1B2A4A;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(max-width:560px){.pay-row{grid-template-columns:1fr 70px 90px;gap:8px;font-size:13px}.pay-date{display:none}.pay-head{grid-template-columns:1fr 70px 90px}.pay-head span:first-child{display:none}}
   .mini-btn{background:#fff;border:1px solid #D5DCE4;color:#5A6474;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
   .mini-btn:hover{border-color:#94A3B8}
   .mini-btn.danger{border-color:#F0C4C0;color:#C0392B}

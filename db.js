@@ -119,6 +119,14 @@ export function initSchema() {
       created_at    TEXT NOT NULL,
       FOREIGN KEY (org_id) REFERENCES organisations(id) ON DELETE CASCADE
     );
+
+    -- Processed Stripe checkout sessions (idempotency: one auto-credit per payment, even on retries)
+    CREATE TABLE IF NOT EXISTS stripe_events (
+      id          TEXT PRIMARY KEY,   -- Stripe checkout session id
+      org_id      TEXT,
+      credits     INTEGER,
+      created_at  TEXT NOT NULL
+    );
   `);
 
   // Migrations on the organisations table (idempotent — safe to re-run).
@@ -155,6 +163,14 @@ export function genToken() {
 }
 export function genPin() {
   return String(Math.floor(1000 + Math.random() * 9000));
+}
+// A short, readable temporary password (no ambiguous characters), e.g. "G7K2-QP4M".
+export function genPassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.randomBytes(8);
+  let s = "";
+  for (let i = 0; i < 8; i++) s += alphabet[bytes[i] % alphabet.length];
+  return s.slice(0, 4) + "-" + s.slice(4);
 }
 
 // ─── SEED DEMO DATA ───────────────────────────────────────────────────────────
