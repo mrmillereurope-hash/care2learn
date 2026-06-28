@@ -247,45 +247,54 @@ function inTransaction(fn) {
   catch (e) { try { db.exec("ROLLBACK"); } catch {} throw e; }
 }
 
-// ─── REFERRAL PROGRAM ─────────────────────────────────────────────────────────
+// ─── REFERRAL PROGRAM (reward on the referred account's first purchase) ───────
 const REFERRAL_CREDITS = { company: 50, individual: 14 };
 function rewardForType(accountType) { return REFERRAL_CREDITS[accountType === "individual" ? "individual" : "company"]; }
 function newReferralCode() {
   let code; do { code = genReferralCode(); } while (db.prepare("SELECT 1 FROM organisations WHERE referral_code = ?").get(code));
   return code;
 }
-// Credit the owner of `code` for referring a freshly-created account. One reward per referred account.
-function applyReferral(code, newOrgId, newOrgName) {
-  if (!code) return { applied: false };
+// At signup: validate the code and record who referred this account — but DON'T pay out yet.
+// The reward is held until the referred account makes its first purchase (anti-abuse).
+function recordReferralIntent(code, newOrgId) {
+  if (!code) return { recorded: false };
   const norm = String(code).trim().toUpperCase();
-  if (!norm) return { applied: false };
-  const referrer = db.prepare("SELECT * FROM organisations WHERE referral_code = ?").get(norm);
-  if (!referrer) return { applied: false, reason: "unknown" };
-  if (referrer.id === newOrgId) return { applied: false, reason: "self" };
-  if (referrer.active === 0) return { applied: false, reason: "inactive" };
-  if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(newOrgId)) return { applied: false, reason: "duplicate" };
+  if (!norm) return { recorded: false };
+  const referrer = db.prepare("SELECT id, active FROM organisations WHERE referral_code = ?").get(norm);
+  if (!referrer || referrer.id === newOrgId || referrer.active === 0) return { recorded: false };
+  db.prepare("UPDATE organisations SET referred_by_code = ? WHERE id = ?").run(norm, newOrgId);
+  return { recorded: true };
+}
+// Called when a referred account first acquires paid credits. Pays the referrer once (idempotent).
+function maybeRewardReferral(orgId, reason) {
+  const acct = db.prepare("SELECT id, name, referred_by_code FROM organisations WHERE id = ?").get(orgId);
+  if (!acct || !acct.referred_by_code) return { rewarded: false };
+  if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(orgId)) return { rewarded: false }; // already paid
+  const referrer = db.prepare("SELECT id, name, account_type, active, credits FROM organisations WHERE referral_code = ?").get(acct.referred_by_code);
+  if (!referrer || referrer.id === orgId || referrer.active === 0) return { rewarded: false };
   const reward = rewardForType(referrer.account_type);
   inTransaction(() => {
-    const cur = (db.prepare("SELECT credits FROM organisations WHERE id = ?").get(referrer.id).credits) || 0;
-    const bal = cur + reward;
+    const bal = (referrer.credits || 0) + reward;
     db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(bal, referrer.id);
     db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
-      .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — ${newOrgName} joined`, new Date().toISOString());
+      .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — ${acct.name} made their first purchase`, new Date().toISOString());
     db.prepare("INSERT INTO referrals (id,referrer_org_id,referred_org_id,code,credits,created_at) VALUES (?,?,?,?,?,?)")
-      .run(genId("REF"), referrer.id, newOrgId, norm, reward, new Date().toISOString());
-    db.prepare("UPDATE organisations SET referred_by_code = ? WHERE id = ?").run(norm, newOrgId);
+      .run(genId("REF"), referrer.id, orgId, acct.referred_by_code, reward, new Date().toISOString());
   });
-  console.log(`🎁 REFERRAL: ${referrer.name} earned ${reward} credits for referring ${newOrgName}`);
-  return { applied: true, reward };
+  console.log(`🎁 REFERRAL PAID: ${referrer.name} earned ${reward} credits — ${acct.name} ${reason || "made a purchase"}`);
+  return { rewarded: true, reward };
 }
 function referralSummary(orgId) {
   const org = db.prepare("SELECT referral_code, account_type FROM organisations WHERE id = ?").get(orgId);
-  const rows = db.prepare("SELECT credits FROM referrals WHERE referrer_org_id = ?").all(orgId);
+  const code = org ? org.referral_code : null;
+  const rewarded = db.prepare("SELECT credits FROM referrals WHERE referrer_org_id = ?").all(orgId);
+  const referredCount = code ? db.prepare("SELECT COUNT(*) AS n FROM organisations WHERE referred_by_code = ?").get(code).n : 0;
   return {
-    code: org ? org.referral_code : null,
+    code,
     rewardPerReferral: rewardForType(org ? org.account_type : "company"),
-    count: rows.length,
-    creditsEarned: rows.reduce((s, r) => s + r.credits, 0),
+    count: rewarded.length,                                   // referrals that have paid out (made a purchase)
+    creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0),
+    pending: Math.max(0, referredCount - rewarded.length),    // signed up, not yet purchased
   };
 }
 
@@ -310,6 +319,7 @@ function grantStripeCredits(sessionId, orgId, credits) {
       .run(genId("CR"), orgId, credits, newBalance, `Stripe payment — ${credits} credit${credits === 1 ? "" : "s"}`, now);
   });
   console.log(`💳 STRIPE AUTO-CREDIT: +${credits} to ${orgId} → balance ${newBalance} (session ${sessionId})`);
+  if (credits > 0) maybeRewardReferral(orgId, "made their first purchase");
 }
 
 route("POST", "/api/webhooks/stripe", async (req, res) => {
@@ -357,14 +367,14 @@ route("POST", "/api/org/register", async (req, res) => {
               VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(id, b.name, b.email.toLowerCase(), hash, salt, b.phone || null, b.address || null, b.cqcNumber || null, new Date().toISOString());
   db.prepare("UPDATE organisations SET referral_code = ? WHERE id = ?").run(newReferralCode(), id);
-  const referral = applyReferral(b.referralCode, id, b.name);
+  const referral = recordReferralIntent(b.referralCode, id);
 
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)")
     .run(token, id, "org", new Date().toISOString());
 
   const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at FROM organisations WHERE id = ?").get(id);
-  send(res, 201, { token, org, referralApplied: referral.applied });
+  send(res, 201, { token, org, referralPending: referral.recorded });
 });
 
 // ── ORG: login ──
@@ -566,11 +576,11 @@ route("POST", "/api/individual/register", async (req, res) => {
   db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at)
               VALUES (?,?,?,?,?,?,?,1,?)`)
     .run(staffId, orgId, b.name, email, "Self-employed carer", genPin(), new Date().toISOString().split("T")[0], new Date().toISOString());
-  const referral = applyReferral(b.referralCode, orgId, b.name);
+  const referral = recordReferralIntent(b.referralCode, orgId);
   const token = genToken();
   db.prepare("INSERT INTO sessions (token,subject_id,kind,created_at) VALUES (?,?,?,?)").run(token, staffId, "staff", new Date().toISOString());
   console.log(`🧑‍⚕️ INDIVIDUAL REGISTERED: ${b.name} (${email})`);
-  send(res, 201, { token, accountType: "individual", staff: { id: staffId, name: b.name, email }, org: { id: orgId, name: b.name, credits: 0 }, referralApplied: referral.applied });
+  send(res, 201, { token, accountType: "individual", staff: { id: staffId, name: b.name, email }, org: { id: orgId, name: b.name, credits: 0 }, referralPending: referral.recorded });
 });
 
 route("POST", "/api/individual/login", async (req, res) => {
@@ -716,6 +726,38 @@ route("GET", "/api/admin/payments", async (req, res) => {
   const totalPence = payments.reduce((s, p) => s + p.amountPence, 0);
   const totalCredits = payments.reduce((s, p) => s + p.credits, 0);
   send(res, 200, { payments, totalPence, totalCredits, count: payments.length });
+});
+
+// Super-admin oversight of the referral programme — every referred account (paid + pending).
+route("GET", "/api/admin/referrals", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const referred = db.prepare(`SELECT id, name, account_type, created_at, referred_by_code
+                               FROM organisations
+                               WHERE referred_by_code IS NOT NULL AND referred_by_code != ''
+                               ORDER BY created_at DESC`).all();
+  const rewardedRows = db.prepare("SELECT referred_org_id, credits, created_at FROM referrals").all();
+  const rewardedMap = new Map(rewardedRows.map(r => [r.referred_org_id, r]));
+  const referrals = referred.map(a => {
+    const referrer = db.prepare("SELECT id, name, account_type FROM organisations WHERE referral_code = ?").get(a.referred_by_code);
+    const paid = rewardedMap.get(a.id);
+    return {
+      referredId: a.id, referredName: a.name, referredType: a.account_type || "company", joinedAt: a.created_at,
+      referrerId: referrer ? referrer.id : null, referrerName: referrer ? referrer.name : "(unknown)",
+      referrerType: referrer ? (referrer.account_type || "company") : null, code: a.referred_by_code,
+      status: paid ? "paid" : "pending",
+      credits: paid ? paid.credits : (referrer ? rewardForType(referrer.account_type) : 0),
+      paidAt: paid ? paid.created_at : null,
+    };
+  });
+  send(res, 200, {
+    summary: {
+      totalReferred: referred.length,
+      rewardedCount: rewardedRows.length,
+      pendingCount: Math.max(0, referred.length - rewardedRows.length),
+      creditsAwarded: rewardedRows.reduce((s, r) => s + r.credits, 0),
+    },
+    referrals,
+  });
 });
 
 route("POST", "/api/staff/login", async (req, res) => {
@@ -956,6 +998,7 @@ route("POST", "/api/admin/orgs/:id/credits", async (req, res) => {
   db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
     .run(tx.id, tx.org_id, tx.amount, tx.balance_after, tx.note, tx.created_at);
   console.log(`💳 CREDITS ${amount > 0 ? "+" + amount : amount} to org ${org.id} → balance ${newBalance}${tx.note ? " (" + tx.note + ")" : ""}`);
+  if (amount > 0) maybeRewardReferral(org.id, "received their first credits");
   send(res, 200, { ok: true, credits: newBalance, transaction: tx });
 });
 

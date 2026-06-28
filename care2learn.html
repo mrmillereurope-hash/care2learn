@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Care2Learn · Mandatory Training Platform</title>
+<title>Care2Learn</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Crect%20width%3D%27100%27%20height%3D%27100%27%20rx%3D%2722%27%20fill%3D%27%230D1B2A%27%2F%3E%3Cpath%20d%3D%27M50%2022%20L74%2030%20L74%2050%20C74%2064%2064%2073%2050%2078%20C36%2073%2026%2064%2026%2050%20L26%2030%20Z%27%20fill%3D%27%23ffffff%27%2F%3E%3Cpath%20d%3D%27M40%2051%20L47%2058%20L62%2040%27%20fill%3D%27none%27%20stroke%3D%27%2316A34A%27%20stroke-width%3D%276%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -456,6 +456,26 @@
   .refer-stat{background:#fff;border:1px solid #E0E6ED;border-radius:14px;padding:18px;text-align:center}
   .refer-stat-n{font-size:30px;font-weight:800;line-height:1;margin-bottom:6px}
   .refer-stat-l{font-size:12px;color:#7A8694;font-weight:600}
+  .refer-pending{background:#FFF8E6;border:1px solid #FCE8B2;color:#8A6D1A;border-radius:12px;padding:12px 16px;font-size:13.5px;margin-bottom:16px}
+  /* Super-admin referrals oversight table */
+  .ref-atable{background:#fff;border:1px solid #E0E6ED;border-radius:14px;overflow:hidden}
+  .ref-arow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border-bottom:1px solid #F0F3F7}
+  .ref-arow:last-child{border-bottom:none}
+  .ref-amain{min-width:0;flex:1}
+  .ref-aname{font-size:14px;font-weight:700;color:#1B2A4A;margin-bottom:3px}
+  .ref-aname.clickable{cursor:pointer}
+  .ref-aname.clickable:hover,.ref-aref:hover{color:#2980B9;text-decoration:underline}
+  .ref-aref{font-weight:700;color:#2C3E50;cursor:pointer}
+  .ref-ameta{font-size:12px;color:#8A93A0}
+  .ref-aright{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+  .ref-pill{display:inline-block;padding:4px 11px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .ref-pill-paid{background:#E7F8EF;color:#16A34A}
+  .ref-pill-pending{background:#FFF4E0;color:#B8791C}
+  .ref-acredits{font-size:16px;font-weight:800;min-width:42px;text-align:right}
+  @media(max-width:600px){
+    .ref-arow{flex-direction:column;align-items:flex-start;gap:8px}
+    .ref-aright{align-self:stretch;justify-content:space-between}
+  }
   .refer-how{background:#F8FAFC;border:1px solid #EEF2F6;border-radius:14px;padding:18px 22px}
   .refer-how-t{font-size:14px;font-weight:800;color:#1B2A4A;margin-bottom:10px}
   .refer-how-list{margin:0;padding-left:20px;color:#48515E;font-size:14px;line-height:1.7}
@@ -1366,25 +1386,35 @@ function genReferralCode() { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s
 const REFERRAL_CREDITS = { company: 50, individual: 14 };
 function rewardForType(t) { return REFERRAL_CREDITS[t === "individual" ? "individual" : "company"]; }
 function newReferralCode() { let code; do { code = genReferralCode(); } while (DB.organisations.some(o => o.referral_code === code)); return code; }
-function applyReferral(code, newOrgId, newOrgName) {
-  if (!code) return { applied: false };
+function recordReferralIntent(code, newOrgId) {
+  if (!code) return { recorded: false };
   const norm = String(code).trim().toUpperCase();
-  if (!norm) return { applied: false };
+  if (!norm) return { recorded: false };
   const referrer = DB.organisations.find(o => o.referral_code === norm);
-  if (!referrer || referrer.id === newOrgId || referrer.active === 0) return { applied: false };
-  if ((DB.referrals = DB.referrals || []).some(r => r.referred_org_id === newOrgId)) return { applied: false };
-  const reward = rewardForType(referrer.account_type);
-  referrer.credits = (referrer.credits || 0) + reward;
-  (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: referrer.id, amount: reward, balance_after: referrer.credits, note: "Referral bonus — " + newOrgName + " joined", created_at: new Date().toISOString() });
-  DB.referrals.push({ id: genId("REF"), referrer_org_id: referrer.id, referred_org_id: newOrgId, code: norm, credits: reward, created_at: new Date().toISOString() });
+  if (!referrer || referrer.id === newOrgId || referrer.active === 0) return { recorded: false };
   const newOrg = DB.organisations.find(o => o.id === newOrgId); if (newOrg) newOrg.referred_by_code = norm;
   persist();
-  return { applied: true, reward };
+  return { recorded: true };
+}
+function maybeRewardReferral(orgId, reason) {
+  const acct = DB.organisations.find(o => o.id === orgId);
+  if (!acct || !acct.referred_by_code) return { rewarded: false };
+  if ((DB.referrals = DB.referrals || []).some(r => r.referred_org_id === orgId)) return { rewarded: false };
+  const referrer = DB.organisations.find(o => o.referral_code === acct.referred_by_code);
+  if (!referrer || referrer.id === orgId || referrer.active === 0) return { rewarded: false };
+  const reward = rewardForType(referrer.account_type);
+  referrer.credits = (referrer.credits || 0) + reward;
+  (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: referrer.id, amount: reward, balance_after: referrer.credits, note: "Referral bonus — " + acct.name + " made their first purchase", created_at: new Date().toISOString() });
+  DB.referrals.push({ id: genId("REF"), referrer_org_id: referrer.id, referred_org_id: orgId, code: acct.referred_by_code, credits: reward, created_at: new Date().toISOString() });
+  persist();
+  return { rewarded: true, reward };
 }
 function referralSummary(orgId) {
   const org = DB.organisations.find(o => o.id === orgId);
-  const rows = (DB.referrals || []).filter(r => r.referrer_org_id === orgId);
-  return { code: org ? org.referral_code : null, rewardPerReferral: rewardForType(org ? org.account_type : "company"), count: rows.length, creditsEarned: rows.reduce((s, r) => s + r.credits, 0) };
+  const code = org ? org.referral_code : null;
+  const rewarded = (DB.referrals || []).filter(r => r.referrer_org_id === orgId);
+  const referredCount = code ? DB.organisations.filter(o => o.referred_by_code === code).length : 0;
+  return { code, rewardPerReferral: rewardForType(org ? org.account_type : "company"), count: rewarded.length, creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0), pending: Math.max(0, referredCount - rewarded.length) };
 }
 
 function addYear(dateStr) {
@@ -1510,12 +1540,12 @@ async function api(path, method = "GET", body) {
       cqc_number: body.cqcNumber || null, created_at: new Date().toISOString(),
       referral_code: newReferralCode(),
     });
-    const referral = applyReferral(body.referralCode, id, body.name);
+    const referral = recordReferralIntent(body.referralCode, id);
     const tok = genToken();
     DB.sessions.push({ token: tok, subject_id: id, kind: "org", created_at: new Date().toISOString() });
     persist();
     const org = DB.organisations.find(o => o.id === id);
-    return { token: tok, org: pubOrg(org), referralApplied: referral.applied };
+    return { token: tok, org: pubOrg(org), referralPending: referral.recorded };
   }
 
   // ── Org login ──
@@ -1677,11 +1707,11 @@ async function api(path, method = "GET", body) {
     DB.organisations.push({ id: orgId, name: body.name, email, password: body.password, phone: null, address: null, cqc_number: null, created_at: new Date().toISOString(), credits: 0, active: 1, account_type: "individual", referral_code: newReferralCode() });
     const staffId = genId("STF");
     DB.staff.push({ id: staffId, org_id: orgId, name: body.name, email, role: "Self-employed carer", pin: genPin(), start_date: new Date().toISOString().split("T")[0], active: 1, created_at: new Date().toISOString() });
-    const referral = applyReferral(body.referralCode, orgId, body.name);
+    const referral = recordReferralIntent(body.referralCode, orgId);
     const tok = genToken();
     DB.sessions.push({ token: tok, subject_id: staffId, kind: "staff", created_at: new Date().toISOString() });
     persist();
-    return { token: tok, accountType: "individual", staff: { id: staffId, name: body.name, email }, org: { id: orgId, name: body.name, credits: 0 }, referralApplied: referral.applied };
+    return { token: tok, accountType: "individual", staff: { id: staffId, name: body.name, email }, org: { id: orgId, name: body.name, credits: 0 }, referralPending: referral.recorded };
   }
 
   // ── Individual login ──
@@ -1729,6 +1759,24 @@ async function api(path, method = "GET", body) {
     DB.enrolments.push(newEnrolment(member.id, body.courseId, null));
     persist();
     return { ok: true, creditUsed: true, credits: org.credits };
+  }
+
+  // ── Demo: simulate an instant card payment (no real Stripe in the standalone) ──
+  if (path === "/checkout/payg" && method === "POST") {
+    const s = sessionFor(token);
+    if (!s) err("Not authenticated.");
+    let org;
+    if (s.kind === "staff") { const m = DB.staff.find(x => x.id === s.subject_id); org = m && DB.organisations.find(o => o.id === m.org_id); }
+    else if (s.kind === "org") { org = DB.organisations.find(o => o.id === s.subject_id); }
+    if (!org) err("Account not found.");
+    const learners = Math.max(1, Math.trunc(Number(body.learners)) || 1);
+    const courses = Math.max(1, Math.trunc(Number(body.courses)) || 1);
+    const added = learners * courses;
+    org.credits = (org.credits || 0) + added;
+    (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: org.id, amount: added, balance_after: org.credits, note: "Stripe payment — " + added + " credit" + (added === 1 ? "" : "s"), created_at: new Date().toISOString() });
+    const ref = maybeRewardReferral(org.id, "made their first purchase");
+    persist();
+    return { demo: true, added, credits: org.credits, referralPaid: ref.rewarded };
   }
 
   // ── Org: change own password ──
@@ -1906,6 +1954,29 @@ async function api(path, method = "GET", body) {
     return { payments, totalPence: payments.reduce((s, p) => s + p.amountPence, 0), totalCredits: payments.reduce((s, p) => s + p.credits, 0), count: payments.length };
   }
 
+  if (path === "/admin/referrals" && method === "GET") {
+    if (!admin()) err("Not authenticated as super admin.");
+    const referred = DB.organisations.filter(o => o.referred_by_code).slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    const rewardedRows = (DB.referrals || []);
+    const rewardedMap = {}; rewardedRows.forEach(r => { rewardedMap[r.referred_org_id] = r; });
+    const referrals = referred.map(a => {
+      const referrer = DB.organisations.find(o => o.referral_code === a.referred_by_code);
+      const paid = rewardedMap[a.id];
+      return {
+        referredId: a.id, referredName: a.name, referredType: a.account_type || "company", joinedAt: a.created_at,
+        referrerId: referrer ? referrer.id : null, referrerName: referrer ? referrer.name : "(unknown)",
+        referrerType: referrer ? (referrer.account_type || "company") : null, code: a.referred_by_code,
+        status: paid ? "paid" : "pending",
+        credits: paid ? paid.credits : (referrer ? rewardForType(referrer.account_type) : 0),
+        paidAt: paid ? paid.created_at : null,
+      };
+    });
+    return {
+      summary: { totalReferred: referred.length, rewardedCount: rewardedRows.length, pendingCount: Math.max(0, referred.length - rewardedRows.length), creditsAwarded: rewardedRows.reduce((s, r) => s + r.credits, 0) },
+      referrals,
+    };
+  }
+
   if (path === "/admin/orgs" && method === "POST") {
     if (!admin()) err("Not authenticated as super admin.");
     if (!body.name || !body.email || !body.password) err("Company name, email and password are required.");
@@ -1978,6 +2049,7 @@ async function api(path, method = "GET", body) {
     const note = ((typeof body.note === "string" ? body.note.trim() : "") || null);
     const tx = { id: genId("CR"), org_id: o.id, amount, balance_after: newBalance, note: note ? note.slice(0, 200) : null, created_at: new Date().toISOString() };
     (DB.credit_transactions = DB.credit_transactions || []).push(tx);
+    if (amount > 0) maybeRewardReferral(o.id, "received their first credits");
     persist();
     return { ok: true, credits: newBalance, transaction: tx };
   }
@@ -2226,16 +2298,15 @@ const STRIPE_PAYG_LINK = "https://buy.stripe.com/3cIfZg48PeVm93ncMOdZ602";
 async function startPaygCheckout(learners, courses) {
   toast("Setting up secure checkout…");
   try {
-    const res = await fetch("/api/checkout/payg", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(state.token ? { "Authorization": "Bearer " + state.token } : {}) },
-      body: JSON.stringify({ learners, courses }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.url) { window.location.href = data.url; return; }
+    const data = await api("/checkout/payg", "POST", { learners, courses });
+    if (data && data.demo) {
+      const ov = document.querySelector(".overlay"); if (ov) ov.remove();
+      toast(`✓ Payment successful — ${data.added} credit${data.added === 1 ? "" : "s"} added.`);
+      if (typeof learnerReturn === "function") await learnerReturn();
+      return;
     }
-  } catch (e) { /* fall through to the static link */ }
+    if (data && data.url) { window.location.href = data.url; return; }
+  } catch (e) { /* fall through to the static payment link */ }
   window.open(STRIPE_PAYG_LINK, "_blank", "noopener");
 }
 
@@ -2567,7 +2638,7 @@ function referralCard(referral, opts) {
       <div class="refer-hero">
         <div class="refer-hero-badge">🎁 Refer &amp; earn</div>
         <div class="refer-hero-title">Earn ${reward} free credits for every ${esc(singular)} you refer</div>
-        <div class="refer-hero-sub">Share your code with ${esc(who)}. The moment they create their Care2Learn account, ${reward} course credits land in your balance — automatically, with no limit on how many you can earn.</div>
+        <div class="refer-hero-sub">Share your code with ${esc(who)}. When someone you refer makes their first credit purchase, ${reward} course credits land in your balance — automatically, with no limit on how many you can earn.</div>
       </div>
       <div class="refer-grid">
         <div class="refer-box">
@@ -2585,16 +2656,17 @@ function referralCard(referral, opts) {
         </div>
       </div>
       <div class="refer-stats">
-        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Successful referrals</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Credited referrals</div></div>
         <div class="refer-stat"><div class="refer-stat-n" style="color:#16A34A">${referral.creditsEarned || 0}</div><div class="refer-stat-l">Credits earned</div></div>
         <div class="refer-stat"><div class="refer-stat-n" style="color:#7C3AED">${reward}</div><div class="refer-stat-l">Credits per referral</div></div>
       </div>
+      ${referral.pending ? `<div class="refer-pending">⏳ <b>${referral.pending}</b> signed up with your code and ${referral.pending === 1 ? "will earn" : "will each earn"} you ${reward} credits on their first purchase.</div>` : ""}
       <div class="refer-how">
         <div class="refer-how-t">How it works</div>
         <ol class="refer-how-list">
           <li>Share your code or invite link with ${esc(who)}.</li>
           <li>They enter your code when they sign up for Care2Learn.</li>
-          <li>You instantly receive ${reward} course credits to spend on any training.</li>
+          <li>When they make their first credit purchase, you receive ${reward} credits — automatically.</li>
         </ol>
       </div>
     </div>`);
@@ -3076,7 +3148,7 @@ async function renderAdminDash() {
   wrap.appendChild(el(`<div class="body" id="abody"></div>`));
   App.appendChild(wrap);
   const nav = document.getElementById("anav");
-  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
+  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["referrals", "🎁 Referrals"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
     const b = el(`<button class="nav-btn ${adminTab === k ? "active" : ""}">${label}</button>`);
     b.onclick = () => { adminTab = k; paintAdminTab(data); };
     nav.appendChild(b);
@@ -3086,12 +3158,13 @@ async function renderAdminDash() {
 }
 
 function paintAdminTab(data) {
-  const tabs = ["companies", "payments", "feedback"];
+  const tabs = ["companies", "payments", "referrals", "feedback"];
   document.querySelectorAll("#anav .nav-btn").forEach((b, i) => b.classList.toggle("active", tabs[i] === adminTab));
   const body = document.getElementById("abody");
   body.innerHTML = "";
   if (adminTab === "companies") return paintAdminCompanies(body, data);
   if (adminTab === "payments") return paintAdminPayments(body);
+  if (adminTab === "referrals") return paintAdminReferrals(body);
   return paintAdminFeedback(body);
 }
 
@@ -3166,6 +3239,38 @@ async function paintAdminPayments(body) {
       <span style="text-align:right;font-weight:800;color:#16A34A">${pounds(p.amountPence)}</span>
     </button>`);
     if (p.orgId) row.onclick = () => renderAdminOrg(p.orgId);
+    table.appendChild(row);
+  });
+  body.appendChild(table);
+}
+
+async function paintAdminReferrals(body) {
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Every account that signed up with a referral code. The referrer is credited automatically once the referred account makes its first purchase.</p></div>`));
+  let data;
+  try { data = await api("/admin/referrals"); }
+  catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
+  const s = data.summary || {};
+  body.appendChild(el(`<div class="astats">
+    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.rewardedCount || 0}</div><div class="metric-l">Credited referrals</div></div>
+    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${s.creditsAwarded || 0}</div><div class="metric-l">Credits awarded</div></div>
+    <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Awaiting first purchase</div></div>
+    <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${s.totalReferred || 0}</div><div class="metric-l">Total referred</div></div>
+  </div>`));
+  if (!data.referrals || !data.referrals.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No referrals yet. When someone signs up using another account's referral code, it'll appear here.</div>`)); return; }
+  const table = el(`<div class="ref-atable"></div>`);
+  data.referrals.forEach(r => {
+    const badge = r.referredType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
+    const rbadge = r.referrerType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
+    const pill = r.status === "paid" ? `<span class="ref-pill ref-pill-paid">✓ Credited</span>` : `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
+    const row = el(`<div class="ref-arow">
+      <div class="ref-amain">
+        <div class="ref-aname${r.referredId ? " clickable" : ""}">${esc(r.referredName)}${badge}</div>
+        <div class="ref-ameta">Referred by <span class="ref-aref">${esc(r.referrerName)}</span>${rbadge} · code ${esc(r.code)} · joined ${fmtDate(r.joinedAt)}${r.status === "paid" && r.paidAt ? " · credited " + fmtDate(r.paidAt) : ""}</div>
+      </div>
+      <div class="ref-aright">${pill}<span class="ref-acredits" style="color:${r.status === "paid" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span></div>
+    </div>`);
+    if (r.referredId) { const n = row.querySelector(".ref-aname"); n.onclick = () => renderAdminOrg(r.referredId); }
+    if (r.referrerId) { const n = row.querySelector(".ref-aref"); n.onclick = () => renderAdminOrg(r.referrerId); }
     table.appendChild(row);
   });
   body.appendChild(table);

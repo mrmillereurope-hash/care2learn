@@ -167,16 +167,15 @@ const STRIPE_PAYG_LINK = "https://buy.stripe.com/3cIfZg48PeVm93ncMOdZ602";
 async function startPaygCheckout(learners, courses) {
   toast("Setting up secure checkout…");
   try {
-    const res = await fetch("/api/checkout/payg", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(state.token ? { "Authorization": "Bearer " + state.token } : {}) },
-      body: JSON.stringify({ learners, courses }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.url) { window.location.href = data.url; return; }
+    const data = await api("/checkout/payg", "POST", { learners, courses });
+    if (data && data.demo) {
+      const ov = document.querySelector(".overlay"); if (ov) ov.remove();
+      toast(`✓ Payment successful — ${data.added} credit${data.added === 1 ? "" : "s"} added.`);
+      if (typeof learnerReturn === "function") await learnerReturn();
+      return;
     }
-  } catch (e) { /* fall through to the static link */ }
+    if (data && data.url) { window.location.href = data.url; return; }
+  } catch (e) { /* fall through to the static payment link */ }
   window.open(STRIPE_PAYG_LINK, "_blank", "noopener");
 }
 
@@ -508,7 +507,7 @@ function referralCard(referral, opts) {
       <div class="refer-hero">
         <div class="refer-hero-badge">🎁 Refer &amp; earn</div>
         <div class="refer-hero-title">Earn ${reward} free credits for every ${esc(singular)} you refer</div>
-        <div class="refer-hero-sub">Share your code with ${esc(who)}. The moment they create their Care2Learn account, ${reward} course credits land in your balance — automatically, with no limit on how many you can earn.</div>
+        <div class="refer-hero-sub">Share your code with ${esc(who)}. When someone you refer makes their first credit purchase, ${reward} course credits land in your balance — automatically, with no limit on how many you can earn.</div>
       </div>
       <div class="refer-grid">
         <div class="refer-box">
@@ -526,16 +525,17 @@ function referralCard(referral, opts) {
         </div>
       </div>
       <div class="refer-stats">
-        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Successful referrals</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Credited referrals</div></div>
         <div class="refer-stat"><div class="refer-stat-n" style="color:#16A34A">${referral.creditsEarned || 0}</div><div class="refer-stat-l">Credits earned</div></div>
         <div class="refer-stat"><div class="refer-stat-n" style="color:#7C3AED">${reward}</div><div class="refer-stat-l">Credits per referral</div></div>
       </div>
+      ${referral.pending ? `<div class="refer-pending">⏳ <b>${referral.pending}</b> signed up with your code and ${referral.pending === 1 ? "will earn" : "will each earn"} you ${reward} credits on their first purchase.</div>` : ""}
       <div class="refer-how">
         <div class="refer-how-t">How it works</div>
         <ol class="refer-how-list">
           <li>Share your code or invite link with ${esc(who)}.</li>
           <li>They enter your code when they sign up for Care2Learn.</li>
-          <li>You instantly receive ${reward} course credits to spend on any training.</li>
+          <li>When they make their first credit purchase, you receive ${reward} credits — automatically.</li>
         </ol>
       </div>
     </div>`);
@@ -1017,7 +1017,7 @@ async function renderAdminDash() {
   wrap.appendChild(el(`<div class="body" id="abody"></div>`));
   App.appendChild(wrap);
   const nav = document.getElementById("anav");
-  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
+  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["referrals", "🎁 Referrals"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
     const b = el(`<button class="nav-btn ${adminTab === k ? "active" : ""}">${label}</button>`);
     b.onclick = () => { adminTab = k; paintAdminTab(data); };
     nav.appendChild(b);
@@ -1027,12 +1027,13 @@ async function renderAdminDash() {
 }
 
 function paintAdminTab(data) {
-  const tabs = ["companies", "payments", "feedback"];
+  const tabs = ["companies", "payments", "referrals", "feedback"];
   document.querySelectorAll("#anav .nav-btn").forEach((b, i) => b.classList.toggle("active", tabs[i] === adminTab));
   const body = document.getElementById("abody");
   body.innerHTML = "";
   if (adminTab === "companies") return paintAdminCompanies(body, data);
   if (adminTab === "payments") return paintAdminPayments(body);
+  if (adminTab === "referrals") return paintAdminReferrals(body);
   return paintAdminFeedback(body);
 }
 
@@ -1107,6 +1108,38 @@ async function paintAdminPayments(body) {
       <span style="text-align:right;font-weight:800;color:#16A34A">${pounds(p.amountPence)}</span>
     </button>`);
     if (p.orgId) row.onclick = () => renderAdminOrg(p.orgId);
+    table.appendChild(row);
+  });
+  body.appendChild(table);
+}
+
+async function paintAdminReferrals(body) {
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Every account that signed up with a referral code. The referrer is credited automatically once the referred account makes its first purchase.</p></div>`));
+  let data;
+  try { data = await api("/admin/referrals"); }
+  catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
+  const s = data.summary || {};
+  body.appendChild(el(`<div class="astats">
+    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.rewardedCount || 0}</div><div class="metric-l">Credited referrals</div></div>
+    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${s.creditsAwarded || 0}</div><div class="metric-l">Credits awarded</div></div>
+    <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Awaiting first purchase</div></div>
+    <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${s.totalReferred || 0}</div><div class="metric-l">Total referred</div></div>
+  </div>`));
+  if (!data.referrals || !data.referrals.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No referrals yet. When someone signs up using another account's referral code, it'll appear here.</div>`)); return; }
+  const table = el(`<div class="ref-atable"></div>`);
+  data.referrals.forEach(r => {
+    const badge = r.referredType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
+    const rbadge = r.referrerType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
+    const pill = r.status === "paid" ? `<span class="ref-pill ref-pill-paid">✓ Credited</span>` : `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
+    const row = el(`<div class="ref-arow">
+      <div class="ref-amain">
+        <div class="ref-aname${r.referredId ? " clickable" : ""}">${esc(r.referredName)}${badge}</div>
+        <div class="ref-ameta">Referred by <span class="ref-aref">${esc(r.referrerName)}</span>${rbadge} · code ${esc(r.code)} · joined ${fmtDate(r.joinedAt)}${r.status === "paid" && r.paidAt ? " · credited " + fmtDate(r.paidAt) : ""}</div>
+      </div>
+      <div class="ref-aright">${pill}<span class="ref-acredits" style="color:${r.status === "paid" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span></div>
+    </div>`);
+    if (r.referredId) { const n = row.querySelector(".ref-aname"); n.onclick = () => renderAdminOrg(r.referredId); }
+    if (r.referrerId) { const n = row.querySelector(".ref-aref"); n.onclick = () => renderAdminOrg(r.referrerId); }
     table.appendChild(row);
   });
   body.appendChild(table);
