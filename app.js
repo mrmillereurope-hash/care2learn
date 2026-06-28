@@ -851,7 +851,17 @@ async function paintOrgTab(org) {
     document.getElementById("import").onclick = () => showBulkImportForm();
 
     if (staff.length === 0) {
-      body.appendChild(el(`<div class="table"><div class="empty">No staff yet. Click "Add Staff Member" to create your first licence.</div></div>`));
+      const empty = el(`<div class="table"><div class="empty">
+        <div style="font-size:15px;font-weight:700;color:#1B2A4A;margin-bottom:4px">No staff yet</div>
+        <div style="margin-bottom:16px">Add your first care professional, or import your whole team from a spreadsheet in one go.</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn-add" id="empty-add">+ Add Staff Member</button>
+          <button class="btn-add" id="empty-import" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">⬆ Import CSV</button>
+        </div>
+      </div></div>`);
+      body.appendChild(empty);
+      empty.querySelector("#empty-add").onclick = () => showAddStaffForm(formSlot);
+      empty.querySelector("#empty-import").onclick = () => showBulkImportForm();
     } else {
       const table = el(`<div class="table"><div class="thead"><span>Name</span><span>Role</span><span>Progress</span><span>Status</span><span>PIN</span><span>Actions</span></div></div>`);
       staff.forEach(s => {
