@@ -95,6 +95,19 @@ export function initSchema() {
       PRIMARY KEY (staff_id, course_id, module_id),
       FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
     );
+
+    -- Product feedback: compliments, bugs and feature requests
+    CREATE TABLE IF NOT EXISTS feedback (
+      id             TEXT PRIMARY KEY,
+      created_at     TEXT NOT NULL,
+      kind           TEXT NOT NULL,   -- 'compliment' | 'bug' | 'feature'
+      message        TEXT NOT NULL,
+      submitter_kind TEXT,            -- 'org' | 'staff'
+      submitter_id   TEXT,
+      submitter_name TEXT,
+      org_id         TEXT,
+      context        TEXT
+    );
   `);
 }
 

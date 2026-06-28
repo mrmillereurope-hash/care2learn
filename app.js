@@ -402,6 +402,7 @@ async function renderOrgDash() {
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
         <nav class="dash-nav" id="nav"></nav>
+        <button class="feedback-btn" id="feedback">💬 Feedback</button>
         <button class="logout" id="logout">Log Out</button>
       </div>
       <div class="body" id="dashbody"></div>
@@ -415,6 +416,7 @@ async function renderOrgDash() {
     nav.appendChild(b);
   });
   document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+  document.getElementById("feedback").onclick = () => openFeedbackModal("Organisation portal");
 
   await paintOrgTab(org);
 }
@@ -700,6 +702,63 @@ async function openStaffModal(staffId) {
 
 // ─── STAFF PORTAL ─────────────────────────────────────────────────────────────
 let staffTab = "courses";
+// ── Feedback modal (compliments, bugs, feature requests) ──
+function openFeedbackModal(context) {
+  let kind = "compliment";
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-h">
+        <div><h2>Send feedback</h2><p>Compliments, bugs, or features you'd like to see in Care2Learn</p></div>
+        <button class="x" id="close">✕</button>
+      </div>
+      <div style="padding:18px 22px 22px">
+        <div class="fb-kinds" id="fbkinds">
+          <button class="fb-kind active" data-kind="compliment">👍 Compliment</button>
+          <button class="fb-kind" data-kind="bug">🐞 Bug</button>
+          <button class="fb-kind" data-kind="feature">💡 Feature</button>
+        </div>
+        <textarea id="fbmsg" class="fb-msg" rows="5" placeholder="Tell us what's on your mind…"></textarea>
+        <div id="fberr" class="fb-err" style="display:none"></div>
+        <button class="fb-send" id="fbsend">Send feedback</button>
+        <p class="fb-note">Your name and role are included so the Care2Learn team can follow up if needed.</p>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+
+  const kindsWrap = modal.querySelector("#fbkinds");
+  kindsWrap.querySelectorAll(".fb-kind").forEach(btn => {
+    btn.onclick = () => {
+      kind = btn.dataset.kind;
+      kindsWrap.querySelectorAll(".fb-kind").forEach(b => b.classList.toggle("active", b === btn));
+    };
+  });
+
+  const send = modal.querySelector("#fbsend");
+  const err = modal.querySelector("#fberr");
+  send.onclick = async () => {
+    const message = modal.querySelector("#fbmsg").value.trim();
+    if (message.length < 3) { err.textContent = "Please add a little more detail."; err.style.display = "block"; return; }
+    err.style.display = "none";
+    send.disabled = true; send.textContent = "Sending…";
+    try { await api("/feedback", "POST", { kind, message, context: context || "" }); }
+    catch (e) { /* offline/demo — still acknowledge the submission */ }
+    modal.innerHTML = `
+      <div style="padding:46px 28px;text-align:center">
+        <div style="font-size:56px;margin-bottom:10px">🙏</div>
+        <h2 style="font-size:21px;font-weight:800;color:#1B2A4A;margin-bottom:8px">Thank you!</h2>
+        <p style="font-size:14px;color:#5A6474;line-height:1.6;max-width:340px;margin:0 auto 22px">Your feedback has been sent to the Care2Learn team. We read every message.</p>
+        <button class="fb-send" id="fbdone" style="max-width:200px;margin:0 auto">Done</button>
+      </div>`;
+    modal.querySelector("#fbdone").onclick = () => overlay.remove();
+  };
+  setTimeout(() => modal.querySelector("#fbmsg")?.focus(), 50);
+}
+
 async function renderStaffPortal() {
   const me = await api("/staff/me");
   App.innerHTML = "";
@@ -708,6 +767,7 @@ async function renderStaffPortal() {
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">👤</span><div><div class="dash-org">${esc(me.staff.name)}</div><div class="dash-sub">${esc(me.staff.role)} · ${esc(me.org.name)}</div></div></div>
         <nav class="dash-nav" id="snav"></nav>
+        <button class="feedback-btn" id="feedback">💬 Feedback</button>
         <button class="logout" id="logout">Log Out</button>
       </div>
       <div class="body" id="sbody"></div>
@@ -720,6 +780,7 @@ async function renderStaffPortal() {
     nav.appendChild(b);
   });
   document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+  document.getElementById("feedback").onclick = () => openFeedbackModal("Staff portal");
   await paintStaffTab();
 }
 

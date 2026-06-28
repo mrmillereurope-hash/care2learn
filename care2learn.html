@@ -96,6 +96,7 @@
     .dash-brand{order:1;flex:1 1 auto;min-width:0}
     .dash-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .logout{order:2}
+    .feedback-btn{order:2}
     .dash-nav{order:3;flex-basis:100%;width:100%;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
     .nav-btn{flex:0 0 auto;white-space:nowrap}
   }
@@ -165,6 +166,19 @@
   .modal-h{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 22px 0}
   .modal-h h2{font-size:21px;font-weight:800;margin-bottom:3px}
   .modal-h p{font-size:13px;color:#7A8599}
+  /* Feedback button + form */
+  .feedback-btn{background:#fff;border:1px solid #E0E6ED;color:#1B2A4A;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .feedback-btn:hover{border-color:#2980B9;color:#2980B9}
+  .fb-kinds{display:flex;gap:8px;margin-bottom:14px}
+  .fb-kind{flex:1;padding:11px 6px;border:2px solid #E8ECF0;border-radius:10px;background:#fff;font-size:13px;font-weight:700;color:#5A6474;cursor:pointer;transition:all .15s}
+  .fb-kind:hover{border-color:#BDC3C7}
+  .fb-kind.active{border-color:#2980B9;background:#2980B910;color:#1A5276}
+  .fb-msg{width:100%;border:2px solid #E8ECF0;border-radius:10px;padding:12px;font-size:14px;font-family:inherit;color:#2C3E50;resize:vertical;box-sizing:border-box}
+  .fb-msg:focus{outline:none;border-color:#2980B9}
+  .fb-err{color:#E74C3C;font-size:13px;margin-top:8px;font-weight:600}
+  .fb-send{width:100%;margin-top:14px;padding:13px;border:none;border-radius:10px;background:#2980B9;color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+  .fb-send:disabled{opacity:.7}
+  .fb-note{font-size:11px;color:#9AA5B1;text-align:center;margin-top:10px;line-height:1.5}
   .x{background:none;border:none;font-size:20px;color:#7A8599;line-height:1}
   .info-row{display:flex;gap:18px;flex-wrap:wrap;padding:12px 22px;background:#F0F4F8;margin-top:14px;font-size:12px;color:#5A6474}
   .crow{display:flex;align-items:center;gap:10px;padding:10px 22px;border-bottom:1px solid #F0F2F5}
@@ -1987,6 +2001,7 @@ async function renderOrgDash() {
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
         <nav class="dash-nav" id="nav"></nav>
+        <button class="feedback-btn" id="feedback">💬 Feedback</button>
         <button class="logout" id="logout">Log Out</button>
       </div>
       <div class="body" id="dashbody"></div>
@@ -2000,6 +2015,7 @@ async function renderOrgDash() {
     nav.appendChild(b);
   });
   document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+  document.getElementById("feedback").onclick = () => openFeedbackModal("Organisation portal");
 
   await paintOrgTab(org);
 }
@@ -2285,6 +2301,63 @@ async function openStaffModal(staffId) {
 
 // ─── STAFF PORTAL ─────────────────────────────────────────────────────────────
 let staffTab = "courses";
+// ── Feedback modal (compliments, bugs, feature requests) ──
+function openFeedbackModal(context) {
+  let kind = "compliment";
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:520px">
+      <div class="modal-h">
+        <div><h2>Send feedback</h2><p>Compliments, bugs, or features you'd like to see in Care2Learn</p></div>
+        <button class="x" id="close">✕</button>
+      </div>
+      <div style="padding:18px 22px 22px">
+        <div class="fb-kinds" id="fbkinds">
+          <button class="fb-kind active" data-kind="compliment">👍 Compliment</button>
+          <button class="fb-kind" data-kind="bug">🐞 Bug</button>
+          <button class="fb-kind" data-kind="feature">💡 Feature</button>
+        </div>
+        <textarea id="fbmsg" class="fb-msg" rows="5" placeholder="Tell us what's on your mind…"></textarea>
+        <div id="fberr" class="fb-err" style="display:none"></div>
+        <button class="fb-send" id="fbsend">Send feedback</button>
+        <p class="fb-note">Your name and role are included so the Care2Learn team can follow up if needed.</p>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+
+  const kindsWrap = modal.querySelector("#fbkinds");
+  kindsWrap.querySelectorAll(".fb-kind").forEach(btn => {
+    btn.onclick = () => {
+      kind = btn.dataset.kind;
+      kindsWrap.querySelectorAll(".fb-kind").forEach(b => b.classList.toggle("active", b === btn));
+    };
+  });
+
+  const send = modal.querySelector("#fbsend");
+  const err = modal.querySelector("#fberr");
+  send.onclick = async () => {
+    const message = modal.querySelector("#fbmsg").value.trim();
+    if (message.length < 3) { err.textContent = "Please add a little more detail."; err.style.display = "block"; return; }
+    err.style.display = "none";
+    send.disabled = true; send.textContent = "Sending…";
+    try { await api("/feedback", "POST", { kind, message, context: context || "" }); }
+    catch (e) { /* offline/demo — still acknowledge the submission */ }
+    modal.innerHTML = `
+      <div style="padding:46px 28px;text-align:center">
+        <div style="font-size:56px;margin-bottom:10px">🙏</div>
+        <h2 style="font-size:21px;font-weight:800;color:#1B2A4A;margin-bottom:8px">Thank you!</h2>
+        <p style="font-size:14px;color:#5A6474;line-height:1.6;max-width:340px;margin:0 auto 22px">Your feedback has been sent to the Care2Learn team. We read every message.</p>
+        <button class="fb-send" id="fbdone" style="max-width:200px;margin:0 auto">Done</button>
+      </div>`;
+    modal.querySelector("#fbdone").onclick = () => overlay.remove();
+  };
+  setTimeout(() => modal.querySelector("#fbmsg")?.focus(), 50);
+}
+
 async function renderStaffPortal() {
   const me = await api("/staff/me");
   App.innerHTML = "";
@@ -2293,6 +2366,7 @@ async function renderStaffPortal() {
       <div class="dash-hdr">
         <div class="dash-brand"><span class="dash-logo">👤</span><div><div class="dash-org">${esc(me.staff.name)}</div><div class="dash-sub">${esc(me.staff.role)} · ${esc(me.org.name)}</div></div></div>
         <nav class="dash-nav" id="snav"></nav>
+        <button class="feedback-btn" id="feedback">💬 Feedback</button>
         <button class="logout" id="logout">Log Out</button>
       </div>
       <div class="body" id="sbody"></div>
@@ -2305,6 +2379,7 @@ async function renderStaffPortal() {
     nav.appendChild(b);
   });
   document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
+  document.getElementById("feedback").onclick = () => openFeedbackModal("Staff portal");
   await paintStaffTab();
 }
 

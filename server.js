@@ -495,6 +495,49 @@ route("POST", "/api/logout", async (req, res) => {
   send(res, 200, { ok: true });
 });
 
+// ── Feedback: compliments, bugs and feature requests (from org or staff) ──
+route("POST", "/api/feedback", async (req, res) => {
+  const s = authSession(req);
+  const b = await readBody(req);
+  const kind = ["compliment", "bug", "feature"].includes(b.kind) ? b.kind : null;
+  const message = typeof b.message === "string" ? b.message.trim() : "";
+  if (!kind) return send(res, 400, { error: "kind must be compliment, bug or feature." });
+  if (message.length < 3) return send(res, 400, { error: "Please add a little more detail." });
+  if (message.length > 4000) return send(res, 400, { error: "Message is too long (max 4000 characters)." });
+
+  let submitterKind = null, submitterId = null, submitterName = null, orgId = null;
+  if (s) {
+    submitterKind = s.kind;
+    submitterId = s.subject_id;
+    if (s.kind === "org") {
+      const o = db.prepare("SELECT id,name FROM organisations WHERE id = ?").get(s.subject_id);
+      if (o) { submitterName = o.name; orgId = o.id; }
+    } else if (s.kind === "staff") {
+      const m = db.prepare("SELECT name,org_id FROM staff WHERE id = ?").get(s.subject_id);
+      if (m) { submitterName = m.name; orgId = m.org_id; }
+    }
+  }
+  const id = genId("FB");
+  const context = typeof b.context === "string" ? b.context.slice(0, 200) : null;
+  db.prepare(`INSERT INTO feedback (id,created_at,kind,message,submitter_kind,submitter_id,submitter_name,org_id,context)
+              VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(id, new Date().toISOString(), kind, message, submitterKind, submitterId, submitterName, orgId, context);
+  console.log(`📨 FEEDBACK [${kind}] from ${submitterName || "unknown"} (${submitterKind || "anonymous"}${orgId ? ", org " + orgId : ""}): ${message.replace(/\s+/g, " ").slice(0, 300)}`);
+  send(res, 200, { ok: true, id });
+});
+
+// ── Admin: export all feedback as JSON (guard with the ADMIN_KEY env var) ──
+//    Visit /api/admin/feedback?key=YOUR_ADMIN_KEY once ADMIN_KEY is set on the server.
+route("GET", "/api/admin/feedback", async (req, res) => {
+  const adminKey = process.env.ADMIN_KEY;
+  if (!adminKey) return send(res, 503, { error: "Feedback export is disabled. Set an ADMIN_KEY environment variable to enable it." });
+  const provided = new URL(req.url, `http://${req.headers.host}`).searchParams.get("key");
+  if (provided !== adminKey) return send(res, 401, { error: "Invalid or missing key." });
+  const rows = db.prepare("SELECT * FROM feedback ORDER BY created_at DESC").all();
+  const counts = rows.reduce((a, r) => { a[r.kind] = (a[r.kind] || 0) + 1; return a; }, {});
+  send(res, 200, { total: rows.length, counts, feedback: rows });
+});
+
 // ─── STATIC FILE SERVING ──────────────────────────────────────────────────────
 const MIME = {
   ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
