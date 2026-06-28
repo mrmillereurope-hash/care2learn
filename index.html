@@ -243,6 +243,9 @@
   .mini-btn:hover{border-color:#94A3B8}
   .mini-btn.danger{border-color:#F0C4C0;color:#C0392B}
   .mini-btn.danger:hover{background:#FDF0EF;border-color:#E74C3C}
+  .mini-btn.success{border-color:#A7E0BF;color:#16A34A}
+  .mini-btn.success:hover{background:#EAF8F0;border-color:#16A34A}
+  .mini-btn:disabled{opacity:.5;cursor:default}
   .fb-item{background:#fff;border:1px solid #E8ECF0;border-left:4px solid #CBD5E1;border-radius:10px;padding:13px 15px;margin-bottom:10px}
   .fb-item.compliment{border-left-color:#16A34A}
   .fb-item.bug{border-left-color:#E74C3C}
@@ -470,11 +473,13 @@
   .ref-aname.clickable:hover,.ref-aref:hover{color:#2980B9;text-decoration:underline}
   .ref-aref{font-weight:700;color:#2C3E50;cursor:pointer}
   .ref-ameta{font-size:12px;color:#8A93A0}
-  .ref-aright{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+  .ref-aright{display:flex;align-items:center;gap:12px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
   .ref-pill{display:inline-block;padding:4px 11px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
   .ref-pill-paid{background:#E7F8EF;color:#16A34A}
   .ref-pill-pending{background:#FFF4E0;color:#B8791C}
+  .ref-pill-declined{background:#EEF1F4;color:#7A8794}
   .ref-acredits{font-size:16px;font-weight:800;min-width:42px;text-align:right}
+  .ref-aactions{display:flex;gap:8px;flex:0 0 auto}
   @media(max-width:600px){
     .ref-arow{flex-direction:column;align-items:flex-start;gap:8px}
     .ref-aright{align-self:stretch;justify-content:space-between}

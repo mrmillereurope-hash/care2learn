@@ -1114,32 +1114,64 @@ async function paintAdminPayments(body) {
 }
 
 async function paintAdminReferrals(body) {
-  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Every account that signed up with a referral code. The referrer is credited automatically once the referred account makes its first purchase.</p></div>`));
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Referrers are credited automatically when a referred account makes its first purchase. You can also <strong>approve</strong> a referral to pay it early, or <strong>decline</strong> one to block it from ever paying out.</p></div>`));
   let data;
   try { data = await api("/admin/referrals"); }
   catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
   const s = data.summary || {};
   body.appendChild(el(`<div class="astats">
-    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.rewardedCount || 0}</div><div class="metric-l">Credited referrals</div></div>
+    <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Pending review</div></div>
+    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.approvedCount || 0}</div><div class="metric-l">Credited</div></div>
+    <div class="metric"><div class="metric-i">🚫</div><div class="metric-v" style="color:#8A94A0">${s.declinedCount || 0}</div><div class="metric-l">Declined</div></div>
     <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${s.creditsAwarded || 0}</div><div class="metric-l">Credits awarded</div></div>
-    <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Awaiting first purchase</div></div>
     <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${s.totalReferred || 0}</div><div class="metric-l">Total referred</div></div>
   </div>`));
   if (!data.referrals || !data.referrals.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No referrals yet. When someone signs up using another account's referral code, it'll appear here.</div>`)); return; }
+  const refresh = () => { const b = document.getElementById("abody"); if (b) { b.innerHTML = ""; paintAdminReferrals(b); } };
   const table = el(`<div class="ref-atable"></div>`);
   data.referrals.forEach(r => {
     const badge = r.referredType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
     const rbadge = r.referrerType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
-    const pill = r.status === "paid" ? `<span class="ref-pill ref-pill-paid">✓ Credited</span>` : `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
+    let pill;
+    if (r.status === "approved") pill = `<span class="ref-pill ref-pill-paid">✓ Credited</span>`;
+    else if (r.status === "declined") pill = `<span class="ref-pill ref-pill-declined">✕ Declined</span>`;
+    else pill = `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
+    const purchaseTag = r.status === "approved" ? "" : (r.hasPurchased ? ` · <span style="color:#16A34A;font-weight:700">✓ has purchased</span>` : ` · <span style="color:#9AA5B1">no purchase yet</span>`);
+    const creditedTag = r.status === "approved" && r.approvedAt ? " · credited " + fmtDate(r.approvedAt) : "";
     const row = el(`<div class="ref-arow">
       <div class="ref-amain">
         <div class="ref-aname${r.referredId ? " clickable" : ""}">${esc(r.referredName)}${badge}</div>
-        <div class="ref-ameta">Referred by <span class="ref-aref">${esc(r.referrerName)}</span>${rbadge} · code ${esc(r.code)} · joined ${fmtDate(r.joinedAt)}${r.status === "paid" && r.paidAt ? " · credited " + fmtDate(r.paidAt) : ""}</div>
+        <div class="ref-ameta">Referred by <span class="ref-aref">${esc(r.referrerName)}</span>${rbadge} · code ${esc(r.code)} · joined ${fmtDate(r.joinedAt)}${creditedTag}${purchaseTag}</div>
       </div>
-      <div class="ref-aright">${pill}<span class="ref-acredits" style="color:${r.status === "paid" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span></div>
+      <div class="ref-aright">
+        ${pill}
+        <span class="ref-acredits" style="color:${r.status === "approved" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span>
+        <span class="ref-aactions"></span>
+      </div>
     </div>`);
     if (r.referredId) { const n = row.querySelector(".ref-aname"); n.onclick = () => renderAdminOrg(r.referredId); }
     if (r.referrerId) { const n = row.querySelector(".ref-aref"); n.onclick = () => renderAdminOrg(r.referrerId); }
+    const actions = row.querySelector(".ref-aactions");
+    const addApprove = (label) => {
+      const b = el(`<button class="mini-btn success">${label}</button>`);
+      b.onclick = async () => {
+        b.disabled = true;
+        try { const res = await api("/admin/referrals/" + r.referredId + "/approve", "POST"); toast(`Approved — ${res.referrerName} credited +${res.reward}.`); refresh(); }
+        catch (e) { toast(e.message); b.disabled = false; }
+      };
+      actions.appendChild(b);
+    };
+    const addDecline = () => {
+      const b = el(`<button class="mini-btn danger">Decline</button>`);
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api("/admin/referrals/" + r.referredId + "/decline", "POST"); toast("Referral declined — it won't pay out."); refresh(); }
+        catch (e) { toast(e.message); b.disabled = false; }
+      };
+      actions.appendChild(b);
+    };
+    if (r.status === "pending") { addApprove("Approve"); addDecline(); }
+    else if (r.status === "declined") { addApprove("Approve anyway"); }
     table.appendChild(row);
   });
   body.appendChild(table);

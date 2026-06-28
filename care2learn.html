@@ -240,6 +240,9 @@
   .mini-btn:hover{border-color:#94A3B8}
   .mini-btn.danger{border-color:#F0C4C0;color:#C0392B}
   .mini-btn.danger:hover{background:#FDF0EF;border-color:#E74C3C}
+  .mini-btn.success{border-color:#A7E0BF;color:#16A34A}
+  .mini-btn.success:hover{background:#EAF8F0;border-color:#16A34A}
+  .mini-btn:disabled{opacity:.5;cursor:default}
   .fb-item{background:#fff;border:1px solid #E8ECF0;border-left:4px solid #CBD5E1;border-radius:10px;padding:13px 15px;margin-bottom:10px}
   .fb-item.compliment{border-left-color:#16A34A}
   .fb-item.bug{border-left-color:#E74C3C}
@@ -467,11 +470,13 @@
   .ref-aname.clickable:hover,.ref-aref:hover{color:#2980B9;text-decoration:underline}
   .ref-aref{font-weight:700;color:#2C3E50;cursor:pointer}
   .ref-ameta{font-size:12px;color:#8A93A0}
-  .ref-aright{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+  .ref-aright{display:flex;align-items:center;gap:12px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
   .ref-pill{display:inline-block;padding:4px 11px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
   .ref-pill-paid{background:#E7F8EF;color:#16A34A}
   .ref-pill-pending{background:#FFF4E0;color:#B8791C}
+  .ref-pill-declined{background:#EEF1F4;color:#7A8794}
   .ref-acredits{font-size:16px;font-weight:800;min-width:42px;text-align:right}
+  .ref-aactions{display:flex;gap:8px;flex:0 0 auto}
   @media(max-width:600px){
     .ref-arow{flex-direction:column;align-items:flex-start;gap:8px}
     .ref-aright{align-self:stretch;justify-content:space-between}
@@ -1396,25 +1401,35 @@ function recordReferralIntent(code, newOrgId) {
   persist();
   return { recorded: true };
 }
-function maybeRewardReferral(orgId, reason) {
+function payReferral(orgId) {
   const acct = DB.organisations.find(o => o.id === orgId);
-  if (!acct || !acct.referred_by_code) return { rewarded: false };
-  if ((DB.referrals = DB.referrals || []).some(r => r.referred_org_id === orgId)) return { rewarded: false };
+  if (!acct) return { paid: false, reason: "not_found" };
+  if (!acct.referred_by_code) return { paid: false, reason: "no_referrer" };
+  if ((DB.referrals = DB.referrals || []).some(r => r.referred_org_id === orgId)) return { paid: false, reason: "already_approved" };
   const referrer = DB.organisations.find(o => o.referral_code === acct.referred_by_code);
-  if (!referrer || referrer.id === orgId || referrer.active === 0) return { rewarded: false };
+  if (!referrer) return { paid: false, reason: "referrer_missing" };
+  if (referrer.id === orgId) return { paid: false, reason: "self" };
+  if (referrer.active === 0) return { paid: false, reason: "referrer_inactive" };
   const reward = rewardForType(referrer.account_type);
   referrer.credits = (referrer.credits || 0) + reward;
-  (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: referrer.id, amount: reward, balance_after: referrer.credits, note: "Referral bonus — " + acct.name + " made their first purchase", created_at: new Date().toISOString() });
+  (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: referrer.id, amount: reward, balance_after: referrer.credits, note: "Referral bonus — referral of " + acct.name + " approved", created_at: new Date().toISOString() });
   DB.referrals.push({ id: genId("REF"), referrer_org_id: referrer.id, referred_org_id: orgId, code: acct.referred_by_code, credits: reward, created_at: new Date().toISOString() });
+  acct.referral_status = "approved";
   persist();
-  return { rewarded: true, reward };
+  return { paid: true, reward, referrerId: referrer.id, referrerName: referrer.name };
+}
+function autoPayReferralOnPurchase(orgId) {
+  const acct = DB.organisations.find(o => o.id === orgId);
+  if (acct && acct.referral_status === "declined") return; // a super-admin blocked this referral
+  payReferral(orgId); // no-op if already paid or not a referral
 }
 function referralSummary(orgId) {
   const org = DB.organisations.find(o => o.id === orgId);
   const code = org ? org.referral_code : null;
   const rewarded = (DB.referrals || []).filter(r => r.referrer_org_id === orgId);
   const referredCount = code ? DB.organisations.filter(o => o.referred_by_code === code).length : 0;
-  return { code, rewardPerReferral: rewardForType(org ? org.account_type : "company"), count: rewarded.length, creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0), pending: Math.max(0, referredCount - rewarded.length) };
+  const declined = code ? DB.organisations.filter(o => o.referred_by_code === code && o.referral_status === "declined").length : 0;
+  return { code, rewardPerReferral: rewardForType(org ? org.account_type : "company"), count: rewarded.length, creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0), pending: Math.max(0, referredCount - rewarded.length - declined) };
 }
 
 function addYear(dateStr) {
@@ -1774,9 +1789,9 @@ async function api(path, method = "GET", body) {
     const added = learners * courses;
     org.credits = (org.credits || 0) + added;
     (DB.credit_transactions = DB.credit_transactions || []).push({ id: genId("CR"), org_id: org.id, amount: added, balance_after: org.credits, note: "Stripe payment — " + added + " credit" + (added === 1 ? "" : "s"), created_at: new Date().toISOString() });
-    const ref = maybeRewardReferral(org.id, "made their first purchase");
+    autoPayReferralOnPurchase(org.id);
     persist();
-    return { demo: true, added, credits: org.credits, referralPaid: ref.rewarded };
+    return { demo: true, added, credits: org.credits };
   }
 
   // ── Org: change own password ──
@@ -1959,22 +1974,48 @@ async function api(path, method = "GET", body) {
     const referred = DB.organisations.filter(o => o.referred_by_code).slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     const rewardedRows = (DB.referrals || []);
     const rewardedMap = {}; rewardedRows.forEach(r => { rewardedMap[r.referred_org_id] = r; });
+    const purchasers = new Set((DB.credit_transactions || []).filter(t => t.amount > 0 && typeof t.note === "string" && t.note.indexOf("Stripe payment") === 0).map(t => t.org_id));
+    let pendingCount = 0, approvedCount = 0, declinedCount = 0;
     const referrals = referred.map(a => {
       const referrer = DB.organisations.find(o => o.referral_code === a.referred_by_code);
       const paid = rewardedMap[a.id];
+      const status = paid ? "approved" : (a.referral_status === "declined" ? "declined" : "pending");
+      if (status === "approved") approvedCount++; else if (status === "declined") declinedCount++; else pendingCount++;
       return {
         referredId: a.id, referredName: a.name, referredType: a.account_type || "company", joinedAt: a.created_at,
+        referredCredits: a.credits || 0, hasPurchased: purchasers.has(a.id),
         referrerId: referrer ? referrer.id : null, referrerName: referrer ? referrer.name : "(unknown)",
-        referrerType: referrer ? (referrer.account_type || "company") : null, code: a.referred_by_code,
-        status: paid ? "paid" : "pending",
+        referrerType: referrer ? (referrer.account_type || "company") : null,
+        referrerActive: referrer ? referrer.active !== 0 : false, code: a.referred_by_code,
+        status,
         credits: paid ? paid.credits : (referrer ? rewardForType(referrer.account_type) : 0),
-        paidAt: paid ? paid.created_at : null,
+        approvedAt: paid ? paid.created_at : null,
       };
     });
     return {
-      summary: { totalReferred: referred.length, rewardedCount: rewardedRows.length, pendingCount: Math.max(0, referred.length - rewardedRows.length), creditsAwarded: rewardedRows.reduce((s, r) => s + r.credits, 0) },
+      summary: { totalReferred: referred.length, pendingCount, approvedCount, declinedCount, creditsAwarded: rewardedRows.reduce((s, r) => s + r.credits, 0) },
       referrals,
     };
+  }
+  let am = path.match(/^\/admin\/referrals\/([^/]+)\/approve$/);
+  if (am && method === "POST") {
+    if (!admin()) err("Not authenticated as super admin.");
+    if (!DB.organisations.find(o => o.id === am[1])) err("Referred account not found.");
+    const result = payReferral(am[1]);
+    if (!result.paid) {
+      const messages = { already_approved: "This referral has already been approved.", no_referrer: "This account didn't sign up with a referral code.", referrer_missing: "The referring account no longer exists.", referrer_inactive: "The referring account is deactivated, so it can't be credited.", self: "An account can't refer itself.", not_found: "Referred account not found.", error: "Something went wrong approving this referral." };
+      err(messages[result.reason] || "Could not approve this referral.");
+    }
+    return { ok: true, reward: result.reward, referrerName: result.referrerName };
+  }
+  am = path.match(/^\/admin\/referrals\/([^/]+)\/decline$/);
+  if (am && method === "POST") {
+    if (!admin()) err("Not authenticated as super admin.");
+    const acct = DB.organisations.find(o => o.id === am[1]); if (!acct) err("Referred account not found.");
+    if ((DB.referrals || []).some(r => r.referred_org_id === am[1])) err("This referral has already been approved and can't be declined.");
+    acct.referral_status = "declined";
+    persist();
+    return { ok: true };
   }
 
   if (path === "/admin/orgs" && method === "POST") {
@@ -2008,7 +2049,7 @@ async function api(path, method = "GET", body) {
     const o = DB.organisations.find(x => x.id === orgId);
     return { org: { id: o.id, name: o.name, email: o.email, createdAt: o.created_at, credits: o.credits, active: true, accountType: "individual" } };
   }
-  let am = path.match(/^\/admin\/orgs\/([^/]+)$/);
+  am = path.match(/^\/admin\/orgs\/([^/]+)$/);
   if (am && method === "GET") {
     if (!admin()) err("Not authenticated as super admin.");
     const o = DB.organisations.find(x => x.id === am[1]); if (!o) err("Company not found.");
@@ -2049,7 +2090,7 @@ async function api(path, method = "GET", body) {
     const note = ((typeof body.note === "string" ? body.note.trim() : "") || null);
     const tx = { id: genId("CR"), org_id: o.id, amount, balance_after: newBalance, note: note ? note.slice(0, 200) : null, created_at: new Date().toISOString() };
     (DB.credit_transactions = DB.credit_transactions || []).push(tx);
-    if (amount > 0) maybeRewardReferral(o.id, "received their first credits");
+    if (amount > 0) autoPayReferralOnPurchase(o.id);
     persist();
     return { ok: true, credits: newBalance, transaction: tx };
   }
@@ -3245,32 +3286,64 @@ async function paintAdminPayments(body) {
 }
 
 async function paintAdminReferrals(body) {
-  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Every account that signed up with a referral code. The referrer is credited automatically once the referred account makes its first purchase.</p></div>`));
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Referrers are credited automatically when a referred account makes its first purchase. You can also <strong>approve</strong> a referral to pay it early, or <strong>decline</strong> one to block it from ever paying out.</p></div>`));
   let data;
   try { data = await api("/admin/referrals"); }
   catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
   const s = data.summary || {};
   body.appendChild(el(`<div class="astats">
-    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.rewardedCount || 0}</div><div class="metric-l">Credited referrals</div></div>
+    <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Pending review</div></div>
+    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.approvedCount || 0}</div><div class="metric-l">Credited</div></div>
+    <div class="metric"><div class="metric-i">🚫</div><div class="metric-v" style="color:#8A94A0">${s.declinedCount || 0}</div><div class="metric-l">Declined</div></div>
     <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${s.creditsAwarded || 0}</div><div class="metric-l">Credits awarded</div></div>
-    <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Awaiting first purchase</div></div>
     <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${s.totalReferred || 0}</div><div class="metric-l">Total referred</div></div>
   </div>`));
   if (!data.referrals || !data.referrals.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No referrals yet. When someone signs up using another account's referral code, it'll appear here.</div>`)); return; }
+  const refresh = () => { const b = document.getElementById("abody"); if (b) { b.innerHTML = ""; paintAdminReferrals(b); } };
   const table = el(`<div class="ref-atable"></div>`);
   data.referrals.forEach(r => {
     const badge = r.referredType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
     const rbadge = r.referrerType === "individual" ? ` <span class="ind-badge">Individual</span>` : "";
-    const pill = r.status === "paid" ? `<span class="ref-pill ref-pill-paid">✓ Credited</span>` : `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
+    let pill;
+    if (r.status === "approved") pill = `<span class="ref-pill ref-pill-paid">✓ Credited</span>`;
+    else if (r.status === "declined") pill = `<span class="ref-pill ref-pill-declined">✕ Declined</span>`;
+    else pill = `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
+    const purchaseTag = r.status === "approved" ? "" : (r.hasPurchased ? ` · <span style="color:#16A34A;font-weight:700">✓ has purchased</span>` : ` · <span style="color:#9AA5B1">no purchase yet</span>`);
+    const creditedTag = r.status === "approved" && r.approvedAt ? " · credited " + fmtDate(r.approvedAt) : "";
     const row = el(`<div class="ref-arow">
       <div class="ref-amain">
         <div class="ref-aname${r.referredId ? " clickable" : ""}">${esc(r.referredName)}${badge}</div>
-        <div class="ref-ameta">Referred by <span class="ref-aref">${esc(r.referrerName)}</span>${rbadge} · code ${esc(r.code)} · joined ${fmtDate(r.joinedAt)}${r.status === "paid" && r.paidAt ? " · credited " + fmtDate(r.paidAt) : ""}</div>
+        <div class="ref-ameta">Referred by <span class="ref-aref">${esc(r.referrerName)}</span>${rbadge} · code ${esc(r.code)} · joined ${fmtDate(r.joinedAt)}${creditedTag}${purchaseTag}</div>
       </div>
-      <div class="ref-aright">${pill}<span class="ref-acredits" style="color:${r.status === "paid" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span></div>
+      <div class="ref-aright">
+        ${pill}
+        <span class="ref-acredits" style="color:${r.status === "approved" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span>
+        <span class="ref-aactions"></span>
+      </div>
     </div>`);
     if (r.referredId) { const n = row.querySelector(".ref-aname"); n.onclick = () => renderAdminOrg(r.referredId); }
     if (r.referrerId) { const n = row.querySelector(".ref-aref"); n.onclick = () => renderAdminOrg(r.referrerId); }
+    const actions = row.querySelector(".ref-aactions");
+    const addApprove = (label) => {
+      const b = el(`<button class="mini-btn success">${label}</button>`);
+      b.onclick = async () => {
+        b.disabled = true;
+        try { const res = await api("/admin/referrals/" + r.referredId + "/approve", "POST"); toast(`Approved — ${res.referrerName} credited +${res.reward}.`); refresh(); }
+        catch (e) { toast(e.message); b.disabled = false; }
+      };
+      actions.appendChild(b);
+    };
+    const addDecline = () => {
+      const b = el(`<button class="mini-btn danger">Decline</button>`);
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api("/admin/referrals/" + r.referredId + "/decline", "POST"); toast("Referral declined — it won't pay out."); refresh(); }
+        catch (e) { toast(e.message); b.disabled = false; }
+      };
+      actions.appendChild(b);
+    };
+    if (r.status === "pending") { addApprove("Approve"); addDecline(); }
+    else if (r.status === "declined") { addApprove("Approve anyway"); }
     table.appendChild(row);
   });
   body.appendChild(table);

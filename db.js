@@ -156,6 +156,10 @@ export function initSchema() {
   if (!orgCols.some((c) => c.name === "referred_by_code")) {
     db.exec("ALTER TABLE organisations ADD COLUMN referred_by_code TEXT");
   }
+  // Manual approval state for a referred account: 'approved' | 'declined' | NULL (awaiting review).
+  if (!orgCols.some((c) => c.name === "referral_status")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN referral_status TEXT");
+  }
   // Backfill a unique referral code for any account that doesn't have one yet.
   backfillReferralCodes();
 }

@@ -271,29 +271,43 @@ function recordReferralIntent(code, newOrgId) {
     return { recorded: false };
   }
 }
-// Called when a referred account first acquires paid credits. Pays the referrer once (idempotent).
-function maybeRewardReferral(orgId, reason) {
+// Pay the referrer for a referred account. Triggered by a super-admin approving the referral.
+// Idempotent (one payout per referred account) and returns a reason when it can't pay.
+function payReferral(orgId) {
   try {
     const acct = db.prepare("SELECT id, name, referred_by_code FROM organisations WHERE id = ?").get(orgId);
-    if (!acct || !acct.referred_by_code) return { rewarded: false };
-    if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(orgId)) return { rewarded: false }; // already paid
+    if (!acct) return { paid: false, reason: "not_found" };
+    if (!acct.referred_by_code) return { paid: false, reason: "no_referrer" };
+    if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(orgId)) return { paid: false, reason: "already_approved" };
     const referrer = db.prepare("SELECT id, name, account_type, active, credits FROM organisations WHERE referral_code = ?").get(acct.referred_by_code);
-    if (!referrer || referrer.id === orgId || referrer.active === 0) return { rewarded: false };
+    if (!referrer) return { paid: false, reason: "referrer_missing" };
+    if (referrer.id === orgId) return { paid: false, reason: "self" };
+    if (referrer.active === 0) return { paid: false, reason: "referrer_inactive" };
     const reward = rewardForType(referrer.account_type);
     inTransaction(() => {
       const bal = (referrer.credits || 0) + reward;
       db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(bal, referrer.id);
       db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
-        .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — ${acct.name} made their first purchase`, new Date().toISOString());
+        .run(genId("CR"), referrer.id, reward, bal, `Referral bonus — referral of ${acct.name} approved`, new Date().toISOString());
       db.prepare("INSERT INTO referrals (id,referrer_org_id,referred_org_id,code,credits,created_at) VALUES (?,?,?,?,?,?)")
         .run(genId("REF"), referrer.id, orgId, acct.referred_by_code, reward, new Date().toISOString());
+      db.prepare("UPDATE organisations SET referral_status = 'approved' WHERE id = ?").run(orgId);
     });
-    console.log(`🎁 REFERRAL PAID: ${referrer.name} earned ${reward} credits — ${acct.name} ${reason || "made a purchase"}`);
-    return { rewarded: true, reward };
+    console.log(`🎁 REFERRAL APPROVED: ${referrer.name} earned ${reward} credits for referring ${acct.name}`);
+    return { paid: true, reward, referrerId: referrer.id, referrerName: referrer.name };
   } catch (e) {
-    console.error("maybeRewardReferral failed (purchase continues):", e.message);
-    return { rewarded: false };
+    console.error("payReferral failed:", e.message);
+    return { paid: false, reason: "error" };
   }
+}
+// Automated payout: fires when a referred account makes its first purchase.
+// Respects a super-admin decline (blocked referrals never auto-pay), and is idempotent.
+function autoPayReferralOnPurchase(orgId) {
+  try {
+    const acct = db.prepare("SELECT referral_status FROM organisations WHERE id = ?").get(orgId);
+    if (acct && acct.referral_status === "declined") return; // a super-admin blocked this referral
+    payReferral(orgId); // no-op if already paid or not a referral
+  } catch (e) { console.error("autoPayReferralOnPurchase failed:", e.message); }
 }
 function referralSummary(orgId) {
   try {
@@ -302,15 +316,17 @@ function referralSummary(orgId) {
     const rewarded = db.prepare("SELECT credits FROM referrals WHERE referrer_org_id = ?").all(orgId);
     let pending = 0;
     try {
+      // Awaiting approval = signed up with my code, not yet approved (no payout row) and not declined.
       const referredCount = code ? db.prepare("SELECT COUNT(*) AS n FROM organisations WHERE referred_by_code = ?").get(code).n : 0;
-      pending = Math.max(0, referredCount - rewarded.length);   // signed up, not yet purchased
+      const declined = code ? db.prepare("SELECT COUNT(*) AS n FROM organisations WHERE referred_by_code = ? AND referral_status = 'declined'").get(code).n : 0;
+      pending = Math.max(0, referredCount - rewarded.length - declined);
     } catch (e) { console.error("referralSummary pending count failed:", e.message); }
     return {
       code,
       rewardPerReferral: rewardForType(org ? org.account_type : "company"),
-      count: rewarded.length,                                   // referrals that have paid out (made a purchase)
+      count: rewarded.length,                                   // approved referrals (credited)
       creditsEarned: rewarded.reduce((s, r) => s + r.credits, 0),
-      pending,
+      pending,                                                  // awaiting admin approval
     };
   } catch (e) {
     console.error("referralSummary failed:", e.message);
@@ -339,7 +355,7 @@ function grantStripeCredits(sessionId, orgId, credits) {
       .run(genId("CR"), orgId, credits, newBalance, `Stripe payment — ${credits} credit${credits === 1 ? "" : "s"}`, now);
   });
   console.log(`💳 STRIPE AUTO-CREDIT: +${credits} to ${orgId} → balance ${newBalance} (session ${sessionId})`);
-  if (credits > 0) maybeRewardReferral(orgId, "made their first purchase");
+  if (credits > 0) autoPayReferralOnPurchase(orgId);
 }
 
 route("POST", "/api/webhooks/stripe", async (req, res) => {
@@ -748,36 +764,75 @@ route("GET", "/api/admin/payments", async (req, res) => {
   send(res, 200, { payments, totalPence, totalCredits, count: payments.length });
 });
 
-// Super-admin oversight of the referral programme — every referred account (paid + pending).
+// Super-admin oversight of the referral programme — every referred account with its approval state.
 route("GET", "/api/admin/referrals", async (req, res) => {
   if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
-  const referred = db.prepare(`SELECT id, name, account_type, created_at, referred_by_code
+  const referred = db.prepare(`SELECT id, name, account_type, created_at, referred_by_code, referral_status, credits
                                FROM organisations
                                WHERE referred_by_code IS NOT NULL AND referred_by_code != ''
                                ORDER BY created_at DESC`).all();
   const rewardedRows = db.prepare("SELECT referred_org_id, credits, created_at FROM referrals").all();
   const rewardedMap = new Map(rewardedRows.map(r => [r.referred_org_id, r]));
+  // "Has paid" signal: the referred account has completed a real card payment.
+  const purchasers = new Set(db.prepare("SELECT DISTINCT org_id FROM credit_transactions WHERE amount > 0 AND note LIKE 'Stripe payment%'").all().map(r => r.org_id));
+  let pendingCount = 0, approvedCount = 0, declinedCount = 0;
   const referrals = referred.map(a => {
-    const referrer = db.prepare("SELECT id, name, account_type FROM organisations WHERE referral_code = ?").get(a.referred_by_code);
+    const referrer = db.prepare("SELECT id, name, account_type, active FROM organisations WHERE referral_code = ?").get(a.referred_by_code);
     const paid = rewardedMap.get(a.id);
+    const status = paid ? "approved" : (a.referral_status === "declined" ? "declined" : "pending");
+    if (status === "approved") approvedCount++; else if (status === "declined") declinedCount++; else pendingCount++;
     return {
       referredId: a.id, referredName: a.name, referredType: a.account_type || "company", joinedAt: a.created_at,
+      referredCredits: a.credits || 0, hasPurchased: purchasers.has(a.id),
       referrerId: referrer ? referrer.id : null, referrerName: referrer ? referrer.name : "(unknown)",
-      referrerType: referrer ? (referrer.account_type || "company") : null, code: a.referred_by_code,
-      status: paid ? "paid" : "pending",
+      referrerType: referrer ? (referrer.account_type || "company") : null,
+      referrerActive: referrer ? referrer.active !== 0 : false, code: a.referred_by_code,
+      status,
       credits: paid ? paid.credits : (referrer ? rewardForType(referrer.account_type) : 0),
-      paidAt: paid ? paid.created_at : null,
+      approvedAt: paid ? paid.created_at : null,
     };
   });
   send(res, 200, {
     summary: {
       totalReferred: referred.length,
-      rewardedCount: rewardedRows.length,
-      pendingCount: Math.max(0, referred.length - rewardedRows.length),
+      pendingCount, approvedCount, declinedCount,
       creditsAwarded: rewardedRows.reduce((s, r) => s + r.credits, 0),
     },
     referrals,
   });
+});
+
+// Super-admin approves a pending referral — credits the referrer.
+route("POST", "/api/admin/referrals/:referredId/approve", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const acct = db.prepare("SELECT id FROM organisations WHERE id = ?").get(req.params.referredId);
+  if (!acct) return send(res, 404, { error: "Referred account not found." });
+  const result = payReferral(req.params.referredId);
+  if (!result.paid) {
+    const messages = {
+      already_approved: "This referral has already been approved.",
+      no_referrer: "This account didn't sign up with a referral code.",
+      referrer_missing: "The referring account no longer exists.",
+      referrer_inactive: "The referring account is deactivated, so it can't be credited.",
+      self: "An account can't refer itself.",
+      not_found: "Referred account not found.",
+      error: "Something went wrong approving this referral.",
+    };
+    return send(res, 400, { error: messages[result.reason] || "Could not approve this referral.", reason: result.reason });
+  }
+  send(res, 200, { ok: true, reward: result.reward, referrerName: result.referrerName });
+});
+
+// Super-admin declines a pending referral — no payout.
+route("POST", "/api/admin/referrals/:referredId/decline", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const acct = db.prepare("SELECT id FROM organisations WHERE id = ?").get(req.params.referredId);
+  if (!acct) return send(res, 404, { error: "Referred account not found." });
+  if (db.prepare("SELECT 1 FROM referrals WHERE referred_org_id = ?").get(req.params.referredId)) {
+    return send(res, 400, { error: "This referral has already been approved and can't be declined." });
+  }
+  db.prepare("UPDATE organisations SET referral_status = 'declined' WHERE id = ?").run(req.params.referredId);
+  send(res, 200, { ok: true });
 });
 
 route("POST", "/api/staff/login", async (req, res) => {
@@ -1018,7 +1073,7 @@ route("POST", "/api/admin/orgs/:id/credits", async (req, res) => {
   db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
     .run(tx.id, tx.org_id, tx.amount, tx.balance_after, tx.note, tx.created_at);
   console.log(`💳 CREDITS ${amount > 0 ? "+" + amount : amount} to org ${org.id} → balance ${newBalance}${tx.note ? " (" + tx.note + ")" : ""}`);
-  if (amount > 0) maybeRewardReferral(org.id, "received their first credits");
+  if (amount > 0) autoPayReferralOnPurchase(org.id);
   send(res, 200, { ok: true, credits: newBalance, transaction: tx });
 });
 
