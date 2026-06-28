@@ -368,7 +368,7 @@ function renderLanding() {
         <div class="lcard">
           <div class="lcard-icon">👤</div>
           <h2>For Care Professionals</h2>
-          <p>Access the courses your manager has assigned, complete assessments, and download your certificates.</p>
+          <p>Take your assigned courses, complete assessments, and get certificates.</p>
           <button class="btn-primary green" id="go-staff-login">Staff Login</button>
           <div class="lcard-or">Self-employed carer?</div>
           <button class="btn-secondary" id="go-ind-reg">Register as an individual</button>
@@ -873,7 +873,7 @@ function openFeedbackModal(context) {
       <div style="padding:46px 28px;text-align:center">
         <div style="font-size:56px;margin-bottom:10px">🙏</div>
         <h2 style="font-size:21px;font-weight:800;color:#1B2A4A;margin-bottom:8px">Thank you!</h2>
-        <p style="font-size:14px;color:#5A6474;line-height:1.6;max-width:340px;margin:0 auto 22px">Your feedback has been sent to the Care2Learn team. We read every message.</p>
+        <p style="font-size:14px;color:#5A6474;line-height:1.6;max-width:340px;margin:0 auto 22px">Your feedback has been sent to the Care2Learn team. Every piece of feedback helps us to improve.</p>
         <button class="fb-send" id="fbdone" style="max-width:200px;margin:0 auto">Done</button>
       </div>`;
     modal.querySelector("#fbdone").onclick = () => overlay.remove();
