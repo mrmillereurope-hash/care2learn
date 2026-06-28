@@ -934,6 +934,34 @@ route("POST", "/api/admin/orgs", async (req, res) => {
   send(res, 201, { org: { id: org.id, name: org.name, email: org.email, phone: org.phone, address: org.address, cqcNumber: org.cqc_number, createdAt: org.created_at, credits: org.credits, active: org.active !== 0 } });
 });
 
+// Super admin creates a self-employed carer (individual) account.
+route("POST", "/api/admin/individuals", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const b = await readBody(req);
+  if (!b.name || !b.email || !b.password) return send(res, 400, { error: "Name, email and password are required." });
+  if (b.password.length < 6) return send(res, 400, { error: "Password must be at least 6 characters." });
+  const email = b.email.toLowerCase();
+  if (db.prepare("SELECT id FROM organisations WHERE email = ?").get(email)) return send(res, 409, { error: "An account with this email already exists." });
+  const orgId = genId("ORG");
+  const { hash, salt } = hashPassword(b.password);
+  db.prepare(`INSERT INTO organisations (id,name,email,password_hash,password_salt,created_at,account_type)
+              VALUES (?,?,?,?,?,?, 'individual')`)
+    .run(orgId, b.name, email, hash, salt, new Date().toISOString());
+  const staffId = genId("STF");
+  db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at)
+              VALUES (?,?,?,?,?,?,?,1,?)`)
+    .run(staffId, orgId, b.name, email, "Self-employed carer", genPin(), new Date().toISOString().split("T")[0], new Date().toISOString());
+  const startCredits = Math.trunc(Number(b.credits));
+  if (Number.isFinite(startCredits) && startCredits > 0) {
+    db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(startCredits, orgId);
+    db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+      .run(genId("CR"), orgId, startCredits, startCredits, "Opening balance", new Date().toISOString());
+  }
+  const org = db.prepare("SELECT id,name,email,created_at,credits,active FROM organisations WHERE id = ?").get(orgId);
+  console.log(`🧑‍⚕️ INDIVIDUAL CREATED: ${b.name} (${email}) by super admin`);
+  send(res, 201, { org: { id: org.id, name: org.name, email: org.email, createdAt: org.created_at, credits: org.credits, active: org.active !== 0, accountType: "individual" } });
+});
+
 // Update a company — deactivate/reactivate or edit details
 route("PATCH", "/api/admin/orgs/:id", async (req, res) => {
   if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });

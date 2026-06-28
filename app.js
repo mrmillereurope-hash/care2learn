@@ -1001,7 +1001,9 @@ function paintAdminCompanies(body, data) {
   if (!companies.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`));
   else { const g = el(`<div class="org-grid"></div>`); companies.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
 
-  body.appendChild(el(`<h2 style="margin:28px 0 12px">🧑‍⚕️ Self-employed carers (${individuals.length})</h2>`));
+  const iHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px"><h2 style="margin:0">🧑‍⚕️ Self-employed carers (${individuals.length})</h2><button class="btn-primary" id="newind" style="width:auto;padding:9px 16px;background:#7C3AED">+ New carer</button></div>`);
+  body.appendChild(iHead);
+  iHead.querySelector("#newind").onclick = () => openAdminNewIndividual(() => renderAdminDash());
   if (!individuals.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No self-employed carers have registered yet. They sign up from the home page.</div>`));
   else { const g = el(`<div class="org-grid"></div>`); individuals.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
 }
@@ -1353,6 +1355,53 @@ function openAdminNewCompany(onCreated) {
     modal.querySelector("#ncdone").onclick = () => { overlay.remove(); onCreated && onCreated(); };
   };
   setTimeout(() => modal.querySelector("#ncname")?.focus(), 50);
+}
+
+function openAdminNewIndividual(onCreated) {
+  const genPw = () => Math.random().toString(36).slice(2, 6) + "-" + Math.random().toString(36).slice(2, 6);
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:480px">
+      <div class="modal-h"><div><h2>New self-employed carer</h2><p>Create an individual carer account on Care2Learn</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:18px 22px 22px">
+        <div id="nierr"></div>
+        <div class="fg"><label>Carer's full name *</label><input class="inp" id="niname" placeholder="Jordan Smith"></div>
+        <div class="fg"><label>Login email *</label><input class="inp" id="niemail" type="email" placeholder="jordan@email.com"></div>
+        <div class="fg"><label>Temporary password *</label>
+          <div style="display:flex;gap:8px">
+            <input class="inp" id="nipw" placeholder="At least 6 characters" style="flex:1">
+            <button class="mini-btn" id="nigen" type="button">Generate</button>
+          </div>
+        </div>
+        <div class="fg"><label>Opening course credits</label><input class="inp" id="nicredits" type="number" inputmode="numeric" placeholder="0"></div>
+        <button class="btn-auth" id="nicreate" style="background:#7C3AED">Create carer</button>
+        <p class="fb-note">You'll see the login details next so you can share them with the carer.</p>
+      </div>
+    </div>`);
+  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#nigen").onclick = () => { modal.querySelector("#nipw").value = genPw(); };
+  modal.querySelector("#nicreate").onclick = async () => {
+    const name = val("niname"), email = val("niemail"), password = val("nipw");
+    const errBox = modal.querySelector("#nierr"); errBox.innerHTML = "";
+    if (!name || !email || !password) { errBox.innerHTML = `<div class="err">Name, email and password are required.</div>`; return; }
+    if (password.length < 6) { errBox.innerHTML = `<div class="err">Password must be at least 6 characters.</div>`; return; }
+    const payload = { name, email, password };
+    const credits = parseInt(val("nicredits"), 10); if (Number.isFinite(credits) && credits > 0) payload.credits = credits;
+    let r; try { r = await api("/admin/individuals", "POST", payload); } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+    modal.innerHTML = `<div style="padding:34px 28px;text-align:center">
+      <div style="font-size:50px;margin-bottom:8px">🎉</div>
+      <h2 style="font-size:20px;font-weight:800;margin-bottom:10px">${esc(name)} created</h2>
+      <div style="background:#F6F8FB;border-radius:12px;padding:16px;text-align:left;font-size:14px;max-width:360px;margin:0 auto 18px">
+        <div style="margin-bottom:6px"><b>Login email:</b> ${esc(email)}</div>
+        <div><b>Password:</b> ${esc(password)}</div>
+      </div>
+      <p style="color:#7A8599;font-size:13px;max-width:360px;margin:0 auto 18px">Share these with the carer. On the home page they tap “Register as an individual” → “Already registered? Log in”, then sign in and can change their password.</p>
+      <button class="btn-auth" id="nidone" style="max-width:200px;margin:0 auto;background:#7C3AED">Done</button></div>`;
+    modal.querySelector("#nidone").onclick = () => { overlay.remove(); onCreated && onCreated(); };
+  };
+  setTimeout(() => modal.querySelector("#niname")?.focus(), 50);
 }
 
 function openAdminStaffModal(orgId, staff, onChange) {
