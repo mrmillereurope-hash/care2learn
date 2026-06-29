@@ -183,6 +183,9 @@ function attentionItems(staffId) {
   return items;
 }
 
+// A manager can nudge the same carer at most once every this many days.
+const NUDGE_COOLDOWN_DAYS = 7;
+
 // Outstanding training for a MANUAL manager nudge. Broader than attentionItems:
 // includes not-started / in-progress / failed too, since the manager is choosing
 // to reach out — anything that isn't completed-and-in-date is listed.
@@ -861,6 +864,12 @@ route("POST", "/api/org/staff/:id/nudge", async (req, res) => {
 
   const items = outstandingForNudge(member.id);
   if (!items.length) return send(res, 200, { sent: false, message: `${member.name} is fully up to date — nothing to nudge about.` });
+
+  const since = daysSince(lastReminded(member.id, "nudge"));
+  if (since < NUDGE_COOLDOWN_DAYS) {
+    const wait = Math.max(1, Math.ceil(NUDGE_COOLDOWN_DAYS - since));
+    return send(res, 200, { sent: false, message: `You nudged ${member.name} recently — you can nudge again in about ${wait} day${wait === 1 ? "" : "s"}.` });
+  }
 
   const r = await sendStaffNudge(org, member, items);
   markReminded(member.id, "nudge");
