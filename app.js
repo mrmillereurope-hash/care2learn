@@ -2381,6 +2381,41 @@ async function renderStaffPortal() {
   document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
   document.getElementById("feedback").onclick = () => openFeedbackModal("Staff portal");
   await paintStaffTab();
+  if (me.notifications && me.notifications.length) showStaffNotifications(me.notifications);
+}
+
+function showStaffNotifications(list) {
+  const items = list.map(n =>
+    `<div style="padding:10px 0;border-bottom:1px solid #F0F2F5">
+      <div style="font-weight:700;color:#1B2A4A">${esc(n.title)}</div>
+      ${n.body ? `<div style="color:#5A6474;font-size:14px;margin-top:2px">${esc(n.body)}</div>` : ""}
+    </div>`
+  ).join("");
+  const hasNudge = list.some(n => n.type === "nudge");
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:440px">
+      <div class="modal-h"><div><h2>📣 You have a reminder</h2></div><button class="x" id="close">✕</button></div>
+      <div style="padding:6px 22px 18px">
+        ${items}
+        <div class="form-actions" style="margin-top:16px">
+          <button class="btn-cancel" id="dismiss">Dismiss</button>
+          ${hasNudge ? `<button class="btn-save" id="viewcourses">View my courses</button>` : ""}
+        </div>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  const ids = list.map(n => n.id);
+  let marked = false;
+  const markRead = () => { if (marked) return; marked = true; api("/staff/notifications/read", "POST", { ids }).catch(() => {}); };
+  const close = () => { markRead(); overlay.remove(); };
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  modal.querySelector("#close").onclick = close;
+  modal.querySelector("#dismiss").onclick = close;
+  const vc = modal.querySelector("#viewcourses");
+  if (vc) vc.onclick = () => { markRead(); overlay.remove(); staffTab = "courses"; paintStaffTab(); };
 }
 
 async function paintStaffTab() {

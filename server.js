@@ -872,6 +872,11 @@ route("POST", "/api/org/staff/:id/nudge", async (req, res) => {
 
   const r = await sendStaffNudge(org, member, items);
   markReminded(member.id, "nudge");
+  // Also surface an in-app notification the next time the carer opens their portal.
+  // Keep only the latest unread nudge so repeat nudges don't stack up.
+  db.prepare("DELETE FROM notifications WHERE staff_id = ? AND type = 'nudge' AND read_at IS NULL").run(member.id);
+  db.prepare("INSERT INTO notifications (id,staff_id,type,title,body,created_at) VALUES (?,?,?,?,?,?)")
+    .run(genId("NTF"), member.id, "nudge", `A reminder from ${org.name}`, "Please complete your outstanding training when you get a moment.", new Date().toISOString());
   send(res, 200, { sent: true, delivered: !!(r && r.sent), message: `Nudge sent to ${member.name}.`, courses: items.length });
 });
 
@@ -1325,11 +1330,29 @@ route("GET", "/api/staff/me", async (req, res) => {
   const modRows = db.prepare("SELECT course_id, module_id FROM module_progress WHERE staff_id = ?").all(member.id);
   for (const e of enrolments) e.modulesCompleted = modRows.filter(m => m.course_id === e.courseId).map(m => m.module_id);
 
+  const notifications = db.prepare("SELECT id,type,title,body,created_at FROM notifications WHERE staff_id = ? AND read_at IS NULL ORDER BY created_at DESC").all(member.id);
+
   send(res, 200, {
     staff: { id: member.id, name: member.name, email: member.email, role: member.role, startDate: member.start_date, pin: member.pin },
     org,
     enrolments,
+    notifications,
   });
+});
+
+// ── STAFF: mark notifications as read (dismiss) ──
+route("POST", "/api/staff/notifications/read", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "staff") return send(res, 401, { error: "Not authenticated as staff." });
+  const b = await readBody(req);
+  const now = new Date().toISOString();
+  if (Array.isArray(b.ids) && b.ids.length) {
+    const ph = b.ids.map(() => "?").join(",");
+    db.prepare(`UPDATE notifications SET read_at = ? WHERE staff_id = ? AND id IN (${ph})`).run(now, s.subject_id, ...b.ids);
+  } else {
+    db.prepare("UPDATE notifications SET read_at = ? WHERE staff_id = ? AND read_at IS NULL").run(now, s.subject_id);
+  }
+  send(res, 200, { ok: true });
 });
 
 // ── STAFF: update slide progress for a course ──

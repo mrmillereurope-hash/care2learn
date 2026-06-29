@@ -162,6 +162,18 @@ export function initSchema() {
       key   TEXT PRIMARY KEY,
       value TEXT
     );
+
+    -- In-app notifications shown to a learner when they next open their portal
+    -- (e.g. a manager 'nudge'). read_at IS NULL means unseen.
+    CREATE TABLE IF NOT EXISTS notifications (
+      id         TEXT PRIMARY KEY,
+      staff_id   TEXT NOT NULL,
+      type       TEXT NOT NULL,   -- e.g. 'nudge'
+      title      TEXT NOT NULL,
+      body       TEXT,
+      created_at TEXT NOT NULL,
+      read_at    TEXT
+    );
   `);
 
   // Migrations on the organisations table (idempotent — safe to re-run).
