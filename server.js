@@ -186,7 +186,6 @@ function attentionItems(staffId) {
 // Outstanding training for a MANUAL manager nudge. Broader than attentionItems:
 // includes not-started / in-progress / failed too, since the manager is choosing
 // to reach out — anything that isn't completed-and-in-date is listed.
-const NUDGE_COOLDOWN_HOURS = 4;
 function outstandingForNudge(staffId) {
   const today = todayStr();
   const items = [];
@@ -862,13 +861,6 @@ route("POST", "/api/org/staff/:id/nudge", async (req, res) => {
 
   const items = outstandingForNudge(member.id);
   if (!items.length) return send(res, 200, { sent: false, message: `${member.name} is fully up to date — nothing to nudge about.` });
-
-  const last = lastReminded(member.id, "nudge");
-  const hrsSince = last ? (Date.now() - new Date(last).getTime()) / 3600000 : Infinity;
-  if (hrsSince < NUDGE_COOLDOWN_HOURS) {
-    const wait = Math.max(1, Math.ceil(NUDGE_COOLDOWN_HOURS - hrsSince));
-    return send(res, 200, { sent: false, message: `You nudged ${member.name} recently — you can nudge again in about ${wait} hour${wait === 1 ? "" : "s"}.` });
-  }
 
   const r = await sendStaffNudge(org, member, items);
   markReminded(member.id, "nudge");

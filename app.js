@@ -2385,37 +2385,32 @@ async function renderStaffPortal() {
 }
 
 function showStaffNotifications(list) {
-  const items = list.map(n =>
-    `<div style="padding:10px 0;border-bottom:1px solid #F0F2F5">
-      <div style="font-weight:700;color:#1B2A4A">${esc(n.title)}</div>
-      ${n.body ? `<div style="color:#5A6474;font-size:14px;margin-top:2px">${esc(n.body)}</div>` : ""}
-    </div>`
-  ).join("");
+  const sbody = document.getElementById("sbody");
+  if (!sbody || !list || !list.length) return;
   const hasNudge = list.some(n => n.type === "nudge");
-  const overlay = el(`<div class="overlay"></div>`);
-  const modal = el(`
-    <div class="modal" style="max-width:440px">
-      <div class="modal-h"><div><h2>📣 You have a reminder</h2></div><button class="x" id="close">✕</button></div>
-      <div style="padding:6px 22px 18px">
-        ${items}
-        <div class="form-actions" style="margin-top:16px">
-          <button class="btn-cancel" id="dismiss">Dismiss</button>
-          ${hasNudge ? `<button class="btn-save" id="viewcourses">View my courses</button>` : ""}
-        </div>
+  const rows = list.map(n =>
+    `<div style="margin-top:2px"><span style="font-weight:700">${esc(n.title)}</span>${n.body ? ` — <span>${esc(n.body)}</span>` : ""}</div>`
+  ).join("");
+  const ids = list.map(n => n.id);
+
+  const wrap = el(`
+    <div style="max-width:1200px;margin:18px auto -6px;padding:0 24px">
+      <div style="display:flex;align-items:flex-start;gap:12px;background:#FEF6E7;border:1px solid #EBC76E;border-left:4px solid #E6A817;border-radius:10px;padding:13px 16px;color:#5A4A1A">
+        <div style="font-size:20px;line-height:1.3">📣</div>
+        <div style="flex:1;font-size:14px;line-height:1.5">${rows}</div>
+        ${hasNudge ? `<button id="nb-view" class="mini-btn" style="white-space:nowrap">View my courses</button>` : ""}
+        <button id="nb-close" aria-label="Dismiss" style="background:none;border:none;font-size:18px;color:#9A8A5A;cursor:pointer;line-height:1;padding:0 2px">✕</button>
       </div>
     </div>
   `);
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-  const ids = list.map(n => n.id);
+  sbody.parentNode.insertBefore(wrap, sbody);
+
   let marked = false;
   const markRead = () => { if (marked) return; marked = true; api("/staff/notifications/read", "POST", { ids }).catch(() => {}); };
-  const close = () => { markRead(); overlay.remove(); };
-  overlay.onclick = (e) => { if (e.target === overlay) close(); };
-  modal.querySelector("#close").onclick = close;
-  modal.querySelector("#dismiss").onclick = close;
-  const vc = modal.querySelector("#viewcourses");
-  if (vc) vc.onclick = () => { markRead(); overlay.remove(); staffTab = "courses"; paintStaffTab(); };
+  const closeBtn = wrap.querySelector("#nb-close");
+  if (closeBtn) closeBtn.onclick = () => { markRead(); wrap.remove(); };
+  const viewBtn = wrap.querySelector("#nb-view");
+  if (viewBtn) viewBtn.onclick = () => { markRead(); wrap.remove(); staffTab = "courses"; paintStaffTab(); };
 }
 
 async function paintStaffTab() {
