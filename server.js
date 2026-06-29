@@ -388,13 +388,25 @@ route("POST", "/api/checkout/payg", async (req, res) => {
   if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
 
   const b = await readBody(req);
-  const learners = Math.floor(Number(b.learners));
-  const courses = Math.floor(Number(b.courses));
-  if (!Number.isFinite(learners) || !Number.isFinite(courses) ||
-      learners < 1 || courses < 1 || learners > 5000 || courses > COURSE_IDS.length) {
-    return send(res, 400, { error: "Please choose a valid number of learners and courses." });
+
+  // Two ways in: a direct credit top-up ({ credits: N }), or the landing calculator
+  // ({ learners, courses }). Both buy the same £4 course-access units.
+  let quantity, description, learners = null, courses = null;
+  if (b.credits != null) {
+    quantity = Math.floor(Number(b.credits));
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > 5000)
+      return send(res, 400, { error: "Please choose a valid number of credits (1–5000)." });
+    description = quantity + " course credit" + (quantity === 1 ? "" : "s") + " — each covers one course for one carer";
+  } else {
+    learners = Math.floor(Number(b.learners));
+    courses = Math.floor(Number(b.courses));
+    if (!Number.isFinite(learners) || !Number.isFinite(courses) ||
+        learners < 1 || courses < 1 || learners > 5000 || courses > COURSE_IDS.length) {
+      return send(res, 400, { error: "Please choose a valid number of learners and courses." });
+    }
+    quantity = learners * courses;
+    description = learners + " learner(s) × " + courses + " course(s)";
   }
-  const quantity = learners * courses;
   const proto = req.headers["x-forwarded-proto"] || "https";
   const base = proto + "://" + (req.headers["host"] || "localhost");
 
@@ -406,9 +418,8 @@ route("POST", "/api/checkout/payg", async (req, res) => {
   form.set("line_items[0][price_data][currency]", "gbp");
   form.set("line_items[0][price_data][unit_amount]", String(PAYG_PENCE_PER_COURSE_PER_LEARNER));
   form.set("line_items[0][price_data][product_data][name]", "Care2Learn — pay-as-you-go course access");
-  form.set("line_items[0][price_data][product_data][description]", learners + " learner(s) × " + courses + " course(s)");
-  form.set("metadata[learners]", String(learners));
-  form.set("metadata[courses]", String(courses));
+  form.set("line_items[0][price_data][product_data][description]", description);
+  if (learners != null) { form.set("metadata[learners]", String(learners)); form.set("metadata[courses]", String(courses)); }
 
   // If the buyer is signed in (a company or a self-employed individual), tag the session
   // with their account id and the number of credits to grant, so the Stripe webhook can
@@ -611,6 +622,29 @@ function setSubscriptionStatusBySubId(subscriptionId, status) {
   console.log(`⭐ SUBSCRIPTION ${String(status).toUpperCase()}: ${org.id} (sub ${subscriptionId})`);
 }
 
+// Option-2 billing: each NEW course assignment costs 1 credit, unless the org is on an
+// active subscription (then unlimited). Callers pass how many genuinely new (learner ×
+// course) pairs they're about to create. Deducts + logs when charged. Returns one of:
+//   { allowed:true,  mode:'subscription', charged:0 }
+//   { allowed:true,  mode:'credits', charged, balance }
+//   { allowed:false, needed, have }
+function chargeForCourseAssignments(orgId, count) {
+  const org = db.prepare("SELECT credits, subscription_status FROM organisations WHERE id = ?").get(orgId);
+  const subscribed = !!org && org.subscription_status === "active";
+  if (!count || count <= 0) return { allowed: true, mode: subscribed ? "subscription" : "credits", charged: 0 };
+  if (subscribed) return { allowed: true, mode: "subscription", charged: 0 };
+  const have = (org && org.credits) || 0;
+  if (have < count) return { allowed: false, needed: count, have };
+  const balance = have - count;
+  db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(balance, orgId);
+  db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")
+    .run(genId("CR"), orgId, -count, balance, `Course assignment — ${count} credit${count === 1 ? "" : "s"}`, new Date().toISOString());
+  return { allowed: true, mode: "credits", charged: count, balance };
+}
+function creditError(needed, have) {
+  return `You need ${needed} credit${needed === 1 ? "" : "s"} to assign ${needed === 1 ? "this course" : "these courses"} (you have ${have}). Subscribe for unlimited team training, or top up your credits.`;
+}
+
 route("POST", "/api/webhooks/stripe", async (req, res) => {
   const raw = await readRawBody(req);
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -789,17 +823,23 @@ route("POST", "/api/org/staff", async (req, res) => {
               VALUES (?,?,?,?,?,?,?,1,?)`)
     .run(id, s.subject_id, b.name, b.email, b.role || "Care Assistant", pin, b.startDate || new Date().toISOString().split("T")[0], new Date().toISOString());
 
-  // Optionally assign initial courses
-  if (Array.isArray(b.courseIds)) {
-    const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts)
-                            VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
-    for (const cid of b.courseIds) {
-      if (COURSE_IDS.includes(cid)) ins.run(genId("ENR"), id, cid, new Date().toISOString(), b.dueDate || null);
+  // Optionally assign initial courses — each costs a credit unless subscribed. The staff
+  // member is always created; if credits run short, the courses are simply left unassigned.
+  let note = null;
+  const wanted = Array.isArray(b.courseIds) ? b.courseIds.filter((c) => COURSE_IDS.includes(c)) : [];
+  if (wanted.length) {
+    const charge = chargeForCourseAssignments(s.subject_id, wanted.length);
+    if (charge.allowed) {
+      const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts)
+                              VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
+      inTransaction(() => { for (const cid of wanted) ins.run(genId("ENR"), id, cid, new Date().toISOString(), b.dueDate || null); });
+    } else {
+      note = `${b.name} was added, but their ${wanted.length} course${wanted.length === 1 ? "" : "s"} weren't assigned — you need ${charge.needed} credit${charge.needed === 1 ? "" : "s"} (you have ${charge.have}). Subscribe or top up, then assign from the staff list.`;
     }
   }
 
   const member = db.prepare("SELECT * FROM staff WHERE id = ?").get(id);
-  send(res, 201, { staff: { ...member, active: !!member.active }, pin });
+  send(res, 201, { staff: { ...member, active: !!member.active }, pin, note });
 });
 
 // ── ORG: bulk-create staff from a CSV import (same fields as the manual add) ──
@@ -828,6 +868,7 @@ route("POST", "/api/org/staff/bulk", async (req, res) => {
 
   const insStaff = db.prepare(`INSERT INTO staff (id,org_id,name,email,role,pin,start_date,active,created_at) VALUES (?,?,?,?,?,?,?,1,?)`);
   const insEnr = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts) VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
+  const createdIds = [];
 
   rows.forEach((row, i) => {
     const rowNum = i + 1;
@@ -846,20 +887,31 @@ route("POST", "/api/org/staff/bulk", async (req, res) => {
     const id = genId("STF");
     const pin = genPin();
     try {
-      inTransaction(() => {
-        insStaff.run(id, s.subject_id, name, email, role, pin, startDate, new Date().toISOString());
-        for (const cid of courseIds) insEnr.run(genId("ENR"), id, cid, new Date().toISOString(), null);
-      });
+      insStaff.run(id, s.subject_id, name, email, role, pin, startDate, new Date().toISOString());
       seen.add(emailLc);
       existing.add(emailLc);
       created.push({ name, email, role, pin });
+      createdIds.push(id);
     } catch (e) {
       skipped.push({ row: rowNum, name, email, reason: "Could not be created" });
     }
   });
 
+  // Assign the chosen courses to every imported staff member — each costs a credit unless
+  // subscribed. Staff are always imported; if credits run short the courses are left off.
+  let courseNote = null;
+  if (courseIds.length && createdIds.length) {
+    const count = createdIds.length * courseIds.length;
+    const charge = chargeForCourseAssignments(s.subject_id, count);
+    if (charge.allowed) {
+      inTransaction(() => { for (const sid of createdIds) for (const cid of courseIds) insEnr.run(genId("ENR"), sid, cid, new Date().toISOString(), null); });
+    } else {
+      courseNote = `Staff imported, but the selected course${courseIds.length === 1 ? "" : "s"} weren't assigned — you need ${charge.needed} credits (you have ${charge.have}). Subscribe or top up, then assign from the staff list.`;
+    }
+  }
+
   console.log(`📥 BULK IMPORT: org ${s.subject_id} — created ${created.length}, skipped ${skipped.length}`);
-  send(res, 200, { created, skipped, summary: { total: rows.length, created: created.length, skipped: skipped.length } });
+  send(res, 200, { created, skipped, summary: { total: rows.length, created: created.length, skipped: skipped.length }, courseNote });
 });
 
 // ── ORG: update staff (deactivate/reactivate, edit) ──
@@ -928,16 +980,20 @@ route("POST", "/api/org/staff/:id/enrol", async (req, res) => {
   const courseIds = Array.isArray(b.courseIds) ? b.courseIds : (b.courseId ? [b.courseId] : []);
   if (courseIds.length === 0) return send(res, 400, { error: "Provide courseId or courseIds." });
 
+  // Only NEW courses cost a credit; ones already assigned are free (idempotent).
+  const valid = courseIds.filter((c) => COURSE_IDS.includes(c));
+  const existing = new Set(db.prepare("SELECT course_id FROM enrolments WHERE staff_id = ?").all(member.id).map((r) => r.course_id));
+  const toAdd = valid.filter((c) => !existing.has(c));
+
+  const charge = chargeForCourseAssignments(s.subject_id, toAdd.length);
+  if (!charge.allowed) return send(res, 402, { error: creditError(charge.needed, charge.have) });
+
   const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts)
                           VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
-  let added = 0;
-  for (const cid of courseIds) {
-    if (!COURSE_IDS.includes(cid)) continue;
-    const r = ins.run(genId("ENR"), member.id, cid, new Date().toISOString(), b.dueDate || null);
-    if (r.changes > 0) added++;
-  }
+  inTransaction(() => { for (const cid of toAdd) ins.run(genId("ENR"), member.id, cid, new Date().toISOString(), b.dueDate || null); });
+
   const enrolments = db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(member.id).map(shapeEnrolment);
-  send(res, 200, { added, enrolments });
+  send(res, 200, { added: toAdd.length, enrolments, mode: charge.mode, credits: charge.balance });
 });
 
 // ── ORG: bulk / role-based course assignment ──
@@ -958,15 +1014,19 @@ route("POST", "/api/org/staff/assign-courses", async (req, res) => {
   }
   if (!staff.length) return send(res, 400, { error: "There are no matching staff to assign to." });
 
+  // Only NEW (staff × course) pairs cost a credit; ones already assigned are free.
+  const pairs = [];
+  for (const m of staff) {
+    const existing = new Set(db.prepare("SELECT course_id FROM enrolments WHERE staff_id = ?").all(m.id).map((r) => r.course_id));
+    for (const cid of courseIds) if (!existing.has(cid)) pairs.push([m.id, cid]);
+  }
+  const charge = chargeForCourseAssignments(s.subject_id, pairs.length);
+  if (!charge.allowed) return send(res, 402, { error: creditError(charge.needed, charge.have) });
+
   const ins = db.prepare(`INSERT OR IGNORE INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts) VALUES (?,?,?,?,?, 'assigned', 0, 0)`);
-  let added = 0;
-  inTransaction(() => {
-    for (const m of staff) for (const cid of courseIds) {
-      const r = ins.run(genId("ENR"), m.id, cid, new Date().toISOString(), b.dueDate || null);
-      if (r.changes > 0) added++;
-    }
-  });
-  send(res, 200, { staffAffected: staff.length, enrolmentsAdded: added });
+  inTransaction(() => { for (const [sid, cid] of pairs) ins.run(genId("ENR"), sid, cid, new Date().toISOString(), b.dueDate || null); });
+
+  send(res, 200, { staffAffected: staff.length, enrolmentsAdded: pairs.length, mode: charge.mode, credits: charge.balance });
 });
 
 // ── ORG: notification settings (toggle automated reminders) ──
@@ -1079,8 +1139,15 @@ route("POST", "/api/individual/enrol", async (req, res) => {
   if (!COURSE_IDS.includes(b.courseId)) return send(res, 400, { error: "Unknown course." });
   if (db.prepare("SELECT id FROM enrolments WHERE staff_id = ? AND course_id = ?").get(member.id, b.courseId))
     return send(res, 200, { ok: true, already: true, credits: org.credits || 0 });
+  // Subscribed → unlimited, no credit charge.
+  if (org.subscription_status === "active") {
+    db.prepare(`INSERT INTO enrolments (id,staff_id,course_id,assigned_at,due_date,status,progress,attempts)
+                VALUES (?,?,?,?,?, 'assigned', 0, 0)`)
+      .run(genId("ENR"), member.id, b.courseId, new Date().toISOString(), null);
+    return send(res, 201, { ok: true, creditUsed: false, subscribed: true, credits: org.credits || 0 });
+  }
   if ((org.credits || 0) < 1)
-    return send(res, 402, { error: "You need a credit to add this course. Please buy credits first." });
+    return send(res, 402, { error: "You need a credit to add this course. Subscribe for unlimited access, or buy credits first." });
   const newBal = org.credits - 1;
   db.prepare("UPDATE organisations SET credits = ? WHERE id = ?").run(newBal, org.id);
   db.prepare("INSERT INTO credit_transactions (id,org_id,amount,balance_after,note,created_at) VALUES (?,?,?,?,?,?)")

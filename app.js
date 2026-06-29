@@ -204,6 +204,83 @@ async function startSubscribe() {
   renderOrgRegister();
 }
 
+// Header pill showing the org's plan: a green "Subscribed" badge, or the credit balance
+// (amber when empty). Always rendered; clicking opens the credits/plan modal.
+function creditPillHtml(org) {
+  if (org.subscription_status === "active") {
+    return `<button class="cred-pill" id="credpill" title="Subscription active — unlimited course assignments" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;background:rgba(39,174,96,.18);border:1px solid rgba(39,174,96,.5);color:#86EFAC">✓ Subscribed</button>`;
+  }
+  const c = org.credits || 0;
+  const style = c < 1
+    ? "background:rgba(230,126,34,.20);border:1px solid rgba(230,126,34,.6);color:#FCD34D"
+    : "background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);color:#fff";
+  return `<button class="cred-pill" id="credpill" title="Course credits — click to top up or subscribe" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;${style}">💳 ${c} credit${c === 1 ? "" : "s"}</button>`;
+}
+
+// Modal: shows the balance/plan and offers a credit top-up and/or subscribing.
+function showCreditsModal(me) {
+  const org = me.org;
+  const subscribed = org.subscription_status === "active";
+  const credits = org.credits || 0;
+  const each = PRICING.paygPerCourse;
+  const presets = [10, 25, 50, 100];
+
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:460px">
+      <div class="modal-h"><div><h2>Credits &amp; plan</h2><p>${subscribed ? "Your subscription covers unlimited course assignments." : "Each credit covers one course for one carer. Credits never expire."}</p></div><button class="x" id="close">✕</button></div>
+      <div style="padding:8px 22px 20px">
+        <div style="margin-bottom:16px">
+          ${subscribed
+            ? `<span class="pill green">✓ Subscribed · Unlimited</span>`
+            : `<span class="pill" style="background:#7C3AED18;color:#5B21B6"><b>${credits}</b> credit${credits === 1 ? "" : "s"} available</span>`}
+        </div>
+        ${subscribed ? "" : `
+          <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">Top up credits</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            ${presets.map(p => `<button class="cred-amt mini-btn" data-q="${p}">${p}</button>`).join("")}
+            <input id="credqty" type="number" min="1" max="5000" value="25" style="width:88px;padding:8px 10px;border:1px solid #D5DCE4;border-radius:8px;font-size:14px">
+          </div>
+          <div id="credtotal" style="font-size:13px;color:#5A6474;margin-bottom:12px"></div>
+          <button class="btn-save" id="buycred" style="width:100%">Buy credits</button>
+          <div style="text-align:center;margin:14px 0 4px;color:#9AA4B2;font-size:12px">— or —</div>
+        `}
+        <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:6px">${subscribed ? "Subscription" : "Go unlimited"}</div>
+        <p style="font-size:13px;color:#5A6474;line-height:1.5;margin-bottom:10px">${subscribed
+          ? "You're on the monthly subscription — assign as many courses as you like."
+          : `Subscribe for ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month and stop counting credits — unlimited course assignments for your whole team.`}</p>
+        ${subscribed ? "" : `<button class="mini-btn" id="gosub" style="width:100%">⭐ Subscribe for unlimited</button>`}
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+
+  if (!subscribed) {
+    const qtyInput = modal.querySelector("#credqty");
+    const totalEl = modal.querySelector("#credtotal");
+    const refresh = () => { const n = Math.max(1, Math.floor(Number(qtyInput.value) || 0)); totalEl.innerHTML = `${n} credit${n === 1 ? "" : "s"} × ${PRICING.currency}${each} = <b>${PRICING.currency}${(n * each).toLocaleString()}</b>`; };
+    qtyInput.oninput = refresh; refresh();
+    modal.querySelectorAll(".cred-amt").forEach(b => b.onclick = () => { qtyInput.value = b.dataset.q; refresh(); });
+    modal.querySelector("#buycred").onclick = () => { const n = Math.max(1, Math.floor(Number(qtyInput.value) || 0)); overlay.remove(); startCreditTopUp(n); };
+    const gosub = modal.querySelector("#gosub");
+    if (gosub) gosub.onclick = () => { overlay.remove(); window.open(subscribeUrl(org.id, org.email), "_blank", "noopener"); };
+  }
+}
+
+// Buy a specific number of credits via the dynamic checkout (tagged with the account,
+// so the webhook tops up the balance automatically). Falls back to the static link.
+async function startCreditTopUp(credits) {
+  toast("Setting up secure checkout…");
+  try {
+    const data = await api("/checkout/payg", "POST", { credits });
+    if (data && data.url) { window.location.href = data.url; return; }
+  } catch (e) { /* fall back to the static payment link */ }
+  window.open(STRIPE_PAYG_LINK, "_blank", "noopener");
+}
+
 // Build the interactive pricing calculator for the landing page.
 function buildCalculator() {
   const courseCount = state.courses.length;
@@ -795,6 +872,7 @@ async function renderOrgDash() {
         <div class="dash-brand"><span class="dash-logo">${logoMark(26, false)}</span><div><div class="dash-org">${esc(org.name)}</div><div class="dash-sub">Care2Learn · Organisation Portal</div></div></div>
         <nav class="dash-nav" id="nav"></nav>
         <div class="dash-actions">
+          ${creditPillHtml(org)}
           <button class="feedback-btn" id="feedback">💬 Feedback</button>
           <button class="logout" id="logout">Log Out</button>
         </div>
@@ -811,6 +889,8 @@ async function renderOrgDash() {
   });
   document.getElementById("logout").onclick = async () => { await api("/logout","POST").catch(()=>{}); clearAuth(); renderLanding(); };
   document.getElementById("feedback").onclick = () => openFeedbackModal("Organisation portal");
+  const credpill = document.getElementById("credpill");
+  if (credpill) credpill.onclick = () => showCreditsModal(me);
 
   await paintOrgTab(org);
 }
@@ -1077,9 +1157,9 @@ function showAddStaffForm(slot) {
     };
     if (!payload.name || !payload.email) { errBox.innerHTML = `<div class="err">Name and email are required.</div>`; return; }
     try {
-      const { pin } = await api("/org/staff", "POST", payload);
+      const resp = await api("/org/staff", "POST", payload);
       slot.innerHTML = "";
-      toast(`✓ Licence created. Login PIN: ${pin}`);
+      toast(resp.note ? `✓ Licence created (PIN ${resp.pin}). ${resp.note}` : `✓ Licence created. Login PIN: ${resp.pin}`);
       paintOrgTab(null);
     } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
@@ -1236,6 +1316,7 @@ async function showBulkImportForm() {
     const region = modal.querySelector("#ibody");
     region.innerHTML =
       `<div class="ok-banner" style="margin-bottom:14px"><b>${summary.created}</b> staff added, each with a login PIN below.${summary.skipped ? ` <b>${summary.skipped}</b> skipped.` : ""}</div>` +
+      (result.courseNote ? `<div class="ok-banner" style="margin-bottom:14px;background:#E67E2218;border-color:#E67E2244;color:#7D5310">${esc(result.courseNote)}</div>` : "") +
       (created.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px"><b style="font-size:14px">New login PINs</b><button class="mini-btn" id="dlpins">⬇ Download PINs (CSV)</button></div><div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>PIN</th></tr></thead><tbody>${createdRows}</tbody></table></div>` : "") +
       (skipped.length ? `<div style="margin-top:14px"><b style="font-size:14px">Skipped rows</b><div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>Reason</th></tr></thead><tbody>${skippedRows}</tbody></table></div></div>` : "") +
       `<div class="form-actions" style="margin-top:14px"><button class="btn-save" id="done">Done</button></div>`;
@@ -1247,10 +1328,12 @@ async function showBulkImportForm() {
 
 // ─── BULK / ROLE-BASED COURSE ASSIGNMENT (organisations only) ─────────────────
 async function showAssignCourses() {
-  let staff = [];
-  try { const r = await api("/org/staff"); staff = (r.staff || []).filter(s => s.active); }
+  let staff = [], me = null;
+  try { const r = await api("/org/staff"); staff = (r.staff || []).filter(s => s.active); me = await api("/org/me"); }
   catch (e) { toast("Couldn't load staff."); return; }
   if (!staff.length) { toast("Add staff before assigning courses."); return; }
+  const subscribed = !!me && me.org && me.org.subscription_status === "active";
+  const credits = (me && me.org && me.org.credits) || 0;
 
   const roleCounts = {};
   staff.forEach(s => { const r = s.role || "Care Assistant"; roleCounts[r] = (roleCounts[r] || 0) + 1; });
@@ -1296,9 +1379,27 @@ async function showAssignCourses() {
   const chosenCourses = () => [...modal.querySelectorAll("#coursegrid input:checked")].map(c => c.value);
   const chosenRoles = () => [...modal.querySelectorAll(".rolecb:checked")].map(c => c.value);
   const affected = () => { if (targetVal() === "all") return staff.length; const set = new Set(chosenRoles()); return staff.filter(s => set.has(s.role || "Care Assistant")).length; };
+  // How many genuinely new (staff × course) assignments the current selection would create.
+  const newPairCount = () => {
+    const courses = chosenCourses(); if (!courses.length) return 0;
+    const set = new Set(chosenRoles());
+    const targetStaff = targetVal() === "all" ? staff : staff.filter(s => set.has(s.role || "Care Assistant"));
+    let n = 0;
+    for (const m of targetStaff) { const have = new Set((m.enrolments || []).map(e => e.courseId)); for (const cid of courses) if (!have.has(cid)) n++; }
+    return n;
+  };
   function refreshCount() {
     const nC = chosenCourses().length, nS = affected();
-    countEl.textContent = (nC && nS) ? `Will assign ${nC} course${nC === 1 ? "" : "s"} to ${nS} staff member${nS === 1 ? "" : "s"}.` : "Choose courses and who should receive them.";
+    if (!nC || !nS) { countEl.textContent = "Choose courses and who should receive them."; countEl.style.color = ""; return; }
+    const newPairs = newPairCount();
+    if (subscribed) {
+      countEl.innerHTML = `Will assign ${nC} course${nC === 1 ? "" : "s"} to ${nS} staff member${nS === 1 ? "" : "s"} · <b>included in your subscription</b>`;
+      countEl.style.color = "";
+    } else {
+      const short = newPairs > credits;
+      countEl.innerHTML = `Will assign ${nC} course${nC === 1 ? "" : "s"} to ${nS} staff member${nS === 1 ? "" : "s"} · <b>${newPairs} credit${newPairs === 1 ? "" : "s"}</b>${newPairs > 0 ? ` (you have ${credits})` : ""}${short ? " — not enough" : ""}`;
+      countEl.style.color = short ? "#B91C1C" : "";
+    }
   }
   modal.querySelectorAll("input[name=target]").forEach(r => r.onchange = () => { roleg.classList.toggle("hidden", targetVal() !== "roles"); refreshCount(); });
   modal.querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", refreshCount));
@@ -1313,7 +1414,9 @@ async function showAssignCourses() {
     try {
       const r = await api("/org/staff/assign-courses", "POST", { courseIds, target, roles: roles2 });
       overlay.remove();
-      toast(`✓ Assigned to ${r.staffAffected} staff · ${r.enrolmentsAdded} new assignment${r.enrolmentsAdded === 1 ? "" : "s"}.`);
+      toast(r.mode === "subscription"
+        ? `✓ Assigned to ${r.staffAffected} staff · ${r.enrolmentsAdded} new (included in your subscription).`
+        : `✓ Assigned to ${r.staffAffected} staff · ${r.enrolmentsAdded} new · ${r.enrolmentsAdded} credit${r.enrolmentsAdded === 1 ? "" : "s"} used${typeof r.credits === "number" ? `, ${r.credits} left` : ""}.`);
       paintOrgTab(null);
     } catch (e) { err.innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = "Assign"; }
   };
@@ -1419,7 +1522,8 @@ async function openStaffModal(staffId) {
     assignSlot.appendChild(sel);
     assignSlot.appendChild(btn);
     btn.onclick = async () => {
-      await api(`/org/staff/${s.id}/enrol`, "POST", { courseId: sel.value });
+      try { await api(`/org/staff/${s.id}/enrol`, "POST", { courseId: sel.value }); }
+      catch (e) { toast(e.message); return; }
       overlay.remove();
       toast("Course assigned.");
       paintOrgTab(null);
