@@ -183,6 +183,44 @@ function attentionItems(staffId) {
   return items;
 }
 
+// Outstanding training for a MANUAL manager nudge. Broader than attentionItems:
+// includes not-started / in-progress / failed too, since the manager is choosing
+// to reach out — anything that isn't completed-and-in-date is listed.
+const NUDGE_COOLDOWN_HOURS = 4;
+function outstandingForNudge(staffId) {
+  const today = todayStr();
+  const items = [];
+  for (const row of db.prepare("SELECT * FROM enrolments WHERE staff_id = ?").all(staffId)) {
+    const e = shapeEnrolment(row);
+    if (e.compliance === "valid") continue; // already done and in date
+    let reason;
+    if (e.compliance === "expired") reason = "Expired — needs renewing";
+    else if (e.compliance === "expiring") reason = `Expires in ${e.daysUntilExpiry} day${e.daysUntilExpiry === 1 ? "" : "s"}`;
+    else if (e.compliance === "in_progress") reason = "In progress";
+    else if (e.compliance === "failed") reason = "Needs another attempt";
+    else if (row.due_date && row.due_date < today) reason = "Overdue";
+    else if (row.due_date) { const d = daysUntil(row.due_date); reason = `Due in ${d} day${d === 1 ? "" : "s"}`; }
+    else reason = "Not started";
+    items.push({ title: e.courseTitle, reason });
+  }
+  return items;
+}
+
+async function sendStaffNudge(org, member, items) {
+  const link = appBase();
+  const lines = items.map((i) => `• ${i.title} — ${i.reason}`).join("\n");
+  const text = `Hi ${member.name},\n\n${org.name} would like you to complete your outstanding training on Care2Learn:\n\n${lines}\n\nLog in to get started:\n${link}\n\nThank you,\n${org.name}`;
+  const li = items.map((i) => `<li><b>${escapeHtml(i.title)}</b> — ${escapeHtml(i.reason)}</li>`).join("");
+  const html = `<div style="font-family:'Segoe UI',system-ui,sans-serif;color:#1A1A2E;line-height:1.6;max-width:560px">
+    <p>Hi ${escapeHtml(member.name)},</p>
+    <p><b>${escapeHtml(org.name)}</b> would like you to complete your outstanding training on Care2Learn:</p>
+    <ul>${li}</ul>
+    <p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 22px;background:#1B2A4A;color:#fff;border-radius:10px;text-decoration:none;font-weight:700">Log in to Care2Learn</a></p>
+    <p style="color:#5A6474">Thank you,<br>${escapeHtml(org.name)}</p>
+  </div>`;
+  return sendEmail({ to: member.email, subject: "A reminder to complete your training", text, html });
+}
+
 // Summarise an org's active team for the manager digest.
 function managerDigest(org) {
   const staff = db.prepare("SELECT * FROM staff WHERE org_id = ? AND active = 1").all(org.id);
@@ -810,6 +848,31 @@ route("POST", "/api/org/staff/:id/reset-pin", async (req, res) => {
   const pin = genPin();
   db.prepare("UPDATE staff SET pin = ? WHERE id = ?").run(pin, member.id);
   send(res, 200, { ok: true, pin, staff: { id: member.id, name: member.name, email: member.email } });
+});
+
+// ── ORG: manually nudge a staff member to complete their outstanding training ──
+route("POST", "/api/org/staff/:id/nudge", async (req, res) => {
+  const s = authSession(req);
+  if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
+  const org = db.prepare("SELECT * FROM organisations WHERE id = ?").get(s.subject_id);
+  const member = db.prepare("SELECT * FROM staff WHERE id = ? AND org_id = ?").get(req.params.id, s.subject_id);
+  if (!member) return send(res, 404, { error: "Staff member not found." });
+  if (!member.active) return send(res, 400, { error: "This staff member's licence is deactivated." });
+  if (!member.email) return send(res, 400, { error: "This staff member has no email address on file." });
+
+  const items = outstandingForNudge(member.id);
+  if (!items.length) return send(res, 200, { sent: false, message: `${member.name} is fully up to date — nothing to nudge about.` });
+
+  const last = lastReminded(member.id, "nudge");
+  const hrsSince = last ? (Date.now() - new Date(last).getTime()) / 3600000 : Infinity;
+  if (hrsSince < NUDGE_COOLDOWN_HOURS) {
+    const wait = Math.max(1, Math.ceil(NUDGE_COOLDOWN_HOURS - hrsSince));
+    return send(res, 200, { sent: false, message: `You nudged ${member.name} recently — you can nudge again in about ${wait} hour${wait === 1 ? "" : "s"}.` });
+  }
+
+  const r = await sendStaffNudge(org, member, items);
+  markReminded(member.id, "nudge");
+  send(res, 200, { sent: true, delivered: !!(r && r.sent), message: `Nudge sent to ${member.name}.`, courses: items.length });
 });
 
 // ── ORG: assign a course to a staff member (enrol) ──

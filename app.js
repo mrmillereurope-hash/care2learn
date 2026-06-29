@@ -885,11 +885,19 @@ async function paintOrgTab(org) {
             </div>
             <span class="row-actions">
               <button class="abtn" data-act="view">Manage</button>
+              ${s.active && s.assignedCount > 0 && !s.compliant ? `<button class="abtn" data-act="nudge">Nudge</button>` : ""}
               ${s.active ? `<button class="abtn danger" data-act="deact">Deactivate</button>` : `<button class="abtn" data-act="react">Reactivate</button>`}
             </span>
           </div>
         `);
         row.querySelector('[data-act="view"]').onclick = () => openStaffModal(s.id);
+        const nudge = row.querySelector('[data-act="nudge"]');
+        if (nudge) nudge.onclick = async () => {
+          nudge.disabled = true; const t = nudge.textContent; nudge.textContent = "Sending…";
+          try { const r = await api(`/org/staff/${s.id}/nudge`, "POST"); toast(r.message + (r.sent && !r.delivered ? " (Email isn't set up yet, so it was logged on the server.)" : "")); }
+          catch (e) { toast(e.message); }
+          nudge.disabled = false; nudge.textContent = t;
+        };
         const deact = row.querySelector('[data-act="deact"]');
         if (deact) deact.onclick = async () => { await api(`/org/staff/${s.id}`,"PATCH",{active:false}); toast(`${s.name}'s licence deactivated.`); paintOrgTab(org); };
         const react = row.querySelector('[data-act="react"]');
@@ -1291,6 +1299,7 @@ async function openStaffModal(staffId) {
 
   const assignedIds = s.enrolments.map(e => e.courseId);
   const available = state.courses.filter(c => !assignedIds.includes(c.id));
+  const hasOutstanding = s.enrolments.some(e => e.compliance !== "valid");
 
   const overlay = el(`<div class="overlay"></div>`);
   const modal = el(`
@@ -1306,6 +1315,7 @@ async function openStaffModal(staffId) {
         <span class="pin-chip">PIN <b id="pinval">${esc(s.pin)}</b></span>
         <button class="mini-btn" id="resetpin">🔑 Reset PIN</button>
         <button class="mini-btn" id="remindpin">✉️ Email reminder</button>
+        ${hasOutstanding ? `<button class="mini-btn" id="nudgebtn">📣 Nudge to complete</button>` : ""}
       </div>
 
       <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5"><b style="font-size:15px">Assigned Courses</b></div>
@@ -1322,6 +1332,13 @@ async function openStaffModal(staffId) {
   modal.querySelector("#close").onclick = () => overlay.remove();
 
   modal.querySelector("#remindpin").onclick = () => pinReminderMailto(s.name, s.email, s.pin, c2lOrgName);
+  const nudgeBtn = modal.querySelector("#nudgebtn");
+  if (nudgeBtn) nudgeBtn.onclick = async () => {
+    nudgeBtn.disabled = true; const t = nudgeBtn.textContent; nudgeBtn.textContent = "Sending…";
+    try { const r = await api(`/org/staff/${s.id}/nudge`, "POST"); toast(r.message + (r.sent && !r.delivered ? " (Logged on the server — email isn't set up yet.)" : "")); }
+    catch (e) { toast(e.message); }
+    nudgeBtn.disabled = false; nudgeBtn.textContent = t;
+  };
   modal.querySelector("#resetpin").onclick = async () => {
     if (!confirm(`Reset ${s.name}'s PIN? Their current PIN will stop working immediately.`)) return;
     let r; try { r = await api(`/org/staff/${s.id}/reset-pin`, "POST"); } catch (e) { toast(e.message); return; }
