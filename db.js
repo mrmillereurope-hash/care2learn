@@ -201,6 +201,19 @@ export function initSchema() {
   if (!orgCols.some((c) => c.name === "reminders_enabled")) {
     db.exec("ALTER TABLE organisations ADD COLUMN reminders_enabled INTEGER NOT NULL DEFAULT 1");
   }
+  // Stripe subscription state — set automatically by the webhook when a subscription checkout completes.
+  if (!orgCols.some((c) => c.name === "subscription_status")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN subscription_status TEXT");           // 'active' | 'past_due' | 'canceled' | NULL
+  }
+  if (!orgCols.some((c) => c.name === "stripe_subscription_id")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN stripe_subscription_id TEXT");
+  }
+  if (!orgCols.some((c) => c.name === "stripe_customer_id")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN stripe_customer_id TEXT");
+  }
+  if (!orgCols.some((c) => c.name === "subscription_updated_at")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN subscription_updated_at TEXT");
+  }
   // Backfill a unique referral code for any account that doesn't have one yet.
   backfillReferralCodes();
 }

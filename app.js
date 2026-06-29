@@ -164,6 +164,8 @@ function fmtMoney(pence) {
 
 // Stripe payment link used as a fallback if server-side checkout is unavailable.
 const STRIPE_PAYG_LINK = "https://buy.stripe.com/3cIfZg48PeVm93ncMOdZ602";
+// Stripe payment link for the monthly subscription (per-learner, volume-tiered).
+const STRIPE_SUB_LINK = "https://buy.stripe.com/28E00i5cT4gIdjD7sudZ603";
 
 // Start pay-as-you-go checkout: ask the server to create a Stripe session for the
 // exact amount (learners × courses × £4). If the server can't (not reachable, or the
@@ -181,6 +183,25 @@ async function startPaygCheckout(learners, courses) {
     if (data && data.url) { window.location.href = data.url; return; }
   } catch (e) { /* fall through to the static payment link */ }
   window.open(STRIPE_PAYG_LINK, "_blank", "noopener");
+}
+
+// Build the subscription Payment Link URL, tagged with the org's id (so the Stripe
+// webhook can mark the right account subscribed) and their email (pre-filled at checkout).
+function subscribeUrl(orgId, email) {
+  const u = new URL(STRIPE_SUB_LINK);
+  if (orgId) u.searchParams.set("client_reference_id", orgId);
+  if (email) u.searchParams.set("prefilled_email", email);
+  return u.toString();
+}
+// Subscription CTA: a signed-in organisation goes straight to a tagged checkout; a
+// logged-out visitor registers first, then subscribes from Settings — so the payment
+// is always linked to an account and fulfils automatically via the webhook.
+async function startSubscribe() {
+  if (state.token && state.kind === "org") {
+    try { const me = await api("/org/me"); window.location.href = subscribeUrl(me.org.id, me.org.email); return; }
+    catch (e) { /* fall through to registration */ }
+  }
+  renderOrgRegister();
 }
 
 // Build the interactive pricing calculator for the landing page.
@@ -288,7 +309,7 @@ function buildCalculator() {
     }
     card.querySelector("#plan-cta").onclick = (calc.mode === "payg")
       ? () => startPaygCheckout(calc.learners, calc.courses)
-      : renderOrgRegister;
+      : () => startSubscribe();
   }
 
   wrap.querySelectorAll(".plan-toggle button").forEach(b => {
@@ -973,7 +994,12 @@ async function paintOrgTab(org) {
       </div>
       <div class="scard" style="margin-top:16px">
         <h3>Subscription</h3>
-        <div style="padding:0 20px 16px"><span class="pill" style="background:#2980B918;color:#1A5276">Standard Plan</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Unlimited staff licences · All ${state.courses.length} mandatory courses · Course assignment · Progress tracking · Certificate generation · CQC compliance report</p></div>
+        <div style="padding:0 20px 16px">
+          ${o.subscription_status === "active"
+            ? `<span class="pill green">✓ Subscribed</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Your monthly subscription is active — all ${state.courses.length} mandatory courses, unlimited staff licences, assignments, certificates and CQC reporting are included.</p>`
+            : `<span class="pill" style="background:#2980B918;color:#1A5276">Pay as you go</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin:8px 0 12px">Subscribe for just ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month to cover your whole team — every mandatory course included, with volume discounts as you grow.</p><button class="mini-btn" id="subscribe">⭐ Subscribe</button>`
+          }
+        </div>
       </div>
       <div class="scard" style="margin-top:16px"><h3>Notifications</h3>
         <div style="padding:0 20px 16px">
@@ -989,6 +1015,8 @@ async function paintOrgTab(org) {
       </div>
     `));
     document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
+    const subBtn = document.getElementById("subscribe");
+    if (subBtn) subBtn.onclick = () => window.open(subscribeUrl(o.id, o.email), "_blank", "noopener");
     const remToggle = document.getElementById("remtoggle");
     if (remToggle) remToggle.onchange = async () => {
       try { await api("/org/settings", "POST", { remindersEnabled: remToggle.checked }); toast(remToggle.checked ? "Reminders turned on." : "Reminders turned off."); }

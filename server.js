@@ -593,6 +593,24 @@ function grantStripeCredits(sessionId, orgId, credits) {
   if (credits > 0) autoPayReferralOnPurchase(orgId);
 }
 
+// Mark an organisation as subscribed (idempotent) when a subscription checkout completes.
+function markSubscriptionActive(orgId, subscriptionId, customerId) {
+  const org = db.prepare("SELECT id FROM organisations WHERE id = ?").get(orgId);
+  if (!org) { console.warn(`⚠ Subscription checkout references unknown account ${orgId} — ignored.`); return; }
+  db.prepare("UPDATE organisations SET subscription_status = 'active', stripe_subscription_id = ?, stripe_customer_id = ?, subscription_updated_at = ? WHERE id = ?")
+    .run(subscriptionId || null, customerId || null, new Date().toISOString(), orgId);
+  console.log(`⭐ SUBSCRIPTION ACTIVE: ${orgId} (sub ${subscriptionId || "n/a"})`);
+}
+// Keep an org's subscription status in step with Stripe, matched by Stripe subscription id.
+function setSubscriptionStatusBySubId(subscriptionId, status) {
+  if (!subscriptionId) return;
+  const org = db.prepare("SELECT id FROM organisations WHERE stripe_subscription_id = ?").get(subscriptionId);
+  if (!org) return; // not one of ours, or not linked yet
+  db.prepare("UPDATE organisations SET subscription_status = ?, subscription_updated_at = ? WHERE stripe_subscription_id = ?")
+    .run(status, new Date().toISOString(), subscriptionId);
+  console.log(`⭐ SUBSCRIPTION ${String(status).toUpperCase()}: ${org.id} (sub ${subscriptionId})`);
+}
+
 route("POST", "/api/webhooks/stripe", async (req, res) => {
   const raw = await readRawBody(req);
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -609,14 +627,33 @@ route("POST", "/api/webhooks/stripe", async (req, res) => {
   if (event.type === "checkout.session.completed") {
     const session = event.data && event.data.object ? event.data.object : {};
     const paid = session.payment_status === "paid" || session.status === "complete";
-    const accountId = session.metadata && session.metadata.account_id;
-    const credits = parseInt((session.metadata && session.metadata.credits) || "0", 10);
-    if (paid && accountId && Number.isFinite(credits) && credits > 0) {
-      try { grantStripeCredits(session.id, accountId, credits); }
-      catch (e) { console.error("Stripe auto-credit failed:", e.message); }
-    } else if (paid && !accountId) {
-      console.log(`ℹ Stripe payment ${session.id} completed without an account_id — no credits granted (untagged purchase).`);
+
+    if (session.mode === "subscription") {
+      // Subscription paid via the Payment Link — client_reference_id carries the org id.
+      const orgId = session.client_reference_id;
+      if (paid && orgId) {
+        try { markSubscriptionActive(orgId, session.subscription, session.customer); }
+        catch (e) { console.error("Subscription activation failed:", e.message); }
+      } else if (paid && !orgId) {
+        console.log(`ℹ Subscription ${session.id} completed without a client_reference_id — can't link it to an account.`);
+      }
+    } else {
+      // One-off pay-as-you-go credit purchase (existing behaviour).
+      const accountId = session.metadata && session.metadata.account_id;
+      const credits = parseInt((session.metadata && session.metadata.credits) || "0", 10);
+      if (paid && accountId && Number.isFinite(credits) && credits > 0) {
+        try { grantStripeCredits(session.id, accountId, credits); }
+        catch (e) { console.error("Stripe auto-credit failed:", e.message); }
+      } else if (paid && !accountId) {
+        console.log(`ℹ Stripe payment ${session.id} completed without an account_id — no credits granted (untagged purchase).`);
+      }
     }
+  } else if (event.type === "customer.subscription.deleted") {
+    const sub = event.data && event.data.object ? event.data.object : {};
+    setSubscriptionStatusBySubId(sub.id, "canceled");
+  } else if (event.type === "customer.subscription.updated") {
+    const sub = event.data && event.data.object ? event.data.object : {};
+    setSubscriptionStatusBySubId(sub.id, sub.status || "active");
   }
   // Always acknowledge so Stripe doesn't keep retrying events we've already seen.
   send(res, 200, { received: true });
@@ -674,7 +711,7 @@ route("POST", "/api/org/login", async (req, res) => {
 route("GET", "/api/org/me", async (req, res) => {
   const s = authSession(req);
   if (!s || s.kind !== "org") return send(res, 401, { error: "Not authenticated as an organisation." });
-  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,reminders_enabled FROM organisations WHERE id = ?").get(s.subject_id);
+  const org = db.prepare("SELECT id,name,email,phone,address,cqc_number,created_at,credits,reminders_enabled,subscription_status FROM organisations WHERE id = ?").get(s.subject_id);
   if (!org) return send(res, 404, { error: "Organisation not found." });
 
   const staff = db.prepare("SELECT * FROM staff WHERE org_id = ?").all(org.id);
