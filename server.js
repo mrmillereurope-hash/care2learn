@@ -350,6 +350,28 @@ route("GET", "/api/health", async (req, res) => {
   send(res, 200, { ok: true, time: new Date().toISOString() });
 });
 
+// ── PUBLIC: demo / contact-form enquiries from the marketing site ──
+// Stores the enquiry so no lead is lost, and logs it to the console (visible in
+// Render logs) for immediate visibility. Email delivery can be added later once
+// the Resend integration is configured.
+route("POST", "/api/contact", async (req, res) => {
+  const b = await readBody(req);
+  const name = (b.name || "").toString().trim();
+  const email = (b.email || "").toString().trim();
+  const org = (b.org || "").toString().trim();
+  const message = (b.message || "").toString().trim();
+  if (!name || !email) return send(res, 400, { error: "Please add your name and email so we can get back to you." });
+  if (!/.+@.+\..+/.test(email)) return send(res, 400, { error: "That email address doesn't look right — please check it." });
+  if (name.length > 200 || email.length > 200 || org.length > 200 || message.length > 4000) {
+    return send(res, 400, { error: "That's a bit longer than expected — please shorten your message." });
+  }
+  const id = genId("ENQ");
+  db.prepare(`INSERT INTO enquiries (id,name,email,org,message,created_at) VALUES (?,?,?,?,?,?)`)
+    .run(id, name, email, org || null, message || null, new Date().toISOString());
+  console.log(`📩 DEMO ENQUIRY — ${name} <${email}>${org ? " · " + org : ""}${message ? "\n   “" + message.slice(0, 300) + "”" : ""}`);
+  send(res, 201, { ok: true });
+});
+
 // ── PUBLIC: pay-as-you-go Stripe checkout ──
 // Creates a Stripe Checkout Session for the exact amount the calculator shows:
 // £4 per course, per learner → quantity = learners × courses at £4 each.
@@ -436,8 +458,8 @@ route("POST", "/api/checkout/payg", async (req, res) => {
 
   const form = new URLSearchParams();
   form.set("mode", "payment");
-  form.set("success_url", base + "/?checkout=success&session_id={CHECKOUT_SESSION_ID}");
-  form.set("cancel_url", base + "/?checkout=cancelled");
+  form.set("success_url", base + "/app?checkout=success&session_id={CHECKOUT_SESSION_ID}");
+  form.set("cancel_url", base + "/app?checkout=cancelled");
   form.set("line_items[0][quantity]", String(quantity));
   form.set("line_items[0][price_data][currency]", "gbp");
   form.set("line_items[0][price_data][unit_amount]", String(PAYG_PENCE_PER_COURSE_PER_LEARNER));
@@ -1904,7 +1926,13 @@ const PUBLIC_DIR = fs.existsSync(path.join(__dirname, "public", "index.html"))
 console.log("Serving front-end files from:", PUBLIC_DIR);
 
 function serveStatic(req, res, urlPath) {
-  let filePath = path.join(PUBLIC_DIR, urlPath === "/" ? "index.html" : urlPath);
+  // Public marketing landing lives at "/"; the application shell lives at "/app".
+  // Anything else is treated as a real file path (app.js, images, etc.).
+  let rel;
+  if (urlPath === "/") rel = "home.html";
+  else if (urlPath === "/app" || urlPath === "/app/") rel = "index.html";
+  else rel = urlPath;
+  let filePath = path.join(PUBLIC_DIR, rel);
   // prevent path traversal
   if (!filePath.startsWith(PUBLIC_DIR)) {
     return send(res, 403, { error: "Forbidden" });

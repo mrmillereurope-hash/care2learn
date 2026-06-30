@@ -174,6 +174,17 @@ export function initSchema() {
       created_at TEXT NOT NULL,
       read_at    TEXT
     );
+
+    -- Demo / contact-form enquiries submitted from the public marketing site.
+    CREATE TABLE IF NOT EXISTS enquiries (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      email      TEXT NOT NULL,
+      org        TEXT,
+      message    TEXT,
+      created_at TEXT NOT NULL,
+      handled_at TEXT
+    );
   `);
 
   // Migrations on the organisations table (idempotent — safe to re-run).
