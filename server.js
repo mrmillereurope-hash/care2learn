@@ -384,6 +384,30 @@ function createStripeCheckout(form) {
   });
 }
 
+// Retrieve a Checkout Session from Stripe (used to verify a payment when the buyer
+// returns to the app, as a reliable backup to the webhook).
+function retrieveStripeSession(sessionId) {
+  return new Promise((resolve, reject) => {
+    const sreq = https.request({
+      hostname: "api.stripe.com",
+      path: "/v1/checkout/sessions/" + encodeURIComponent(sessionId),
+      method: "GET",
+      headers: { "Authorization": "Bearer " + process.env.STRIPE_SECRET_KEY },
+    }, (sres) => {
+      let data = "";
+      sres.on("data", (c) => (data += c));
+      sres.on("end", () => {
+        let json;
+        try { json = JSON.parse(data); } catch { return reject(new Error("Invalid response from Stripe")); }
+        if (sres.statusCode >= 200 && sres.statusCode < 300) resolve(json);
+        else reject(new Error((json.error && json.error.message) || ("Stripe error " + sres.statusCode)));
+      });
+    });
+    sreq.on("error", reject);
+    sreq.end();
+  });
+}
+
 route("POST", "/api/checkout/payg", async (req, res) => {
   if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
 
@@ -412,7 +436,7 @@ route("POST", "/api/checkout/payg", async (req, res) => {
 
   const form = new URLSearchParams();
   form.set("mode", "payment");
-  form.set("success_url", base + "/?checkout=success");
+  form.set("success_url", base + "/?checkout=success&session_id={CHECKOUT_SESSION_ID}");
   form.set("cancel_url", base + "/?checkout=cancelled");
   form.set("line_items[0][quantity]", String(quantity));
   form.set("line_items[0][price_data][currency]", "gbp");
@@ -447,6 +471,56 @@ route("POST", "/api/checkout/payg", async (req, res) => {
     console.error("Stripe checkout error:", e.message);
     send(res, 502, { error: "Could not start checkout. Please try again." });
   }
+});
+
+// ── Reconcile a checkout the instant the buyer returns to the app ──
+// A reliable backup to the webhook: we ask Stripe directly whether the session was paid,
+// then apply the same effect (credits or subscription) the webhook would. Idempotent via
+// grantStripeCredits, so it's safe even if the webhook also fires for the same session.
+route("POST", "/api/checkout/confirm", async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
+  const sess = authSession(req);
+  if (!sess) return send(res, 401, { error: "Not authenticated." });
+
+  // Resolve the caller's account (an organisation, or a self-employed individual's account).
+  let accountId = null;
+  if (sess.kind === "org") accountId = sess.subject_id;
+  else if (sess.kind === "staff") {
+    const st = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(sess.subject_id);
+    if (st) accountId = st.org_id;
+  }
+  if (!accountId) return send(res, 400, { error: "No account to credit." });
+
+  const b = await readBody(req);
+  const sessionId = String(b.sessionId || "").trim();
+  if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) return send(res, 400, { error: "Invalid session id." });
+
+  let session;
+  try { session = await retrieveStripeSession(sessionId); }
+  catch (e) { console.error("Checkout confirm — retrieve failed:", e.message); return send(res, 502, { error: "Could not verify the payment yet. Please refresh in a moment." }); }
+
+  const paid = session.payment_status === "paid" || session.status === "complete";
+  if (!paid) return send(res, 200, { ok: true, pending: true });
+
+  if (session.mode === "subscription") {
+    if (session.client_reference_id === accountId) {
+      try { markSubscriptionActive(accountId, session.subscription, session.customer); }
+      catch (e) { console.error("Confirm subscription failed:", e.message); }
+    }
+    return send(res, 200, { ok: true, mode: "subscription", subscribed: true });
+  }
+
+  // One-off credit purchase: only honour a session that was tagged for THIS account.
+  const tagged = session.metadata && session.metadata.account_id;
+  const credits = parseInt((session.metadata && session.metadata.credits) || "0", 10);
+  if (tagged !== accountId) return send(res, 200, { ok: true, mismatch: true });
+  const before = ((db.prepare("SELECT credits FROM organisations WHERE id = ?").get(accountId)) || {}).credits || 0;
+  if (Number.isFinite(credits) && credits > 0) {
+    try { grantStripeCredits(session.id, accountId, credits); }
+    catch (e) { console.error("Confirm credit grant failed:", e.message); }
+  }
+  const nowBal = ((db.prepare("SELECT credits FROM organisations WHERE id = ?").get(accountId)) || {}).credits || 0;
+  send(res, 200, { ok: true, mode: "credits", granted: nowBal > before, added: Math.max(0, nowBal - before), credits: nowBal });
 });
 
 // ── Stripe webhook: auto-credit accounts when a payment succeeds ──

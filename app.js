@@ -99,12 +99,45 @@ function logoMark(size, dark) {
 }
 
 // ── Checkout return handling ──
+let pendingCheckout = null; // { status, sessionId } captured from the Stripe return URL
+
 function checkCheckoutResult() {
-  const c = new URLSearchParams(location.search).get("checkout");
+  const params = new URLSearchParams(location.search);
+  const c = params.get("checkout");
   if (!c) return;
+  const sessionId = params.get("session_id") || null;
   history.replaceState(null, "", location.pathname);
-  if (c === "success") toast("Payment received — thank you! We'll email you with access details shortly.");
-  else if (c === "cancelled") toast("Checkout cancelled — no payment was taken.");
+  if (c === "cancelled") { toast("Checkout cancelled — no payment was taken."); return; }
+  if (c === "success") {
+    pendingCheckout = { status: "success", sessionId };
+    // No session id to verify (e.g. a static payment link) → acknowledge now; the webhook
+    // remains the fallback. With a session id, confirmPendingCheckout() handles it precisely.
+    if (!sessionId) toast("Payment received — thank you! Your account will update shortly.");
+  }
+}
+
+// After returning from a successful checkout, verify it with the server and apply the
+// result (credits or subscription) immediately — a reliable backup to the Stripe webhook.
+async function confirmPendingCheckout() {
+  if (!pendingCheckout || pendingCheckout.status !== "success" || !pendingCheckout.sessionId) return;
+  const { sessionId } = pendingCheckout;
+  pendingCheckout = null; // run once
+  try {
+    const r = await api("/checkout/confirm", "POST", { sessionId });
+    if (r.mode === "subscription" && r.subscribed) {
+      toast("✓ You're subscribed — unlimited course assignments are now active.");
+    } else if (r.mode === "credits") {
+      if (r.granted && r.added > 0) toast(`✓ Payment received — ${r.added} credit${r.added === 1 ? "" : "s"} added. You now have ${r.credits}.`);
+      else toast(`✓ Payment received — your credits are up to date (${r.credits}).`);
+    } else if (r.pending) {
+      toast("Payment received — we're confirming it now; your balance will update in a moment.");
+    } else {
+      toast("Payment received — thank you!");
+    }
+  } catch (e) {
+    // Verification couldn't run (e.g. the secret key isn't set) — don't block the dashboard.
+    toast("Payment received — thank you! Your balance will update shortly.");
+  }
 }
 
 // ── Boot ──
@@ -861,6 +894,7 @@ function showReferralTerms() {
 }
 
 async function renderOrgDash() {
+  await confirmPendingCheckout();
   const me = await api("/org/me");
   const org = me.org;
   c2lOrgName = org.name;
