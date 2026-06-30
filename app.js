@@ -170,6 +170,14 @@ async function boot() {
   if (state.token && state.kind === "staff") {
     try { await renderStaffPortal(); return; } catch (e) { clearAuth(); }
   }
+  // Deep links from the marketing site: take visitors straight to sign-in / sign-up.
+  // Consume the hash so a later refresh or "Back" returns to the account hub, not here.
+  if (location.hash === "#login" || location.hash === "#register") {
+    const wantRegister = location.hash === "#register";
+    history.replaceState(null, "", location.pathname);
+    wantRegister ? renderOrgRegister() : renderOrgLogin();
+    return;
+  }
   renderLanding();
 }
 
@@ -546,9 +554,13 @@ function renderOrgRegister() {
       <div class="fg"><label>Address</label><input class="inp" id="address" placeholder="123 High Street, Town"></div>
       <div class="fg"><label>Referral code <span style="color:#9AA5B1;font-weight:400">(optional)</span></label><input class="inp" id="refcode" placeholder="e.g. K7Q2MP" style="text-transform:uppercase"></div>
       <button class="btn-auth" id="submit">Register Organisation</button>
+      <div class="auth-alt"><button class="linkbtn" id="tologin">Already have an account? Sign in</button></div>
+      <div class="auth-alt"><button class="linkbtn" id="toind">Self-employed carer? Register as an individual</button></div>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
+  document.getElementById("tologin").onclick = renderOrgLogin;
+  document.getElementById("toind").onclick = renderIndividualRegister;
   if (referralFromUrl) document.getElementById("refcode").value = referralFromUrl;
   document.getElementById("submit").onclick = async () => {
     const errBox = document.getElementById("err");
@@ -579,12 +591,14 @@ function renderOrgLogin() {
       <div class="fg"><label>Password</label><input class="inp" id="password" type="password" placeholder="Your password"></div>
       <button class="btn-auth" id="submit">Sign In</button>
       <button class="btn-demo" id="demo">🎯 Try Demo Account</button>
+      <div class="auth-alt"><button class="linkbtn" id="toreg">New to Care2Learn? Create an account</button></div>
       <div class="auth-alt"><button class="linkbtn" id="forgot">Forgot your password?</button></div>
     </div></div>
   `));
   document.getElementById("back").onclick = renderLanding;
   document.getElementById("submit").onclick = () => doOrgLogin(val("email"), val("password"));
   document.getElementById("demo").onclick = () => doOrgLogin("demo@care2learn.co.uk", "demo123");
+  document.getElementById("toreg").onclick = renderOrgRegister;
   document.getElementById("forgot").onclick = () => renderForgotPassword(renderOrgLogin);
 }
 async function doOrgLogin(email, password) {
@@ -1686,7 +1700,7 @@ async function renderAdminDash() {
   wrap.appendChild(el(`<div class="body" id="abody"></div>`));
   App.appendChild(wrap);
   const nav = document.getElementById("anav");
-  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["referrals", "🎁 Referrals"], ["feedback", "💬 Feedback"]].forEach(([k, label]) => {
+  [["companies", "🏢 Accounts"], ["payments", "💷 Payments"], ["referrals", "🎁 Referrals"], ["feedback", "💬 Feedback"], ["enquiries", "📩 Enquiries"]].forEach(([k, label]) => {
     const b = el(`<button class="nav-btn ${adminTab === k ? "active" : ""}">${label}</button>`);
     b.onclick = () => { adminTab = k; paintAdminTab(data); };
     nav.appendChild(b);
@@ -1696,14 +1710,15 @@ async function renderAdminDash() {
 }
 
 function paintAdminTab(data) {
-  const tabs = ["companies", "payments", "referrals", "feedback"];
+  const tabs = ["companies", "payments", "referrals", "feedback", "enquiries"];
   document.querySelectorAll("#anav .nav-btn").forEach((b, i) => b.classList.toggle("active", tabs[i] === adminTab));
   const body = document.getElementById("abody");
   body.innerHTML = "";
   if (adminTab === "companies") return paintAdminCompanies(body, data);
   if (adminTab === "payments") return paintAdminPayments(body);
   if (adminTab === "referrals") return paintAdminReferrals(body);
-  return paintAdminFeedback(body);
+  if (adminTab === "feedback") return paintAdminFeedback(body);
+  return paintAdminEnquiries(body);
 }
 
 function adminOrgRow(o) {
@@ -1844,6 +1859,57 @@ async function paintAdminReferrals(body) {
     table.appendChild(row);
   });
   body.appendChild(table);
+}
+
+async function paintAdminEnquiries(body) {
+  body.appendChild(el(`<div><h1 style="margin-bottom:4px">Enquiries</h1><p style="color:#5A6474;margin-bottom:16px">Demo requests and messages sent from the public website's contact form.</p></div>`));
+  let data;
+  try { data = await api("/admin/enquiries"); }
+  catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
+  const c = data.counts || {};
+  body.appendChild(el(`<div class="astats">
+    <div class="metric"><div class="metric-i">📨</div><div class="metric-v">${c.total || 0}</div><div class="metric-l">Total</div></div>
+    <div class="metric"><div class="metric-i">🔵</div><div class="metric-v" style="color:#2980B9">${c.open || 0}</div><div class="metric-l">To follow up</div></div>
+    <div class="metric"><div class="metric-i">✅</div><div class="metric-v" style="color:#16A34A">${c.handled || 0}</div><div class="metric-l">Handled</div></div>
+  </div>`));
+  if (!data.enquiries.length) {
+    body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No enquiries yet. Demo requests from the website will appear here.</div>`));
+    return;
+  }
+  const list = el(`<div></div>`);
+  const subject = encodeURIComponent("Care2Learn — your demo request");
+  data.enquiries.forEach((q) => {
+    const done = !!q.handled_at;
+    const mailto = `mailto:${esc(q.email)}?subject=${subject}`;
+    const item = el(`
+      <div class="fb-item" style="border-left:4px solid ${done ? "#16A34A" : "#2980B9"};${done ? "opacity:.7" : ""}">
+        <div class="fb-item-h">
+          <span class="fb-item-kind">${done ? "✅ Handled" : "🔵 To follow up"}</span>
+          <span>${fmtDate(q.created_at)}</span>
+        </div>
+        <div style="font-size:15px;color:#2C3E50;font-weight:700;margin-bottom:2px">${esc(q.name)}${q.org ? ` <span style="font-weight:400;color:#5A6474">· ${esc(q.org)}</span>` : ""}</div>
+        <div style="font-size:13px;margin-bottom:8px"><a href="${mailto}" class="linkbtn" style="text-decoration:none">${esc(q.email)}</a></div>
+        ${q.message ? `<div style="font-size:14px;color:#2C3E50;line-height:1.5;margin-bottom:10px">${esc(q.message)}</div>` : `<div style="font-size:13px;color:#9AA5B1;margin-bottom:10px">(no message left)</div>`}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="mini-btn ${done ? "" : "success"}" data-act="toggle">${done ? "↩︎ Reopen" : "✓ Mark handled"}</button>
+          <a class="mini-btn" href="${mailto}" style="text-decoration:none">✉️ Reply by email</a>
+          <button class="mini-btn danger" data-act="delete">Delete</button>
+        </div>
+      </div>`);
+    item.querySelector('[data-act="toggle"]').onclick = async (ev) => {
+      ev.target.disabled = true;
+      try { await api("/admin/enquiries/" + q.id, "PATCH", { handled: !done }); paintAdminTab(); }
+      catch (e) { toast(e.message); ev.target.disabled = false; }
+    };
+    item.querySelector('[data-act="delete"]').onclick = async (ev) => {
+      if (!confirm("Delete this enquiry permanently?")) return;
+      ev.target.disabled = true;
+      try { await api("/admin/enquiries/" + q.id, "DELETE"); toast("Enquiry deleted."); paintAdminTab(); }
+      catch (e) { toast(e.message); ev.target.disabled = false; }
+    };
+    list.appendChild(item);
+  });
+  body.appendChild(list);
 }
 
 async function paintAdminFeedback(body) {

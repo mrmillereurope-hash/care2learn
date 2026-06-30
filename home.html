@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Health and Social Care E-Learning | Care2Learn</title>
 <meta name="description" content="Care2Learn is the e-learning platform for UK adult social care — assign mandatory training, track every learner's compliance in real time, and stay CQC inspection-ready.">
-<script>/* If the visitor is already signed in, send them straight to their dashboard. */try{if(localStorage.getItem("c2l_token")){location.replace("/app"+location.search+location.hash);}}catch(e){}</script>
+<script>/* If the visitor is already signed in, send them straight to their dashboard. The hidden admin route also lives behind /app now. */try{var c2lTok=localStorage.getItem("c2l_token");if(c2lTok){location.replace("/app"+location.search+location.hash);}else if(location.hash==="#admin"){location.replace("/app#admin");}}catch(e){}</script>
 <style>
   /* ============================================================
      Care2Learn — Apple-style showcase (STANDALONE PREVIEW)
@@ -354,7 +354,7 @@
   <a class="brand" href="#top"><span class="shield">✓</span> Care2Learn</a>
   <div class="nav-right">
     <a class="btn btn-primary" href="#demo">Book a demo</a>
-    <a class="btn btn-ghost nav-signin" href="/app">Sign in</a>
+    <a class="btn btn-ghost nav-signin" href="/app#login">Sign in</a>
   </div>
 </header>
 
@@ -370,7 +370,7 @@
         <p class="lead reveal d2">The seamless training platform that gives care teams their time back — for the work that matters most.</p>
         <div class="btn-row reveal d3">
           <a class="btn btn-outline" href="#glance">See how it works</a>
-          <a class="btn btn-primary" href="/app">Get started</a>
+          <a class="btn btn-primary" href="/app#register">Get started</a>
         </div>
       </div>
 
@@ -560,7 +560,7 @@
           <p id="calcRec">Unlimited saves you <b>£576</b> a year.</p>
           <div class="calc-cta">
             <a class="btn btn-outline" href="#demo">Book a demo</a>
-            <a class="btn btn-primary" href="/app">Get started</a>
+            <a class="btn btn-primary" href="/app#register">Get started</a>
           </div>
         </div>
       </div>
@@ -607,7 +607,7 @@
       <h2 class="close-h reveal">Training sorted,<br>so you can care.</h2>
       <div class="btn-row reveal d1" style="margin-top:34px">
         <a class="btn btn-outline" href="#demo">Book a demo</a>
-        <a class="btn btn-primary" href="/app">Get started</a>
+        <a class="btn btn-primary" href="/app#register">Get started</a>
       </div>
     </div>
     <div class="foot">

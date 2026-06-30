@@ -1910,6 +1910,38 @@ route("GET", "/api/admin/feedback", async (req, res) => {
   send(res, 200, { total: rows.length, counts, feedback: rows });
 });
 
+// ── SUPER ADMIN: demo / contact enquiries from the public marketing site ──
+route("GET", "/api/admin/enquiries", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const rows = db.prepare("SELECT id, name, email, org, message, created_at, handled_at FROM enquiries ORDER BY created_at DESC").all();
+  const counts = {
+    total: rows.length,
+    open: rows.filter((r) => !r.handled_at).length,
+    handled: rows.filter((r) => r.handled_at).length,
+  };
+  send(res, 200, { counts, enquiries: rows });
+});
+
+// Toggle an enquiry between "to follow up" and "handled".
+route("PATCH", "/api/admin/enquiries/:id", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const row = db.prepare("SELECT * FROM enquiries WHERE id = ?").get(req.params.id);
+  if (!row) return send(res, 404, { error: "Enquiry not found." });
+  const b = await readBody(req);
+  const handledAt = b.handled ? (row.handled_at || new Date().toISOString()) : null;
+  db.prepare("UPDATE enquiries SET handled_at = ? WHERE id = ?").run(handledAt, row.id);
+  send(res, 200, { id: row.id, handledAt });
+});
+
+// Permanently remove an enquiry (e.g. spam).
+route("DELETE", "/api/admin/enquiries/:id", async (req, res) => {
+  if (!authAdmin(req)) return send(res, 401, { error: "Not authenticated as super admin." });
+  const row = db.prepare("SELECT id FROM enquiries WHERE id = ?").get(req.params.id);
+  if (!row) return send(res, 404, { error: "Enquiry not found." });
+  db.prepare("DELETE FROM enquiries WHERE id = ?").run(row.id);
+  send(res, 200, { ok: true });
+});
+
 // ─── STATIC FILE SERVING ──────────────────────────────────────────────────────
 const MIME = {
   ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
