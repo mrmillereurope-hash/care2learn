@@ -90,8 +90,8 @@ function toast(msg) {
 
 // ── Brand logo (shield + tick). dark=true gives a navy shield for light backgrounds. ──
 function logoMark(size, dark) {
-  const shield = dark ? "#1B2A4A" : "#ffffff";
-  const tick = dark ? "#22C55E" : "#16A34A";
+  const shield = dark ? "#1E3A5F" : "#ffffff";
+  const tick = dark ? "#22C55E" : "#1FA463";
   return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 100 100" style="display:inline-block;vertical-align:middle;flex:0 0 auto" aria-label="Care2Learn">'
     + '<path d="M50 14 L80 24 L80 47 C80 65 67 77 50 83 C33 77 20 65 20 47 L20 24 Z" fill="' + shield + '"/>'
     + '<path d="M37 49 L46 58 L64 37" fill="none" stroke="' + tick + '" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>'
@@ -274,7 +274,7 @@ function showCreditsModal(me) {
         <div style="margin-bottom:16px">
           ${subscribed
             ? `<span class="pill green">✓ Subscribed · Unlimited</span>`
-            : `<span class="pill" style="background:#7C3AED18;color:#5B21B6"><b>${credits}</b> credit${credits === 1 ? "" : "s"} available</span>`}
+            : `<span class="pill" style="background:#1E3A5F18;color:#5B21B6"><b>${credits}</b> credit${credits === 1 ? "" : "s"} available</span>`}
         </div>
         ${subscribed ? "" : `
           <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">Top up credits</div>
@@ -282,12 +282,12 @@ function showCreditsModal(me) {
             ${presets.map(p => `<button class="cred-amt mini-btn" data-q="${p}">${p}</button>`).join("")}
             <input id="credqty" type="number" min="1" max="5000" value="25" style="width:88px;padding:8px 10px;border:1px solid #D5DCE4;border-radius:8px;font-size:14px">
           </div>
-          <div id="credtotal" style="font-size:13px;color:#5A6474;margin-bottom:12px"></div>
+          <div id="credtotal" style="font-size:13px;color:#586473;margin-bottom:12px"></div>
           <button class="btn-save" id="buycred" style="width:100%">Buy credits</button>
           <div style="text-align:center;margin:14px 0 4px;color:#9AA4B2;font-size:12px">— or —</div>
         `}
         <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:6px">${subscribed ? "Subscription" : "Go unlimited"}</div>
-        <p style="font-size:13px;color:#5A6474;line-height:1.5;margin-bottom:10px">${subscribed
+        <p style="font-size:13px;color:#586473;line-height:1.5;margin-bottom:10px">${subscribed
           ? "You're on the monthly subscription — assign as many courses as you like."
           : `Subscribe for ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month and stop counting credits — unlimited course assignments for your whole team.`}</p>
         ${subscribed ? "" : `<button class="mini-btn" id="gosub" style="width:100%">⭐ Subscribe for unlimited</button>`}
@@ -499,12 +499,6 @@ function renderLanding() {
         <div class="landing-logo">${logoMark(54, false)}</div>
         <div class="landing-title">Care2Learn</div>
         <div class="landing-tag">Training sorted, so you can care.</div>
-        <p class="landing-desc">The complete e-learning platform for social care. Register your organisation, assign mandatory courses to staff, and track every learner's progress and compliance in real time.</p>
-        <div class="landing-stats">
-          <div><span class="lstat-n">${state.courses.length}</span><span class="lstat-l">Courses</span></div>
-          <div><span class="lstat-n">Instant</span><span class="lstat-l">Certificates</span></div>
-          <div><span class="lstat-n">CQC</span><span class="lstat-l">Audit Ready</span></div>
-        </div>
       </div>
       <div class="landing-cards">
         <div class="lcard">
@@ -523,8 +517,6 @@ function renderLanding() {
           <button class="btn-secondary" id="go-ind-reg">Register as an individual</button>
         </div>
       </div>
-      <div id="calc-slot"></div>
-      <div id="faq-slot"></div>
       <div class="footer">Aligned to the Care Certificate 2026 · CQC Inspection Ready · Powered by Care2Learn</div>
     </div>
   `));
@@ -532,8 +524,6 @@ function renderLanding() {
   document.getElementById("go-org-reg").onclick = renderOrgRegister;
   document.getElementById("go-staff-login").onclick = renderStaffLogin;
   document.getElementById("go-ind-reg").onclick = renderIndividualRegister;
-  document.getElementById("calc-slot").appendChild(buildCalculator());
-  document.getElementById("faq-slot").appendChild(buildFAQ());
 }
 
 // ─── ORG REGISTER ─────────────────────────────────────────────────────────────
@@ -781,9 +771,9 @@ function referralCard(referral, opts) {
         </div>
       </div>
       <div class="refer-stats">
-        <div class="refer-stat"><div class="refer-stat-n" style="color:#2980B9">${referral.count || 0}</div><div class="refer-stat-l">Credited referrals</div></div>
-        <div class="refer-stat"><div class="refer-stat-n" style="color:#16A34A">${referral.creditsEarned || 0}</div><div class="refer-stat-l">Credits earned</div></div>
-        <div class="refer-stat"><div class="refer-stat-n" style="color:#7C3AED">${reward}</div><div class="refer-stat-l">Credits per referral</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#1E3A5F">${referral.count || 0}</div><div class="refer-stat-l">Credited referrals</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#1FA463">${referral.creditsEarned || 0}</div><div class="refer-stat-l">Credits earned</div></div>
+        <div class="refer-stat"><div class="refer-stat-n" style="color:#1E3A5F">${reward}</div><div class="refer-stat-l">Credits per referral</div></div>
       </div>
       ${referral.pending ? `<div class="refer-pending">⏳ <b>${referral.pending}</b> signed up with your code and ${referral.pending === 1 ? "will earn" : "will each earn"} you ${reward} credits on their first purchase.</div>` : ""}
       <div class="refer-how">
@@ -896,7 +886,7 @@ function showReferralTerms() {
         <p>If you have any questions about the Programme or these terms, please contact us via the in-app <b>Feedback</b> option or at <a href="mailto:support@care2learn.co.uk">support@care2learn.co.uk</a>.</p>
       </div>
       <div class="terms-foot">
-        <button class="btn-save" id="termsok" style="background:#1B2A4A">Got it</button>
+        <button class="btn-save" id="termsok" style="background:#1E3A5F">Got it</button>
       </div>
     </div>
   `);
@@ -958,17 +948,17 @@ async function paintOrgTab(org) {
     const hour = new Date().getHours();
     body.appendChild(el(`<div class="hero"><h1>Good ${hour<12?"morning":hour<18?"afternoon":"evening"}! 👋</h1><p>Training compliance overview for ${esc(me.org.name)}.</p></div>`));
     if (me.org && me.org.credits > 0) {
-      body.appendChild(el(`<div style="background:#7C3AED10;border:1px solid #7C3AED25;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:10px">
+      body.appendChild(el(`<div style="background:#1E3A5F10;border:1px solid #1E3A5F25;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:10px">
         <span style="font-size:20px">💳</span>
-        <span style="font-size:14px;color:#4A3A6B"><b style="color:#7C3AED">${me.org.credits}</b> course credit${me.org.credits === 1 ? "" : "s"} available — each one covers one course for one staff member.</span>
+        <span style="font-size:14px;color:#4A3A6B"><b style="color:#1E3A5F">${me.org.credits}</b> course credit${me.org.credits === 1 ? "" : "s"} available — each one covers one course for one staff member.</span>
       </div>`));
     }
     const m = me.summary;
     body.appendChild(el(`
       <div class="metrics">
-        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${m.activeStaff}</div><div class="metric-l">Active Staff</div></div>
-        <div class="metric"><div class="metric-i">✅</div><div class="metric-v" style="color:#27AE60">${m.fullyCompliant}</div><div class="metric-l">Fully Compliant</div></div>
-        <div class="metric"><div class="metric-i">⚠️</div><div class="metric-v" style="color:#E67E22">${m.expiringSoon}</div><div class="metric-l">Expiring ≤30 days</div></div>
+        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#1E3A5F">${m.activeStaff}</div><div class="metric-l">Active Staff</div></div>
+        <div class="metric"><div class="metric-i">✅</div><div class="metric-v" style="color:#1FA463">${m.fullyCompliant}</div><div class="metric-l">Fully Compliant</div></div>
+        <div class="metric"><div class="metric-i">⚠️</div><div class="metric-v" style="color:#E0902E">${m.expiringSoon}</div><div class="metric-l">Expiring ≤30 days</div></div>
         <div class="metric"><div class="metric-i">📋</div><div class="metric-v" style="color:#9B59B6">${m.totalEnrolments}</div><div class="metric-l">Course Assignments</div></div>
       </div>
     `));
@@ -977,7 +967,7 @@ async function paintOrgTab(org) {
     me.byCourse.forEach(c => {
       const total = m.activeStaff || 1;
       const pct = Math.round((c.completed / total) * 100);
-      const color = pct >= 80 ? "#27AE60" : pct >= 50 ? "#E67E22" : "#E74C3C";
+      const color = pct >= 80 ? "#1FA463" : pct >= 50 ? "#E0902E" : "#E5484D";
       grid.appendChild(el(`
         <div class="cc">
           <div class="cc-top"><span style="font-size:22px">${c.icon}</span><div style="flex:1"><div class="cc-name">${esc(c.title)}</div><div class="cc-frac" style="color:${color}">${c.completed}/${c.assigned||total}</div></div></div>
@@ -991,8 +981,8 @@ async function paintOrgTab(org) {
   if (orgTab === "staff") {
     const { staff } = await api("/org/staff");
     body.innerHTML = "";
-    const assignBtn = staff.length ? `<button class="btn-add" id="assign" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">📚 Assign courses</button>` : "";
-    const sh = el(`<div class="sh"><h2>Staff &amp; Licences</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${assignBtn}<button class="btn-add" id="import" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">⬆ Import CSV</button><button class="btn-add" id="add">+ Add Staff Member</button></div></div>`);
+    const assignBtn = staff.length ? `<button class="btn-add" id="assign" style="background:#fff;color:#1E3A5F;border:1px solid #D5DCE4">📚 Assign courses</button>` : "";
+    const sh = el(`<div class="sh"><h2>Staff &amp; Licences</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${assignBtn}<button class="btn-add" id="import" style="background:#fff;color:#1E3A5F;border:1px solid #D5DCE4">⬆ Import CSV</button><button class="btn-add" id="add">+ Add Staff Member</button></div></div>`);
     body.appendChild(sh);
     const formSlot = el(`<div id="formslot"></div>`);
     body.appendChild(formSlot);
@@ -1004,11 +994,11 @@ async function paintOrgTab(org) {
 
     if (staff.length === 0) {
       const empty = el(`<div class="table"><div class="empty">
-        <div style="font-size:15px;font-weight:700;color:#1B2A4A;margin-bottom:4px">No staff yet</div>
+        <div style="font-size:15px;font-weight:700;color:#1E3A5F;margin-bottom:4px">No staff yet</div>
         <div style="margin-bottom:16px">Add your first care professional, or import your whole team from a spreadsheet in one go.</div>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
           <button class="btn-add" id="empty-add">+ Add Staff Member</button>
-          <button class="btn-add" id="empty-import" style="background:#fff;color:#1B2A4A;border:1px solid #D5DCE4">⬆ Import CSV</button>
+          <button class="btn-add" id="empty-import" style="background:#fff;color:#1E3A5F;border:1px solid #D5DCE4">⬆ Import CSV</button>
         </div>
       </div></div>`);
       body.appendChild(empty);
@@ -1028,7 +1018,7 @@ async function paintOrgTab(org) {
               <span class="t-role">${esc(s.role)}</span>
             </div>
             <div class="trow-meta">
-              <span><b style="color:${s.completedCount===s.assignedCount&&s.assignedCount>0?"#27AE60":"#E67E22"}">${s.completedCount}</b>/${s.assignedCount}</span>
+              <span><b style="color:${s.completedCount===s.assignedCount&&s.assignedCount>0?"#1FA463":"#E0902E"}">${s.completedCount}</b>/${s.assignedCount}</span>
               <span>${statusPill}</span>
               <span><span class="trow-pin-label">PIN </span><span class="t-pin trow-pin-val">${esc(s.pin)}</span></span>
             </div>
@@ -1088,7 +1078,7 @@ async function paintOrgTab(org) {
         if (enr) cell.title = enr.courseTitle + " — " + enr.compliance + (enr.expiryDate ? " (until " + fmtDate(enr.expiryDate) + ")" : "");
         row.appendChild(cell);
       });
-      row.appendChild(el(`<span style="margin-left:auto;width:auto"><b style="color:${validCount===state.courses.length?"#27AE60":"#E67E22"}">${validCount}/${state.courses.length}</b></span>`));
+      row.appendChild(el(`<span style="margin-left:auto;width:auto"><b style="color:${validCount===state.courses.length?"#1FA463":"#E0902E"}">${validCount}/${state.courses.length}</b></span>`));
       matrix.appendChild(row);
     });
     if (active.length === 0) matrix.appendChild(el(`<div class="empty">No active staff to report on.</div>`));
@@ -1124,22 +1114,22 @@ async function paintOrgTab(org) {
         <h3>Subscription</h3>
         <div style="padding:0 20px 16px">
           ${o.subscription_status === "active"
-            ? `<span class="pill green">✓ Subscribed</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin-top:8px">Your monthly subscription is active — all ${state.courses.length} mandatory courses, unlimited staff licences, assignments, certificates and CQC reporting are included.</p>`
-            : `<span class="pill" style="background:#2980B918;color:#1A5276">Pay as you go</span><p style="font-size:13px;color:#5A6474;line-height:1.6;margin:8px 0 12px">Subscribe for just ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month to cover your whole team — every mandatory course included, with volume discounts as you grow.</p><button class="mini-btn" id="subscribe">⭐ Subscribe</button>`
+            ? `<span class="pill green">✓ Subscribed</span><p style="font-size:13px;color:#586473;line-height:1.6;margin-top:8px">Your monthly subscription is active — all ${state.courses.length} mandatory courses, unlimited staff licences, assignments, certificates and CQC reporting are included.</p>`
+            : `<span class="pill" style="background:#1E3A5F18;color:#1A5276">Pay as you go</span><p style="font-size:13px;color:#586473;line-height:1.6;margin:8px 0 12px">Subscribe for just ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month to cover your whole team — every mandatory course included, with volume discounts as you grow.</p><button class="mini-btn" id="subscribe">⭐ Subscribe</button>`
           }
         </div>
       </div>
       <div class="scard" style="margin-top:16px"><h3>Notifications</h3>
         <div style="padding:0 20px 16px">
-          <label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#2C3E50;cursor:pointer">
+          <label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#1E3A5F;cursor:pointer">
             <input type="checkbox" id="remtoggle" ${o.reminders_enabled ? "checked" : ""} style="margin-top:3px">
             <span>Automatically email staff when their training is due, expiring or overdue — and send me a summary of who needs attention.</span>
           </label>
           <div style="margin-top:12px"><button class="mini-btn" id="rempreview">✉️ Send me a preview</button></div>
-          <p style="font-size:12px;color:#7A8599;margin-top:10px">Each person is emailed at most once a week, and only when something needs attention. The preview goes to your inbox only (${esc(o.email)}).</p>
+          <p style="font-size:12px;color:#8E99A8;margin-top:10px">Each person is emailed at most once a week, and only when something needs attention. The preview goes to your inbox only (${esc(o.email)}).</p>
         </div>
       </div>
-      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the password you use to sign in.</p><button class="mini-btn" id="orgchgpw">🔒 Change password</button></div></div>
+      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#586473;margin-bottom:10px">Change the password you use to sign in.</p><button class="mini-btn" id="orgchgpw">🔒 Change password</button></div></div>
       </div>
     `));
     document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
@@ -1364,7 +1354,7 @@ async function showBulkImportForm() {
     const region = modal.querySelector("#ibody");
     region.innerHTML =
       `<div class="ok-banner" style="margin-bottom:14px"><b>${summary.created}</b> staff added, each with a login PIN below.${summary.skipped ? ` <b>${summary.skipped}</b> skipped.` : ""}</div>` +
-      (result.courseNote ? `<div class="ok-banner" style="margin-bottom:14px;background:#E67E2218;border-color:#E67E2244;color:#7D5310">${esc(result.courseNote)}</div>` : "") +
+      (result.courseNote ? `<div class="ok-banner" style="margin-bottom:14px;background:#E0902E18;border-color:#E0902E44;color:#7D5310">${esc(result.courseNote)}</div>` : "") +
       (created.length ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px"><b style="font-size:14px">New login PINs</b><button class="mini-btn" id="dlpins">⬇ Download PINs (CSV)</button></div><div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>PIN</th></tr></thead><tbody>${createdRows}</tbody></table></div>` : "") +
       (skipped.length ? `<div style="margin-top:14px"><b style="font-size:14px">Skipped rows</b><div class="csv-wrap"><table class="csv-preview"><thead><tr><th>Name</th><th>Email</th><th>Reason</th></tr></thead><tbody>${skippedRows}</tbody></table></div></div>` : "") +
       `<div class="form-actions" style="margin-top:14px"><button class="btn-save" id="done">Done</button></div>`;
@@ -1391,7 +1381,7 @@ async function showAssignCourses() {
     `<label class="chk" data-cid="${c.id}"><input type="checkbox" value="${c.id}"> ${c.icon} ${esc(c.title)}</label>`
   ).join("");
   const roleChecks = roles.map(r =>
-    `<label class="chk"><input type="checkbox" class="rolecb" value="${esc(r)}"> ${esc(r)} <span style="color:#7A8599;font-weight:600">(${roleCounts[r]})</span></label>`
+    `<label class="chk"><input type="checkbox" class="rolecb" value="${esc(r)}"> ${esc(r)} <span style="color:#8E99A8;font-weight:600">(${roleCounts[r]})</span></label>`
   ).join("");
 
   const overlay = el(`<div class="overlay"></div>`);
@@ -1404,8 +1394,8 @@ async function showAssignCourses() {
         <div class="chk-grid" id="coursegrid">${courseChecks}</div>
         <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin:14px 0 8px">Who should get them?</label>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#2C3E50;cursor:pointer"><input type="radio" name="target" value="all" checked> Everyone (${staff.length} active staff)</label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#2C3E50;cursor:pointer"><input type="radio" name="target" value="roles"> Only certain roles</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1E3A5F;cursor:pointer"><input type="radio" name="target" value="all" checked> Everyone (${staff.length} active staff)</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1E3A5F;cursor:pointer"><input type="radio" name="target" value="roles"> Only certain roles</label>
         </div>
         <div id="roleg" class="hidden" style="margin-top:10px"><div class="chk-grid">${roleChecks}</div></div>
         <div class="csv-sum" id="count" style="margin-top:14px"></div>
@@ -1497,10 +1487,10 @@ async function openStaffModal(staffId) {
         ${hasOutstanding ? `<button class="mini-btn" id="nudgebtn">📣 Nudge to complete</button>` : ""}
       </div>
 
-      <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5"><b style="font-size:15px">Assigned Courses</b></div>
+      <div style="padding:14px 22px 6px;border-top:1px solid #F4F7FA"><b style="font-size:15px">Assigned Courses</b></div>
       <div id="assigned"></div>
 
-      <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5;margin-top:8px"><b style="font-size:15px">Assign a New Course</b></div>
+      <div style="padding:14px 22px 6px;border-top:1px solid #F4F7FA;margin-top:8px"><b style="font-size:15px">Assign a New Course</b></div>
       <div style="padding:0 22px 18px" id="assign-slot"></div>
     </div>
   `);
@@ -1530,7 +1520,7 @@ async function openStaffModal(staffId) {
 
   const assignedBox = modal.querySelector("#assigned");
   if (s.enrolments.length === 0) {
-    assignedBox.appendChild(el(`<div style="padding:8px 22px;color:#7A8599;font-size:13px;font-style:italic">No courses assigned yet.</div>`));
+    assignedBox.appendChild(el(`<div style="padding:8px 22px;color:#8E99A8;font-size:13px;font-style:italic">No courses assigned yet.</div>`));
   } else {
     s.enrolments.forEach(e => {
       const c = state.courses.find(x => x.id === e.courseId) || {};
@@ -1545,7 +1535,7 @@ async function openStaffModal(staffId) {
         <div class="crow">
           <span class="crow-icon">${c.icon||"📘"}</span>
           <div style="flex:1"><div class="crow-name">${esc(e.courseTitle)}</div><div class="crow-meta">${badge}</div>
-            <div class="mini-bar"><div class="mini-fill" style="width:${e.progress}%;background:${c.color||"#2980B9"}"></div></div>
+            <div class="mini-bar"><div class="mini-fill" style="width:${e.progress}%;background:${c.color||"#1E3A5F"}"></div></div>
           </div>
           <button class="abtn danger" data-remove="${e.courseId}">Remove</button>
         </div>
@@ -1563,7 +1553,7 @@ async function openStaffModal(staffId) {
 
   const assignSlot = modal.querySelector("#assign-slot");
   if (available.length === 0) {
-    assignSlot.appendChild(el(`<div style="color:#7A8599;font-size:13px;font-style:italic">All courses assigned.</div>`));
+    assignSlot.appendChild(el(`<div style="color:#8E99A8;font-size:13px;font-style:italic">All courses assigned.</div>`));
   } else {
     const sel = el(`<select class="inp" style="margin-bottom:10px">${available.map(c=>`<option value="${c.id}">${c.icon} ${esc(c.title)}</option>`).join("")}</select>`);
     const btn = el(`<button class="btn-save" style="width:100%">Assign Course</button>`);
@@ -1630,8 +1620,8 @@ function openFeedbackModal(context) {
     modal.innerHTML = `
       <div style="padding:46px 28px;text-align:center">
         <div style="font-size:56px;margin-bottom:10px">🙏</div>
-        <h2 style="font-size:21px;font-weight:800;color:#1B2A4A;margin-bottom:8px">Thank you!</h2>
-        <p style="font-size:14px;color:#5A6474;line-height:1.6;max-width:340px;margin:0 auto 22px">Your feedback has been sent to the Care2Learn team. Every piece of feedback helps us to improve.</p>
+        <h2 style="font-size:21px;font-weight:800;color:#1E3A5F;margin-bottom:8px">Thank you!</h2>
+        <p style="font-size:14px;color:#586473;line-height:1.6;max-width:340px;margin:0 auto 22px">Your feedback has been sent to the Care2Learn team. Every piece of feedback helps us to improve.</p>
         <button class="fb-send" id="fbdone" style="max-width:200px;margin:0 auto">Done</button>
       </div>`;
     modal.querySelector("#fbdone").onclick = () => overlay.remove();
@@ -1655,7 +1645,7 @@ function renderAdminLogin(errMsg) {
       <div id="err">${errMsg ? `<div class="err">${esc(errMsg)}</div>` : ""}</div>
       <div class="fg"><label>Email</label><input class="inp" id="ae" type="email" placeholder="you@care2learn.co.uk"></div>
       <div class="fg"><label>Password</label><input class="inp" id="ap" type="password" placeholder="Your password"></div>
-      <button class="btn-auth" id="asubmit" style="background:#7C3AED">Sign In</button>
+      <button class="btn-auth" id="asubmit" style="background:#1E3A5F">Sign In</button>
     </div></div>
   `));
   document.getElementById("back").onclick = () => { location.hash = ""; renderLanding(); };
@@ -1734,7 +1724,7 @@ function adminOrgRow(o) {
         <span class="org-stat"><span class="org-stat-n">${o.activeStaff}</span><span class="org-stat-l">${o.accountType === "individual" ? "Learner" : "Staff"}</span></span>
         <span class="org-stat"><span class="org-stat-n">${o.fullyCompliant}</span><span class="org-stat-l">Compliant</span></span>
         <span class="org-stat"><span class="org-stat-n">${o.enrolments}</span><span class="org-stat-l">Courses</span></span>
-        <span class="org-stat"><span class="org-stat-n" style="color:#7C3AED">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
+        <span class="org-stat"><span class="org-stat-n" style="color:#1E3A5F">${o.credits || 0}</span><span class="org-stat-l">Credits</span></span>
       </span>
     </button>`);
   row.onclick = () => renderAdminOrg(o.id);
@@ -1748,22 +1738,22 @@ function paintAdminCompanies(body, data) {
   body.appendChild(el(`
     <div>
       <h1 style="margin:0 0 4px">Accounts</h1>
-      <p style="color:#5A6474;margin-bottom:18px">Every organisation and self-employed carer on Care2Learn. Tap one to view and support it.</p>
+      <p style="color:#586473;margin-bottom:18px">Every organisation and self-employed carer on Care2Learn. Tap one to view and support it.</p>
       <div class="astats">
-        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#7C3AED">${companies.length}</div><div class="metric-l">Companies</div></div>
-        <div class="metric"><div class="metric-i">🧑‍⚕️</div><div class="metric-v" style="color:#7C3AED">${individuals.length}</div><div class="metric-l">Self-employed</div></div>
-        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${t.staff}</div><div class="metric-l">Learners</div></div>
-        <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#16A34A">${t.credits || 0}</div><div class="metric-l">Total Credits</div></div>
+        <div class="metric"><div class="metric-i">🏢</div><div class="metric-v" style="color:#1E3A5F">${companies.length}</div><div class="metric-l">Companies</div></div>
+        <div class="metric"><div class="metric-i">🧑‍⚕️</div><div class="metric-v" style="color:#1E3A5F">${individuals.length}</div><div class="metric-l">Self-employed</div></div>
+        <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#1E3A5F">${t.staff}</div><div class="metric-l">Learners</div></div>
+        <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#1FA463">${t.credits || 0}</div><div class="metric-l">Total Credits</div></div>
       </div>
     </div>`));
 
-  const cHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:6px 0 12px"><h2 style="margin:0">🏢 Companies (${companies.length})</h2><button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#7C3AED">+ New Company</button></div>`);
+  const cHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:6px 0 12px"><h2 style="margin:0">🏢 Companies (${companies.length})</h2><button class="btn-primary" id="newco" style="width:auto;padding:9px 16px;background:#1E3A5F">+ New Company</button></div>`);
   body.appendChild(cHead);
   cHead.querySelector("#newco").onclick = () => openAdminNewCompany(() => renderAdminDash());
   if (!companies.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No companies have registered yet.</div>`));
   else { const g = el(`<div class="org-grid"></div>`); companies.forEach(o => g.appendChild(adminOrgRow(o))); body.appendChild(g); }
 
-  const iHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px"><h2 style="margin:0">🧑‍⚕️ Self-employed carers (${individuals.length})</h2><button class="btn-primary" id="newind" style="width:auto;padding:9px 16px;background:#7C3AED">+ New carer</button></div>`);
+  const iHead = el(`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px"><h2 style="margin:0">🧑‍⚕️ Self-employed carers (${individuals.length})</h2><button class="btn-primary" id="newind" style="width:auto;padding:9px 16px;background:#1E3A5F">+ New carer</button></div>`);
   body.appendChild(iHead);
   iHead.querySelector("#newind").onclick = () => openAdminNewIndividual(() => renderAdminDash());
   if (!individuals.length) body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No self-employed carers have registered yet. They sign up from the home page.</div>`));
@@ -1771,15 +1761,15 @@ function paintAdminCompanies(body, data) {
 }
 
 async function paintAdminPayments(body) {
-  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Payments</h1><p style="color:#5A6474;margin-bottom:16px">Card payments received via Stripe — each one automatically tops up the account's credit balance.</p></div>`));
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Payments</h1><p style="color:#586473;margin-bottom:16px">Card payments received via Stripe — each one automatically tops up the account's credit balance.</p></div>`));
   let data;
   try { data = await api("/admin/payments"); }
   catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
   const pounds = (p) => "£" + (p / 100).toLocaleString(undefined, Number.isInteger(p / 100) ? {} : { minimumFractionDigits: 2 });
   body.appendChild(el(`<div class="astats">
-    <div class="metric"><div class="metric-i">💷</div><div class="metric-v" style="color:#16A34A">${pounds(data.totalPence || 0)}</div><div class="metric-l">Total received</div></div>
-    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${data.totalCredits || 0}</div><div class="metric-l">Credits sold</div></div>
-    <div class="metric"><div class="metric-i">🧾</div><div class="metric-v" style="color:#2980B9">${data.count || 0}</div><div class="metric-l">Payments</div></div>
+    <div class="metric"><div class="metric-i">💷</div><div class="metric-v" style="color:#1FA463">${pounds(data.totalPence || 0)}</div><div class="metric-l">Total received</div></div>
+    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#1E3A5F">${data.totalCredits || 0}</div><div class="metric-l">Credits sold</div></div>
+    <div class="metric"><div class="metric-i">🧾</div><div class="metric-v" style="color:#1E3A5F">${data.count || 0}</div><div class="metric-l">Payments</div></div>
   </div>`));
   if (!data.payments || !data.payments.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No payments yet. When a company or carer buys credits, it'll appear here automatically.</div>`)); return; }
   const table = el(`<div class="pay-table"></div>`);
@@ -1788,8 +1778,8 @@ async function paintAdminPayments(body) {
     const row = el(`<button class="pay-row">
       <span class="pay-date">${fmtDate(p.createdAt)}</span>
       <span class="pay-acct">${esc(p.orgName)}${p.accountType === "individual" ? ` <span class="ind-badge">Individual</span>` : ""}</span>
-      <span style="text-align:right;font-weight:700;color:#7C3AED">+${p.credits}</span>
-      <span style="text-align:right;font-weight:800;color:#16A34A">${pounds(p.amountPence)}</span>
+      <span style="text-align:right;font-weight:700;color:#1E3A5F">+${p.credits}</span>
+      <span style="text-align:right;font-weight:800;color:#1FA463">${pounds(p.amountPence)}</span>
     </button>`);
     if (p.orgId) row.onclick = () => renderAdminOrg(p.orgId);
     table.appendChild(row);
@@ -1798,17 +1788,17 @@ async function paintAdminPayments(body) {
 }
 
 async function paintAdminReferrals(body) {
-  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#5A6474;margin-bottom:16px">Referrers are credited automatically when a referred account makes its first purchase. You can also <strong>approve</strong> a referral to pay it early, or <strong>decline</strong> one to block it from ever paying out.</p></div>`));
+  body.appendChild(el(`<div><h1 style="margin:0 0 4px">Referrals</h1><p style="color:#586473;margin-bottom:16px">Referrers are credited automatically when a referred account makes its first purchase. You can also <strong>approve</strong> a referral to pay it early, or <strong>decline</strong> one to block it from ever paying out.</p></div>`));
   let data;
   try { data = await api("/admin/referrals"); }
   catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
   const s = data.summary || {};
   body.appendChild(el(`<div class="astats">
     <div class="metric"><div class="metric-i">⏳</div><div class="metric-v" style="color:#C7892B">${s.pendingCount || 0}</div><div class="metric-l">Pending review</div></div>
-    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#16A34A">${s.approvedCount || 0}</div><div class="metric-l">Credited</div></div>
+    <div class="metric"><div class="metric-i">🎁</div><div class="metric-v" style="color:#1FA463">${s.approvedCount || 0}</div><div class="metric-l">Credited</div></div>
     <div class="metric"><div class="metric-i">🚫</div><div class="metric-v" style="color:#8A94A0">${s.declinedCount || 0}</div><div class="metric-l">Declined</div></div>
-    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#7C3AED">${s.creditsAwarded || 0}</div><div class="metric-l">Credits awarded</div></div>
-    <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#2980B9">${s.totalReferred || 0}</div><div class="metric-l">Total referred</div></div>
+    <div class="metric"><div class="metric-i">💳</div><div class="metric-v" style="color:#1E3A5F">${s.creditsAwarded || 0}</div><div class="metric-l">Credits awarded</div></div>
+    <div class="metric"><div class="metric-i">👥</div><div class="metric-v" style="color:#1E3A5F">${s.totalReferred || 0}</div><div class="metric-l">Total referred</div></div>
   </div>`));
   if (!data.referrals || !data.referrals.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No referrals yet. When someone signs up using another account's referral code, it'll appear here.</div>`)); return; }
   const refresh = () => { const b = document.getElementById("abody"); if (b) { b.innerHTML = ""; paintAdminReferrals(b); } };
@@ -1820,7 +1810,7 @@ async function paintAdminReferrals(body) {
     if (r.status === "approved") pill = `<span class="ref-pill ref-pill-paid">✓ Credited</span>`;
     else if (r.status === "declined") pill = `<span class="ref-pill ref-pill-declined">✕ Declined</span>`;
     else pill = `<span class="ref-pill ref-pill-pending">⏳ Pending</span>`;
-    const purchaseTag = r.status === "approved" ? "" : (r.hasPurchased ? ` · <span style="color:#16A34A;font-weight:700">✓ has purchased</span>` : ` · <span style="color:#9AA5B1">no purchase yet</span>`);
+    const purchaseTag = r.status === "approved" ? "" : (r.hasPurchased ? ` · <span style="color:#1FA463;font-weight:700">✓ has purchased</span>` : ` · <span style="color:#9AA5B1">no purchase yet</span>`);
     const creditedTag = r.status === "approved" && r.approvedAt ? " · credited " + fmtDate(r.approvedAt) : "";
     const row = el(`<div class="ref-arow">
       <div class="ref-amain">
@@ -1829,7 +1819,7 @@ async function paintAdminReferrals(body) {
       </div>
       <div class="ref-aright">
         ${pill}
-        <span class="ref-acredits" style="color:${r.status === "approved" ? "#16A34A" : "#9AA5B1"}">+${r.credits}</span>
+        <span class="ref-acredits" style="color:${r.status === "approved" ? "#1FA463" : "#9AA5B1"}">+${r.credits}</span>
         <span class="ref-aactions"></span>
       </div>
     </div>`);
@@ -1862,15 +1852,15 @@ async function paintAdminReferrals(body) {
 }
 
 async function paintAdminEnquiries(body) {
-  body.appendChild(el(`<div><h1 style="margin-bottom:4px">Enquiries</h1><p style="color:#5A6474;margin-bottom:16px">Demo requests and messages sent from the public website's contact form.</p></div>`));
+  body.appendChild(el(`<div><h1 style="margin-bottom:4px">Enquiries</h1><p style="color:#586473;margin-bottom:16px">Demo requests and messages sent from the public website's contact form.</p></div>`));
   let data;
   try { data = await api("/admin/enquiries"); }
   catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
   const c = data.counts || {};
   body.appendChild(el(`<div class="astats">
     <div class="metric"><div class="metric-i">📨</div><div class="metric-v">${c.total || 0}</div><div class="metric-l">Total</div></div>
-    <div class="metric"><div class="metric-i">🔵</div><div class="metric-v" style="color:#2980B9">${c.open || 0}</div><div class="metric-l">To follow up</div></div>
-    <div class="metric"><div class="metric-i">✅</div><div class="metric-v" style="color:#16A34A">${c.handled || 0}</div><div class="metric-l">Handled</div></div>
+    <div class="metric"><div class="metric-i">🔵</div><div class="metric-v" style="color:#1E3A5F">${c.open || 0}</div><div class="metric-l">To follow up</div></div>
+    <div class="metric"><div class="metric-i">✅</div><div class="metric-v" style="color:#1FA463">${c.handled || 0}</div><div class="metric-l">Handled</div></div>
   </div>`));
   if (!data.enquiries.length) {
     body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No enquiries yet. Demo requests from the website will appear here.</div>`));
@@ -1882,14 +1872,14 @@ async function paintAdminEnquiries(body) {
     const done = !!q.handled_at;
     const mailto = `mailto:${esc(q.email)}?subject=${subject}`;
     const item = el(`
-      <div class="fb-item" style="border-left:4px solid ${done ? "#16A34A" : "#2980B9"};${done ? "opacity:.7" : ""}">
+      <div class="fb-item" style="border-left:4px solid ${done ? "#1FA463" : "#1E3A5F"};${done ? "opacity:.7" : ""}">
         <div class="fb-item-h">
           <span class="fb-item-kind">${done ? "✅ Handled" : "🔵 To follow up"}</span>
           <span>${fmtDate(q.created_at)}</span>
         </div>
-        <div style="font-size:15px;color:#2C3E50;font-weight:700;margin-bottom:2px">${esc(q.name)}${q.org ? ` <span style="font-weight:400;color:#5A6474">· ${esc(q.org)}</span>` : ""}</div>
+        <div style="font-size:15px;color:#1E3A5F;font-weight:700;margin-bottom:2px">${esc(q.name)}${q.org ? ` <span style="font-weight:400;color:#586473">· ${esc(q.org)}</span>` : ""}</div>
         <div style="font-size:13px;margin-bottom:8px"><a href="${mailto}" class="linkbtn" style="text-decoration:none">${esc(q.email)}</a></div>
-        ${q.message ? `<div style="font-size:14px;color:#2C3E50;line-height:1.5;margin-bottom:10px">${esc(q.message)}</div>` : `<div style="font-size:13px;color:#9AA5B1;margin-bottom:10px">(no message left)</div>`}
+        ${q.message ? `<div style="font-size:14px;color:#1E3A5F;line-height:1.5;margin-bottom:10px">${esc(q.message)}</div>` : `<div style="font-size:13px;color:#9AA5B1;margin-bottom:10px">(no message left)</div>`}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="mini-btn ${done ? "" : "success"}" data-act="toggle">${done ? "↩︎ Reopen" : "✓ Mark handled"}</button>
           <a class="mini-btn" href="${mailto}" style="text-decoration:none">✉️ Reply by email</a>
@@ -1913,14 +1903,14 @@ async function paintAdminEnquiries(body) {
 }
 
 async function paintAdminFeedback(body) {
-  body.appendChild(el(`<div><h1 style="margin-bottom:4px">Feedback</h1><p style="color:#5A6474;margin-bottom:16px">Compliments, bugs and feature requests from companies and their staff.</p></div>`));
+  body.appendChild(el(`<div><h1 style="margin-bottom:4px">Feedback</h1><p style="color:#586473;margin-bottom:16px">Compliments, bugs and feature requests from companies and their staff.</p></div>`));
   let data;
   try { data = await api("/admin/feedback"); } catch (e) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">${esc(e.message)}</div>`)); return; }
   const c = data.counts || {};
   body.appendChild(el(`<div class="astats">
-    <div class="metric"><div class="metric-i">👍</div><div class="metric-v" style="color:#16A34A">${c.compliment || 0}</div><div class="metric-l">Compliments</div></div>
-    <div class="metric"><div class="metric-i">🐞</div><div class="metric-v" style="color:#E74C3C">${c.bug || 0}</div><div class="metric-l">Bugs</div></div>
-    <div class="metric"><div class="metric-i">💡</div><div class="metric-v" style="color:#2980B9">${c.feature || 0}</div><div class="metric-l">Feature Requests</div></div>
+    <div class="metric"><div class="metric-i">👍</div><div class="metric-v" style="color:#1FA463">${c.compliment || 0}</div><div class="metric-l">Compliments</div></div>
+    <div class="metric"><div class="metric-i">🐞</div><div class="metric-v" style="color:#E5484D">${c.bug || 0}</div><div class="metric-l">Bugs</div></div>
+    <div class="metric"><div class="metric-i">💡</div><div class="metric-v" style="color:#1E3A5F">${c.feature || 0}</div><div class="metric-l">Feature Requests</div></div>
   </div>`));
   if (!data.feedback.length) { body.appendChild(el(`<div class="empty" style="background:#fff;border-radius:12px">No feedback yet.</div>`)); return; }
   const list = el(`<div></div>`);
@@ -1930,7 +1920,7 @@ async function paintAdminFeedback(body) {
     list.appendChild(el(`
       <div class="fb-item ${esc(f.kind)}">
         <div class="fb-item-h"><span class="fb-item-kind">${label[f.kind] || esc(f.kind)}</span><span>${fmtDate(f.created_at)}</span></div>
-        <div style="font-size:14px;color:#2C3E50;line-height:1.5;margin-bottom:6px">${esc(f.message)}</div>
+        <div style="font-size:14px;color:#1E3A5F;line-height:1.5;margin-bottom:6px">${esc(f.message)}</div>
         <div style="font-size:12px;color:#9AA5B1">From ${who}${f.context ? " · " + esc(f.context) : ""}</div>
       </div>`));
   });
@@ -1953,7 +1943,7 @@ async function renderAdminOrg(orgId) {
   back.onclick = () => renderAdminDash();
   body.appendChild(back);
   const infoCard = el(`
-    <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:20px;margin-bottom:14px">
+    <div style="background:#fff;border:1px solid #E7ECF2;border-radius:14px;padding:20px;margin-bottom:14px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="min-width:0">
           <h1 style="margin-bottom:8px">${esc(org.name)} ${org.accountType === "individual" ? `<span class="ind-badge">Individual</span> ` : ""}${org.active ? `<span class="on-badge">Active</span>` : `<span class="off-badge">Inactive</span>`}</h1>
@@ -1963,7 +1953,7 @@ async function renderAdminOrg(orgId) {
             ${org.cqcNumber ? `<span>🏥 CQC ${esc(org.cqcNumber)}</span>` : ""}
             <span>📅 Joined ${fmtDate(org.createdAt)}</span>
           </div>
-          ${org.address ? `<div style="font-size:13px;color:#7A8599;margin-top:8px">${esc(org.address)}</div>` : ""}
+          ${org.address ? `<div style="font-size:13px;color:#8E99A8;margin-top:8px">${esc(org.address)}</div>` : ""}
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;flex-shrink:0">
           <button class="mini-btn" id="resetpw">🔑 Reset password</button>
@@ -1982,22 +1972,22 @@ async function renderAdminOrg(orgId) {
   };
   infoCard.querySelector("#resetpw").onclick = () => openAdminResetPassword(orgId, org.name, org.email);
   const creditsCard = el(`
-    <div style="background:#fff;border:1px solid #E8ECF0;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <div style="background:#fff;border:1px solid #E7ECF2;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
-        <div style="font-size:12px;font-weight:700;color:#7A8599;text-transform:uppercase;letter-spacing:.5px">Course credits</div>
-        <div style="font-size:34px;font-weight:900;color:#7C3AED;line-height:1.1;margin-top:2px">${org.credits}</div>
+        <div style="font-size:12px;font-weight:700;color:#8E99A8;text-transform:uppercase;letter-spacing:.5px">Course credits</div>
+        <div style="font-size:34px;font-weight:900;color:#1E3A5F;line-height:1.1;margin-top:2px">${org.credits}</div>
         <div style="font-size:12px;color:#9AA5B1;margin-top:2px">1 credit = 1 course assigned to 1 learner</div>
       </div>
-      <button class="btn-primary" id="addcredits" style="width:auto;padding:10px 18px;background:#7C3AED">+ Add credits</button>
+      <button class="btn-primary" id="addcredits" style="width:auto;padding:10px 18px;background:#1E3A5F">+ Add credits</button>
     </div>`);
   body.appendChild(creditsCard);
   creditsCard.querySelector("#addcredits").onclick = () => openAdminCredits(orgId, org.credits, () => renderAdminOrg(orgId));
   if (transactions.length) {
-    const hist = el(`<div style="background:#fff;border:1px solid #E8ECF0;border-radius:12px;padding:14px 16px;margin-bottom:18px"></div>`);
-    hist.appendChild(el(`<div style="font-size:12px;font-weight:700;color:#7A8599;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Recent top-ups</div>`));
+    const hist = el(`<div style="background:#fff;border:1px solid #E7ECF2;border-radius:12px;padding:14px 16px;margin-bottom:18px"></div>`);
+    hist.appendChild(el(`<div style="font-size:12px;font-weight:700;color:#8E99A8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Recent top-ups</div>`));
     transactions.slice(0, 5).forEach(t => {
       hist.appendChild(el(`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:6px 0;border-bottom:1px solid #F4F6F8">
-        <span style="color:#2C3E50">${t.amount > 0 ? "+" : ""}${t.amount} credits${t.note ? " · " + esc(t.note) : ""}</span>
+        <span style="color:#1E3A5F">${t.amount > 0 ? "+" : ""}${t.amount} credits${t.note ? " · " + esc(t.note) : ""}</span>
         <span style="color:#9AA5B1;white-space:nowrap">${fmtDate(t.created_at)} · bal ${t.balance_after}</span>
       </div>`));
     });
@@ -2012,11 +2002,11 @@ async function renderAdminOrg(orgId) {
   else {
     const grid = el(`<div class="sc-grid"></div>`);
     staff.forEach(s => {
-      const statusColor = !s.active ? "#94A3B8" : s.compliant ? "#16A34A" : "#E67E22";
+      const statusColor = !s.active ? "#94A3B8" : s.compliant ? "#1FA463" : "#E0902E";
       const statusText = !s.active ? "Inactive" : s.compliant ? "Compliant" : "In progress";
       const card = el(`
         <div class="sc" style="cursor:pointer">
-          <div class="sc-top" style="background:#1B2A4A"><span style="font-size:28px">👤</span><span class="sc-badge" style="background:${statusColor}66">${statusText}</span></div>
+          <div class="sc-top" style="background:#1E3A5F"><span style="font-size:28px">👤</span><span class="sc-badge" style="background:${statusColor}66">${statusText}</span></div>
           <div class="sc-body">
             <div class="sc-title">${esc(s.name)}</div>
             <div class="sc-meta">${esc(s.role)} · PIN ${esc(s.pin)}</div>
@@ -2058,8 +2048,8 @@ function openAdminAddStaff(orgId, onAdded) {
       modal.innerHTML = `<div style="padding:40px 28px;text-align:center">
         <div style="font-size:50px;margin-bottom:8px">✅</div>
         <h2 style="font-size:20px;font-weight:800;margin-bottom:6px">${esc(name)} added</h2>
-        <p style="color:#5A6474;font-size:14px;margin-bottom:6px">Their login PIN is</p>
-        <div style="font-size:30px;font-weight:900;letter-spacing:4px;color:#2980B9;margin-bottom:18px">${esc(pin)}</div>
+        <p style="color:#586473;font-size:14px;margin-bottom:6px">Their login PIN is</p>
+        <div style="font-size:30px;font-weight:900;letter-spacing:4px;color:#1E3A5F;margin-bottom:18px">${esc(pin)}</div>
         <button class="btn-auth" id="asdone" style="max-width:200px;margin:0 auto">Done</button></div>`;
       modal.querySelector("#asdone").onclick = () => { overlay.remove(); onAdded && onAdded(); };
     } catch (e) { errBox.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -2075,7 +2065,7 @@ function openAdminResetPassword(orgId, name, email) {
       <div class="modal" style="max-width:440px">
         <div class="modal-h"><div><h2>New password</h2><p>Share this with ${esc(name)} — it replaces their old one.</p></div><button class="x" id="close">✕</button></div>
         <div style="padding:22px;text-align:center">
-          <div style="font-size:30px;font-weight:900;letter-spacing:3px;color:#7C3AED;margin-bottom:16px">${esc(r.password)}</div>
+          <div style="font-size:30px;font-weight:900;letter-spacing:3px;color:#1E3A5F;margin-bottom:16px">${esc(r.password)}</div>
           <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
             <button class="mini-btn" id="copy">📋 Copy</button>
             <button class="mini-btn" id="emailit">✉️ Email it</button>
@@ -2158,11 +2148,11 @@ function openAdminCredits(orgId, currentBalance, onChange) {
     <div class="modal" style="max-width:460px">
       <div class="modal-h"><div><h2>Add credits</h2><p>Top up this company's course-credit balance</p></div><button class="x" id="close">✕</button></div>
       <div style="padding:18px 22px 22px">
-        <div style="background:#7C3AED10;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:#5A6474">Current balance: <b style="color:#7C3AED;font-size:18px">${currentBalance}</b> credits</div>
+        <div style="background:#1E3A5F10;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:#586473">Current balance: <b style="color:#1E3A5F;font-size:18px">${currentBalance}</b> credits</div>
         <div id="acerr"></div>
         <div class="fg"><label>Credits to add</label><input class="inp" id="acamt" type="number" inputmode="numeric" placeholder="e.g. 50"></div>
         <div class="fg"><label>Note (optional)</label><input class="inp" id="acnote" placeholder="e.g. Invoice #1024 paid"></div>
-        <button class="btn-auth" id="acadd" style="background:#7C3AED">Add credits</button>
+        <button class="btn-auth" id="acadd" style="background:#1E3A5F">Add credits</button>
         <p class="fb-note">Enter a negative number to make a correction. Every change is recorded.</p>
       </div>
     </div>`);
@@ -2204,7 +2194,7 @@ function openAdminNewCompany(onCreated) {
         </div>
         <div class="fg"><label>Address</label><input class="inp" id="ncaddr" placeholder="Optional"></div>
         <div class="fg"><label>Opening course credits</label><input class="inp" id="nccredits" type="number" inputmode="numeric" placeholder="0"></div>
-        <button class="btn-auth" id="nccreate" style="background:#7C3AED">Create company</button>
+        <button class="btn-auth" id="nccreate" style="background:#1E3A5F">Create company</button>
         <p class="fb-note">You'll see the login details next so you can share them with the company.</p>
       </div>
     </div>`);
@@ -2227,8 +2217,8 @@ function openAdminNewCompany(onCreated) {
         <div style="margin-bottom:6px"><b>Login email:</b> ${esc(email)}</div>
         <div><b>Password:</b> ${esc(password)}</div>
       </div>
-      <p style="color:#7A8599;font-size:13px;max-width:340px;margin:0 auto 18px">Share these with the company. They can change the password after logging in.</p>
-      <button class="btn-auth" id="ncdone" style="max-width:200px;margin:0 auto;background:#7C3AED">Done</button></div>`;
+      <p style="color:#8E99A8;font-size:13px;max-width:340px;margin:0 auto 18px">Share these with the company. They can change the password after logging in.</p>
+      <button class="btn-auth" id="ncdone" style="max-width:200px;margin:0 auto;background:#1E3A5F">Done</button></div>`;
     modal.querySelector("#ncdone").onclick = () => { overlay.remove(); onCreated && onCreated(); };
   };
   setTimeout(() => modal.querySelector("#ncname")?.focus(), 50);
@@ -2251,7 +2241,7 @@ function openAdminNewIndividual(onCreated) {
           </div>
         </div>
         <div class="fg"><label>Opening course credits</label><input class="inp" id="nicredits" type="number" inputmode="numeric" placeholder="0"></div>
-        <button class="btn-auth" id="nicreate" style="background:#7C3AED">Create carer</button>
+        <button class="btn-auth" id="nicreate" style="background:#1E3A5F">Create carer</button>
         <p class="fb-note">You'll see the login details next so you can share them with the carer.</p>
       </div>
     </div>`);
@@ -2274,8 +2264,8 @@ function openAdminNewIndividual(onCreated) {
         <div style="margin-bottom:6px"><b>Login email:</b> ${esc(email)}</div>
         <div><b>Password:</b> ${esc(password)}</div>
       </div>
-      <p style="color:#7A8599;font-size:13px;max-width:360px;margin:0 auto 18px">Share these with the carer. On the home page they tap “Register as an individual” → “Already registered? Log in”, then sign in and can change their password.</p>
-      <button class="btn-auth" id="nidone" style="max-width:200px;margin:0 auto;background:#7C3AED">Done</button></div>`;
+      <p style="color:#8E99A8;font-size:13px;max-width:360px;margin:0 auto 18px">Share these with the carer. On the home page they tap “Register as an individual” → “Already registered? Log in”, then sign in and can change their password.</p>
+      <button class="btn-auth" id="nidone" style="max-width:200px;margin:0 auto;background:#1E3A5F">Done</button></div>`;
     modal.querySelector("#nidone").onclick = () => { overlay.remove(); onCreated && onCreated(); };
   };
   setTimeout(() => modal.querySelector("#niname")?.focus(), 50);
@@ -2291,16 +2281,16 @@ function openAdminStaffModal(orgId, staff, onChange) {
         <div><h2>${esc(staff.name)}</h2><p>${esc(staff.role)} · PIN ${esc(staff.pin)} · ${esc(staff.email)}</p></div>
         <button class="x" id="close">✕</button>
       </div>
-      <div style="padding:14px 22px"><span class="pill" style="background:${staff.active ? "#16A34A18" : "#94A3B818"};color:${staff.active ? "#15803D" : "#64748B"}">${staff.active ? "Active licence" : "Inactive licence"}</span>
+      <div style="padding:14px 22px"><span class="pill" style="background:${staff.active ? "#1FA46318" : "#94A3B818"};color:${staff.active ? "#15803D" : "#64748B"}">${staff.active ? "Active licence" : "Inactive licence"}</span>
         <button class="mini-btn" id="toggle" style="margin-left:8px">${staff.active ? "Deactivate" : "Reactivate"}</button></div>
       <div style="padding:0 22px 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span class="pin-chip">PIN <b id="apinval">${esc(staff.pin)}</b></span>
         <button class="mini-btn" id="aresetpin">🔑 Reset PIN</button>
         <button class="mini-btn" id="aremindpin">✉️ Email reminder</button>
       </div>
-      <div style="padding:6px 22px 4px;border-top:1px solid #F0F2F5"><b style="font-size:15px">Assigned Courses (${staff.enrolments.length})</b></div>
+      <div style="padding:6px 22px 4px;border-top:1px solid #F4F7FA"><b style="font-size:15px">Assigned Courses (${staff.enrolments.length})</b></div>
       <div id="assigned" style="padding:0 22px"></div>
-      <div style="padding:14px 22px 6px;border-top:1px solid #F0F2F5;margin-top:8px"><b style="font-size:15px">Assign a Course</b></div>
+      <div style="padding:14px 22px 6px;border-top:1px solid #F4F7FA;margin-top:8px"><b style="font-size:15px">Assign a Course</b></div>
       <div style="padding:0 22px 20px" id="assign-slot"></div>
     </div>`);
   overlay.appendChild(modal); document.body.appendChild(overlay);
@@ -2322,8 +2312,8 @@ function openAdminStaffModal(orgId, staff, onChange) {
   staff.enrolments.forEach(e => {
     const status = e.compliance === "valid" ? "✓ Complete" : e.compliance === "expiring" ? "Expiring" : e.compliance === "expired" ? "Expired" : e.compliance === "failed" ? "Failed" : e.progress ? e.progress + "%" : "Not started";
     const row = el(`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #F4F6F8">
-      <span style="flex:1;font-size:14px;color:#2C3E50">${esc(e.courseTitle)}</span>
-      <span class="pill" style="background:#EEF2F6;color:#5A6474;font-size:11px">${status}</span>
+      <span style="flex:1;font-size:14px;color:#1E3A5F">${esc(e.courseTitle)}</span>
+      <span class="pill" style="background:#EEF2F6;color:#586473;font-size:11px">${status}</span>
       <button class="mini-btn danger">Remove</button></div>`);
     row.querySelector("button").onclick = async () => {
       await api(`/admin/orgs/${orgId}/staff/${staff.id}/enrol/${e.courseId}`, "DELETE").catch(() => {});
@@ -2472,15 +2462,15 @@ async function renderIndividualPortal() {
       else if (e.compliance === "failed") { badge = `<span class="sc-badge" style="background:rgba(231,76,60,.4)">Retake</span>`; cta = "Retake →"; }
       const card = el(`
         <div class="sc">
-          <div class="sc-top" style="background:${c.color||"#1B2A4A"}"><span style="font-size:32px">${c.icon||"📘"}</span>${badge}</div>
+          <div class="sc-top" style="background:${c.color||"#1E3A5F"}"><span style="font-size:32px">${c.icon||"📘"}</span>${badge}</div>
           <div class="sc-body">
-            <div style="font-size:10px;font-weight:700;color:#2980B9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
+            <div style="font-size:10px;font-weight:700;color:#1E3A5F;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
             <div class="sc-title">${esc(e.courseTitle)}</div>
             <div class="sc-meta">⏱ ${c.duration||""} · ${c.modules ? c.modules.length + " modules" : (c.quiz||[]).length + " questions"}</div>
             ${e.compliance==="in_progress" ? `<div class="obar-mini" style="margin-bottom:11px"><div class="obar-mini-f" style="width:${e.progress}%;background:${c.color}"></div></div>` : ""}
             ${(e.compliance==="valid"||e.compliance==="expiring")
-              ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#2980B9"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
-              : `<button class="sc-cta" style="background:${c.color||"#2980B9"}">${cta}</button>`}
+              ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#1E3A5F"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
+              : `<button class="sc-cta" style="background:${c.color||"#1E3A5F"}">${cta}</button>`}
           </div>
         </div>`);
       card.onclick = () => (c.modules ? openCareCertificate(e.courseId, me) : openCoursePlayer(e.courseId, me));
@@ -2497,11 +2487,11 @@ async function renderIndividualPortal() {
       const c = state.courses.find(x => x.id === e.courseId) || {};
       const item = el(`
         <div class="sc" style="cursor:pointer">
-          <div class="sc-top" style="background:${c.color||"#1B2A4A"}"><span style="font-size:32px">🏆</span></div>
+          <div class="sc-top" style="background:${c.color||"#1E3A5F"}"><span style="font-size:32px">🏆</span></div>
           <div class="sc-body">
             <div class="sc-title">${esc(e.courseTitle)}</div>
             <div class="sc-meta">Passed ${e.score}% · expires ${fmtDate(e.expiryDate)}</div>
-            <button class="sc-cta" style="background:${c.color||"#2980B9"}">View certificate →</button>
+            <button class="sc-cta" style="background:${c.color||"#1E3A5F"}">View certificate →</button>
           </div>
         </div>`);
       item.onclick = () => printCertificate(e, me);
@@ -2531,7 +2521,7 @@ function openBuyCredits() {
       <div class="modal-h"><div><h2>Buy credits</h2><p>1 credit = 1 course · £${PRICING.paygPerCourse} each</p></div><button class="x" id="close">✕</button></div>
       <div style="padding:18px 22px 22px">
         <div class="fg"><label>How many credits?</label><input class="inp" id="qty" type="number" inputmode="numeric" value="1" min="1"></div>
-        <div id="qtysum" style="font-size:14px;color:#5A6474;margin:-4px 0 14px"></div>
+        <div id="qtysum" style="font-size:14px;color:#586473;margin:-4px 0 14px"></div>
         <button class="btn-auth" id="checkout">Continue to secure payment</button>
         <p class="fb-note">You'll be taken to our secure Stripe checkout. Credits are added to your account once payment is confirmed.</p>
       </div>
@@ -2562,11 +2552,11 @@ async function openAddIndividualCourse(me, credits) {
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   modal.querySelector("#close").onclick = () => overlay.remove();
   const list = modal.querySelector("#addlist");
-  if (!available.length) { list.appendChild(el(`<div style="padding:14px;color:#7A8599">You've already added every available course.</div>`)); return; }
+  if (!available.length) { list.appendChild(el(`<div style="padding:14px;color:#8E99A8">You've already added every available course.</div>`)); return; }
   available.forEach(c => {
     const row = el(`
       <div class="addrow">
-        <div class="addrow-ic" style="background:${c.color||"#1B2A4A"}">${c.icon||"📘"}</div>
+        <div class="addrow-ic" style="background:${c.color||"#1E3A5F"}">${c.icon||"📘"}</div>
         <div style="flex:1;min-width:0"><div class="addrow-t">${esc(c.title)}</div><div class="addrow-m">⏱ ${c.duration||""} · ${c.modules ? c.modules.length+" modules" : (c.quiz||[]).length+" questions"}</div></div>
         <button class="mini-btn">Add</button>
       </div>`);
@@ -2660,7 +2650,7 @@ async function paintStaffTab() {
   const total = enrolments.length;
 
   if (staffTab === "courses") {
-    body.appendChild(el(`<div class="hero"><h1>Welcome back, ${esc(me.staff.name.split(" ")[0])}! 👋</h1><p>You've completed <b style="color:#27AE60">${doneCount} of ${total}</b> assigned course${total===1?"":"s"}.</p></div>`));
+    body.appendChild(el(`<div class="hero"><h1>Welcome back, ${esc(me.staff.name.split(" ")[0])}! 👋</h1><p>You've completed <b style="color:#1FA463">${doneCount} of ${total}</b> assigned course${total===1?"":"s"}.</p></div>`));
 
     const expiring = enrolments.filter(e => e.compliance === "expiring");
     if (expiring.length) {
@@ -2683,15 +2673,15 @@ async function paintStaffTab() {
 
         const card = el(`
           <div class="sc">
-            <div class="sc-top" style="background:${c.color||"#1B2A4A"}"><span style="font-size:32px">${c.icon||"📘"}</span>${badge}</div>
+            <div class="sc-top" style="background:${c.color||"#1E3A5F"}"><span style="font-size:32px">${c.icon||"📘"}</span>${badge}</div>
             <div class="sc-body">
-              <div style="font-size:10px;font-weight:700;color:#2980B9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
+              <div style="font-size:10px;font-weight:700;color:#1E3A5F;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Mandatory</div>
               <div class="sc-title">${esc(e.courseTitle)}</div>
               <div class="sc-meta">⏱ ${c.duration||""} · ${c.modules ? c.modules.length + " modules" : (c.quiz||[]).length + " questions"}${e.dueDate?` · due ${fmtDate(e.dueDate)}`:""}</div>
               ${e.compliance==="in_progress" ? `<div class="obar-mini" style="margin-bottom:11px"><div class="obar-mini-f" style="width:${e.progress}%;background:${c.color}"></div></div>` : ""}
               ${(e.compliance==="valid"||e.compliance==="expiring")
-                ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#2980B9"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
-                : `<button class="sc-cta" style="background:${c.color||"#2980B9"}">${cta}</button>`}
+                ? `<div class="sc-done"><div class="sc-score" style="color:${c.color||"#1E3A5F"}">${e.score}%</div><div class="sc-exp">Expires ${fmtDate(e.expiryDate)}</div></div>`
+                : `<button class="sc-cta" style="background:${c.color||"#1E3A5F"}">${cta}</button>`}
             </div>
           </div>
         `);
@@ -2748,10 +2738,10 @@ async function paintStaffTab() {
       </div>
       <div class="scard" style="margin-top:16px">
         <h3>Training Summary</h3>
-        <div class="srow"><label>Courses Completed</label><span style="color:#27AE60;font-weight:700">${doneCount} / ${total}</span></div>
+        <div class="srow"><label>Courses Completed</label><span style="color:#1FA463;font-weight:700">${doneCount} / ${total}</span></div>
         <div class="srow"><label>Compliance</label><span class="pill ${doneCount===total&&total>0?"green":"amber"}">${doneCount===total&&total>0?"✓ Fully Compliant":"In Progress"}</span></div>
       </div>
-      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#5A6474;margin-bottom:10px">Change the 4-digit PIN you use to sign in.</p><button class="mini-btn" id="chgpin">🔒 Change PIN</button></div></div>
+      <div class="scard" style="margin-top:16px"><h3>Security</h3><div style="padding:0 20px 16px"><p style="font-size:13px;color:#586473;margin-bottom:10px">Change the 4-digit PIN you use to sign in.</p><button class="mini-btn" id="chgpin">🔒 Change PIN</button></div></div>
       </div>
     `));
     document.getElementById("chgpin").onclick = () => openChangePin();
@@ -2789,7 +2779,7 @@ function renderSlideVisual(slide, course) {
   }
   if (v === "compare" && d.left && d.right) {
     const col = (side, bg) => `<div class="vcol"><div class="vcol-h" style="background:${bg}">${esc(side.title)}</div><ul class="vcol-items">${side.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul></div>`;
-    return `<div class="vcompare">${col(d.left, c)}${col(d.right, "#5A6474")}</div>`;
+    return `<div class="vcompare">${col(d.left, c)}${col(d.right, "#586473")}</div>`;
   }
   if (v === "cycle" && d.items) {
     return `<div class="vcycle">${
@@ -2887,7 +2877,7 @@ async function openCoursePlayer(courseId, me, opts) {
       `));
       const nav = el(`<div class="snav"></div>`);
       if (slideIdx > 0) { const b = el(`<button class="btn-out" style="border-color:${course.color};color:${course.color}">← Previous</button>`); b.onclick = () => { slideIdx--; render(); }; nav.appendChild(b); }
-      else { const b = el(`<button class="btn-out" style="border-color:#BDC3C7;color:#7A8599">← Overview</button>`); b.onclick = () => { stage = "intro"; render(); }; nav.appendChild(b); }
+      else { const b = el(`<button class="btn-out" style="border-color:#BDC3C7;color:#8E99A8">← Overview</button>`); b.onclick = () => { stage = "intro"; render(); }; nav.appendChild(b); }
       nav.appendChild(el(`<div style="flex:1"></div>`));
       if (slideIdx < course.slides.length-1) { const b = el(`<button class="btn-go" style="background:${course.color}">Next →</button>`); b.onclick = async () => { slideIdx++; await saveProgress(); render(); }; nav.appendChild(b); }
       else { const b = el(`<button class="btn-go" style="background:${course.color}">📝 Start Assessment</button>`); b.onclick = async () => { inQuiz = true; await saveProgress(100); render(); }; nav.appendChild(b); }
@@ -2950,7 +2940,7 @@ async function openCareCertificate(courseId, me) {
       const isDone = completed.has(m.id);
       const item = el(`
         <button class="cc-mod ${isDone ? "done" : ""}" style="--c:${course.color}">
-          <span class="cc-num" style="background:${isDone ? course.color : "#E0E6ED"};color:${isDone ? "#fff" : "#5A6474"}">${isDone ? "✓" : i + 1}</span>
+          <span class="cc-num" style="background:${isDone ? course.color : "#E0E6ED"};color:${isDone ? "#fff" : "#586473"}">${isDone ? "✓" : i + 1}</span>
           <span class="cc-mod-body"><span class="cc-mod-title">${esc(m.title)}</span><span class="cc-mod-sum">${esc(m.summary || "")}</span></span>
           <span class="cc-mod-cta" style="color:${course.color}">${isDone ? "Review" : "Start"} →</span>
         </button>`);
@@ -2993,7 +2983,7 @@ async function openCareCertificate(courseId, me) {
           </div>`));
         const nav = el(`<div class="snav"></div>`);
         if (slideIdx > 0) { const b = el(`<button class="btn-out" style="border-color:${course.color};color:${course.color}">← Previous</button>`); b.onclick = () => { slideIdx--; render(); }; nav.appendChild(b); }
-        else { const b = el(`<button class="btn-out" style="border-color:#BDC3C7;color:#7A8599">← Modules</button>`); b.onclick = () => renderMenu(); nav.appendChild(b); }
+        else { const b = el(`<button class="btn-out" style="border-color:#BDC3C7;color:#8E99A8">← Modules</button>`); b.onclick = () => renderMenu(); nav.appendChild(b); }
         nav.appendChild(el(`<div style="flex:1"></div>`));
         if (slideIdx < m.slides.length - 1) { const b = el(`<button class="btn-go" style="background:${course.color}">Next →</button>`); b.onclick = () => { slideIdx++; render(); }; nav.appendChild(b); }
         else { const b = el(`<button class="btn-go" style="background:${course.color}">📝 Take the quiz</button>`); b.onclick = () => { inQuiz = true; render(); }; nav.appendChild(b); }
@@ -3033,7 +3023,7 @@ function renderModuleQuiz(course, module, onRetry, onPass) {
     const q = quiz[cur];
     const inner = el(`<div class="quiz"></div>`);
     inner.appendChild(el(`<div class="qbar"><div class="qbar-f" style="width:${(cur / quiz.length) * 100}%;background:${course.color}"></div></div>`));
-    inner.appendChild(el(`<div class="qmeta"><span style="color:${course.color};font-weight:700">Question ${cur + 1} of ${quiz.length}</span><span style="color:#7A8599">Pass: ${passNeed} of ${quiz.length}</span></div>`));
+    inner.appendChild(el(`<div class="qmeta"><span style="color:${course.color};font-weight:700">Question ${cur + 1} of ${quiz.length}</span><span style="color:#8E99A8">Pass: ${passNeed} of ${quiz.length}</span></div>`));
     inner.appendChild(el(`<div class="qq">${esc(q.q)}</div>`));
     const opts = el(`<div class="qopts"></div>`);
     q.options.forEach((opt, i) => {
@@ -3046,7 +3036,7 @@ function renderModuleQuiz(course, module, onRetry, onPass) {
     });
     inner.appendChild(opts);
     if (answered) {
-      inner.appendChild(el(`<div class="qexp" style="border-left:3px solid ${course.color}"><b style="color:${selected === q.answer ? course.color : "#E74C3C"}">${selected === q.answer ? "✓ Correct!" : "✗ Incorrect"}</b><p>${esc(q.explanation || "")}</p></div>`));
+      inner.appendChild(el(`<div class="qexp" style="border-left:3px solid ${course.color}"><b style="color:${selected === q.answer ? course.color : "#E5484D"}">${selected === q.answer ? "✓ Correct!" : "✗ Incorrect"}</b><p>${esc(q.explanation || "")}</p></div>`));
       const nb = el(`<button class="qnext" style="background:${course.color}">${cur + 1 >= quiz.length ? "See result" : "Next →"}</button>`);
       nb.onclick = () => { cur++; selected = null; answered = false; paint(); };
       inner.appendChild(nb);
@@ -3059,11 +3049,11 @@ function renderModuleQuiz(course, module, onRetry, onPass) {
     const passed = correct >= passNeed;
     const box = el(`<div class="quiz" style="text-align:center">
       <div style="font-size:54px;margin-bottom:6px">${passed ? "🎉" : "📘"}</div>
-      <h2 style="color:${passed ? course.color : "#E67E22"};margin-bottom:6px">${passed ? "Module complete!" : "Not quite there"}</h2>
-      <p style="color:#5A6474;margin-bottom:4px">You scored ${correct} of ${quiz.length} (${score}%).</p>
-      <p style="color:#7A8599;font-size:13px;margin-bottom:20px">${passed ? "This module is now ticked off." : `You need ${passNeed} of ${quiz.length} to pass.`}</p>
+      <h2 style="color:${passed ? course.color : "#E0902E"};margin-bottom:6px">${passed ? "Module complete!" : "Not quite there"}</h2>
+      <p style="color:#586473;margin-bottom:4px">You scored ${correct} of ${quiz.length} (${score}%).</p>
+      <p style="color:#8E99A8;font-size:13px;margin-bottom:20px">${passed ? "This module is now ticked off." : `You need ${passNeed} of ${quiz.length} to pass.`}</p>
     </div>`);
-    const btn = el(`<button class="qnext" style="background:${passed ? course.color : "#E67E22"};max-width:320px;margin:0 auto">${passed ? "Back to modules →" : "Try again"}</button>`);
+    const btn = el(`<button class="qnext" style="background:${passed ? course.color : "#E0902E"};max-width:320px;margin:0 auto">${passed ? "Back to modules →" : "Try again"}</button>`);
     btn.onclick = () => { if (passed) onPass(score); else onRetry(); };
     box.appendChild(btn);
     wrap.appendChild(box);
@@ -3084,7 +3074,7 @@ function renderQuiz(course, me, onRestart) {
     const q = quiz[cur];
     const inner = el(`<div class="quiz"></div>`);
     inner.appendChild(el(`<div class="qbar"><div class="qbar-f" style="width:${(cur/quiz.length)*100}%;background:${course.color}"></div></div>`));
-    inner.appendChild(el(`<div class="qmeta"><span style="color:${course.color};font-weight:700">Question ${cur+1} of ${quiz.length}</span><span style="color:#7A8599">Score: ${correct}</span></div>`));
+    inner.appendChild(el(`<div class="qmeta"><span style="color:${course.color};font-weight:700">Question ${cur+1} of ${quiz.length}</span><span style="color:#8E99A8">Score: ${correct}</span></div>`));
     inner.appendChild(el(`<div class="qq">${esc(q.q)}</div>`));
     const opts = el(`<div class="qopts"></div>`);
     q.options.forEach((opt,i) => {
@@ -3103,7 +3093,7 @@ function renderQuiz(course, me, onRestart) {
     });
     inner.appendChild(opts);
     if (answered) {
-      inner.appendChild(el(`<div class="qexp" style="border-left:3px solid ${course.color}"><b style="color:${selected===q.answer?course.color:"#E74C3C"}">${selected===q.answer?"✓ Correct!":"✗ Incorrect"}</b><p>${esc(q.explanation)}</p></div>`));
+      inner.appendChild(el(`<div class="qexp" style="border-left:3px solid ${course.color}"><b style="color:${selected===q.answer?course.color:"#E5484D"}">${selected===q.answer?"✓ Correct!":"✗ Incorrect"}</b><p>${esc(q.explanation)}</p></div>`));
       const nb = el(`<button class="qnext" style="background:${course.color}">${cur+1>=quiz.length?"View Results":"Next →"}</button>`);
       nb.onclick = async () => {
         if (cur+1 >= quiz.length) { await finish(); }
@@ -3127,9 +3117,9 @@ function renderQuiz(course, me, onRestart) {
     const done = el(`
       <div class="qdone">
         <div style="font-size:56px;margin-bottom:12px">${passed?"🏆":"📚"}</div>
-        <h2 style="color:${passed?course.color:"#E74C3C"};margin-bottom:8px">${passed?"Competency Confirmed!":"Additional Study Required"}</h2>
-        <div class="qscore-box" style="border-color:${passed?course.color:"#E74C3C"}"><span class="qbig" style="color:${passed?course.color:"#E74C3C"}">${score}%</span><span style="color:#7A8599;font-size:14px">${results.filter(Boolean).length} of ${quiz.length} correct</span></div>
-        <p style="color:#5A6474;font-size:14px;line-height:1.7;max-width:400px;margin:0 auto">${passed?"You have demonstrated competency. Your certificate has been issued and your progress saved — your manager can now see this course as complete.":"You scored below the 70% pass mark. Review the course sections and try the assessment again."}</p>
+        <h2 style="color:${passed?course.color:"#E5484D"};margin-bottom:8px">${passed?"Competency Confirmed!":"Additional Study Required"}</h2>
+        <div class="qscore-box" style="border-color:${passed?course.color:"#E5484D"}"><span class="qbig" style="color:${passed?course.color:"#E5484D"}">${score}%</span><span style="color:#8E99A8;font-size:14px">${results.filter(Boolean).length} of ${quiz.length} correct</span></div>
+        <p style="color:#586473;font-size:14px;line-height:1.7;max-width:400px;margin:0 auto">${passed?"You have demonstrated competency. Your certificate has been issued and your progress saved — your manager can now see this course as complete.":"You scored below the 70% pass mark. Review the course sections and try the assessment again."}</p>
       </div>
     `);
     if (!passed) {
@@ -3157,27 +3147,27 @@ function renderQuiz(course, me, onRestart) {
 // ── Print the certificate via a hidden iframe (no pop-up window required) ──
 function printCertificate(enr, me) {
   const c = state.courses.find(x => x.id === enr.courseId) || {};
-  const color = c.color || "#1B2A4A";
+  const color = c.color || "#1E3A5F";
   const doc =
 '<!DOCTYPE html><html><head><meta charset="utf-8">' +
 '<title>Certificate — ' + esc(enr.courseTitle) + ' — ' + esc(me.staff.name) + '</title>' +
 '<style>' +
 '@page{size:A4 portrait;margin:14mm;}' +
 '*{box-sizing:border-box;margin:0;padding:0;}' +
-'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1A1A2E;padding:10px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1E3A5F;padding:10px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
 '.sheet{border:3px solid ' + color + ';border-radius:14px;overflow:hidden;max-width:760px;margin:0 auto;}' +
 '.top{background:' + color + ';color:#fff;padding:24px 32px;display:flex;justify-content:space-between;align-items:center;}' +
 '.brand{font-size:22px;font-weight:900;display:flex;align-items:center;gap:8px;}' +
 '.badge{font-size:12px;opacity:.85;letter-spacing:1px;}' +
 '.bodyc{padding:40px 40px 30px;text-align:center;}' +
 '.icon{font-size:64px;margin-bottom:10px;}' +
-'.sm{font-size:14px;color:#7A8599;margin:6px 0;}' +
+'.sm{font-size:14px;color:#8E99A8;margin:6px 0;}' +
 '.name{font-size:34px;font-weight:900;margin:6px 0;}' +
 '.course{font-size:24px;font-weight:800;color:' + color + ';margin:6px 0;}' +
 '.meta{display:flex;justify-content:center;gap:38px;margin:28px 0 18px;flex-wrap:wrap;}' +
-'.ml{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#7A8599;font-weight:700;}' +
+'.ml{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8E99A8;font-weight:700;}' +
 '.mv{font-size:16px;font-weight:800;margin-top:3px;}' +
-'.strip{margin-top:6px;padding:14px;background:' + color + '14;border-radius:8px;display:flex;justify-content:space-between;font-size:12px;color:#5A6474;}' +
+'.strip{margin-top:6px;padding:14px;background:' + color + '14;border-radius:8px;display:flex;justify-content:space-between;font-size:12px;color:#586473;}' +
 '.foot{text-align:center;font-size:11px;color:#9AA5B1;margin-top:16px;}' +
 '</style></head><body>' +
 '<div class="sheet">' +
@@ -3243,11 +3233,11 @@ function printViaIframe(html) {
 // ── Compliance status → printable label + colours ──
 function compStatusStyle(compliance) {
   switch (compliance) {
-    case "valid":       return { label: "Valid",         fg: "#15803D", bg: "#16A34A1A" };
-    case "expiring":    return { label: "Expiring soon", fg: "#9A6700", bg: "#E67E221A" };
-    case "expired":     return { label: "Expired",       fg: "#B91C1C", bg: "#E74C3C1A" };
-    case "in_progress": return { label: "In progress",   fg: "#1D4E89", bg: "#2980B91A" };
-    case "failed":      return { label: "Failed",        fg: "#B91C1C", bg: "#E74C3C1A" };
+    case "valid":       return { label: "Valid",         fg: "#15803D", bg: "#1FA4631A" };
+    case "expiring":    return { label: "Expiring soon", fg: "#9A6700", bg: "#E0902E1A" };
+    case "expired":     return { label: "Expired",       fg: "#B91C1C", bg: "#E5484D1A" };
+    case "in_progress": return { label: "In progress",   fg: "#1D4E89", bg: "#1E3A5F1A" };
+    case "failed":      return { label: "Failed",        fg: "#B91C1C", bg: "#E5484D1A" };
     default:            return { label: "Not started",   fg: "#4B5563", bg: "#9CA3AF1A" };
   }
 }
@@ -3284,10 +3274,10 @@ async function downloadComplianceReport() {
         + '</tr>';
     }).join("");
     const overall = (s.assignedCount > 0 && s.compliant)
-      ? '<span class="badge" style="color:#15803D;background:#16A34A1A">Fully compliant</span>'
+      ? '<span class="badge" style="color:#15803D;background:#1FA4631A">Fully compliant</span>'
       : (s.assignedCount === 0
         ? '<span class="badge" style="color:#4B5563;background:#9CA3AF1A">No courses assigned</span>'
-        : '<span class="badge" style="color:#9A6700;background:#E67E221A">Action required</span>');
+        : '<span class="badge" style="color:#9A6700;background:#E0902E1A">Action required</span>');
     const table = (s.enrolments && s.enrolments.length)
       ? '<table><thead><tr><th>Course</th><th>Status</th><th>Score</th><th>Completed</th><th>Expires</th></tr></thead><tbody>' + rows + '</tbody></table>'
       : '<div class="none">No courses assigned.</div>';
@@ -3302,27 +3292,27 @@ async function downloadComplianceReport() {
 + '<style>'
 + '@page{size:A4 portrait;margin:14mm;}'
 + '*{box-sizing:border-box;margin:0;padding:0;}'
-+ 'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1A1A2E;font-size:12px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
++ 'body{font-family:"Segoe UI",system-ui,sans-serif;color:#1E3A5F;font-size:12px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
 + '.hd{background:#0D1B2A;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:8px;}'
 + '.hd .l{display:flex;align-items:center;gap:11px;}'
 + '.hd .ttl{font-size:18px;font-weight:700;}'
 + '.hd .sub{font-size:11px;color:#9FB0C4;}'
 + '.hd .org{font-size:13px;font-weight:700;text-align:right;}'
-+ '.meta{display:flex;justify-content:space-between;margin:14px 2px;font-size:11px;color:#5A6474;}'
++ '.meta{display:flex;justify-content:space-between;margin:14px 2px;font-size:11px;color:#586473;}'
 + '.sumrow{display:flex;gap:10px;margin-bottom:18px;}'
 + '.sum{flex:1;border:1px solid #E5E7EB;border-radius:8px;padding:10px;text-align:center;}'
 + '.sum .n{font-size:22px;font-weight:800;}'
-+ '.sum .l{font-size:9px;color:#7A8599;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}'
++ '.sum .l{font-size:9px;color:#8E99A8;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}'
 + '.staff{margin-bottom:14px;page-break-inside:avoid;}'
-+ '.staff-h{display:flex;justify-content:space-between;align-items:center;background:#F0F4F8;padding:8px 12px;border-radius:6px;margin-bottom:6px;}'
++ '.staff-h{display:flex;justify-content:space-between;align-items:center;background:#F4F7FA;padding:8px 12px;border-radius:6px;margin-bottom:6px;}'
 + '.staff-name{font-weight:700;font-size:13px;}'
-+ '.staff-role{color:#7A8599;font-size:11px;}'
++ '.staff-role{color:#8E99A8;font-size:11px;}'
 + 'table{width:100%;border-collapse:collapse;}'
-+ 'th{text-align:left;color:#7A8599;font-weight:600;padding:5px 8px;border-bottom:1px solid #E5E7EB;text-transform:uppercase;font-size:9px;letter-spacing:.3px;}'
-+ 'td{padding:6px 8px;border-bottom:1px solid #F0F2F5;font-size:11px;}'
++ 'th{text-align:left;color:#8E99A8;font-weight:600;padding:5px 8px;border-bottom:1px solid #E5E7EB;text-transform:uppercase;font-size:9px;letter-spacing:.3px;}'
++ 'td{padding:6px 8px;border-bottom:1px solid #F4F7FA;font-size:11px;}'
 + '.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}'
-+ '.none{padding:8px 12px;color:#7A8599;font-style:italic;font-size:11px;}'
-+ '.legend{margin-top:6px;font-size:10px;color:#7A8599;line-height:1.6;}'
++ '.none{padding:8px 12px;color:#8E99A8;font-style:italic;font-size:11px;}'
++ '.legend{margin-top:6px;font-size:10px;color:#8E99A8;line-height:1.6;}'
 + '.foot{margin-top:18px;padding-top:10px;border-top:1px solid #E5E7EB;text-align:center;font-size:10px;color:#9AA5B1;}'
 + '</style></head><body>'
 + '<div class="hd"><div class="l">' + logoMark(26, false) + '<div><div class="ttl">Care2Learn</div><div class="sub">Training Compliance Report</div></div></div><div class="org">' + esc(org.name) + (org.cqc_number ? '<br><span style="font-weight:400;color:#9FB0C4">CQC ' + esc(org.cqc_number) + '</span>' : '') + '</div></div>'
@@ -3363,7 +3353,7 @@ function showCertificate(enr, me) {
           <div><div class="cm-l">Valid Until</div><div class="cm-v">${fmtDate(enr.expiryDate)}</div></div>
           <div><div class="cm-l">Cert ID</div><div class="cm-v mono">${esc(enr.certId)}</div></div>
         </div>
-        <div style="padding:12px;background:${c.color}18;border-radius:8px;display:flex;justify-content:space-between;font-size:11px;color:#5A6474"><span>Aligned to the Care Certificate 2026</span><span>Pass mark: 70% · Achieved: ${enr.score}%</span></div>
+        <div style="padding:12px;background:${c.color}18;border-radius:8px;display:flex;justify-content:space-between;font-size:11px;color:#586473"><span>Aligned to the Care Certificate 2026</span><span>Pass mark: 70% · Achieved: ${enr.score}%</span></div>
       </div>
       <div class="cert-actions">
         <button class="btn-cancel" style="flex:1" id="cert-close">Close</button>
