@@ -311,17 +311,30 @@ async function runReminderJob({ force = false } = {}) {
 function startReminderScheduler() {
   const TICK_MS = 60 * 60 * 1000;
   const tick = () => {
+    if (new Date().getUTCHours() < REMINDER_HOUR) return;
+    const today = todayStr();
+    // Job 1 — daily learner reminders (independently claimed).
     try {
-      if (new Date().getUTCHours() < REMINDER_HOUR) return;
-      const today = todayStr();
       const last = db.prepare("SELECT value FROM system_state WHERE key = 'reminders_last_run'").get();
-      if (last && last.value === today) return;
-      // Claim today's run first so a restart mid-job can't double-send.
-      const u = db.prepare("UPDATE system_state SET value = ? WHERE key = 'reminders_last_run'").run(today);
-      if (!u.changes) db.prepare("INSERT INTO system_state (key, value) VALUES ('reminders_last_run', ?)").run(today);
-      runReminderJob();
+      if (!last || last.value !== today) {
+        // Claim today's run first so a restart mid-job can't double-send.
+        const u = db.prepare("UPDATE system_state SET value = ? WHERE key = 'reminders_last_run'").run(today);
+        if (!u.changes) db.prepare("INSERT INTO system_state (key, value) VALUES ('reminders_last_run', ?)").run(today);
+        runReminderJob();
+      }
     } catch (e) {
       console.error("🔔 Reminder scheduler tick error: " + e.message);
+    }
+    // Job 2 — reconcile subscription seat counts to headcount, so each bill is correct.
+    try {
+      const last = db.prepare("SELECT value FROM system_state WHERE key = 'subscription_sync_last_run'").get();
+      if (!last || last.value !== today) {
+        const u = db.prepare("UPDATE system_state SET value = ? WHERE key = 'subscription_sync_last_run'").run(today);
+        if (!u.changes) db.prepare("INSERT INTO system_state (key, value) VALUES ('subscription_sync_last_run', ?)").run(today);
+        reconcileAllSubscriptionSeats();
+      }
+    } catch (e) {
+      console.error("↔ Subscription reconcile tick error: " + e.message);
     }
   };
   setInterval(tick, TICK_MS);
@@ -524,6 +537,16 @@ route("POST", "/api/checkout/payg", async (req, res) => {
 // Mirrors PRICING in public/app.js. Stripe applies the right rate automatically from the quantity.
 const SUBSCRIPTION_TIERS = [[49, 200], [99, 180], [199, 160], [299, 140], [399, 120], ["inf", 100]];
 
+// The per-learner monthly rate (in pence) for a given seat count, read from the volume tier
+// table above. Because the Stripe price is built from these same tiers, seats × this rate is
+// exactly what Stripe will invoice — so we can show the amount without a second API call.
+function ratePenceForSeats(seats) {
+  for (const [upTo, amt] of SUBSCRIPTION_TIERS) {
+    if (upTo === "inf" || seats <= upTo) return amt;
+  }
+  return SUBSCRIPTION_TIERS[SUBSCRIPTION_TIERS.length - 1][1];
+}
+
 // Ensure a single volume-tiered recurring Price exists in Stripe (created once, then cached in
 // system_state). Using one tiered price means the bill applies the correct per-learner rate
 // automatically based on the seat quantity — so we only ever have to update the quantity.
@@ -573,6 +596,24 @@ async function syncSubscriptionSeats(orgId) {
   }
 }
 
+// Nightly safety net: re-sync every active subscription's seat quantity to its current
+// headcount, so the monthly bill is correct before it's raised even if a live sync was missed
+// (e.g. Stripe was briefly unreachable during a staff change). Best-effort; never throws.
+async function reconcileAllSubscriptionSeats() {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY) return;
+    const orgs = db.prepare("SELECT id FROM organisations WHERE subscription_status = 'active' AND stripe_subscription_id IS NOT NULL").all();
+    if (!orgs.length) return;
+    console.log(`↔ Reconciling subscription seats for ${orgs.length} active subscription(s)…`);
+    for (const o of orgs) {
+      await syncSubscriptionSeats(o.id);
+    }
+    console.log("↔ Subscription seat reconciliation complete.");
+  } catch (e) {
+    console.error("↔ Subscription seat reconciliation failed: " + e.message);
+  }
+}
+
 // ── Start a subscription checkout (server-created session, like PAYG) ──
 // Creating the session here (rather than sending the buyer to a static Payment Link) means
 // they return to /app with a session id, so /api/checkout/confirm activates the subscription
@@ -618,6 +659,59 @@ route("POST", "/api/checkout/subscription", async (req, res) => {
   } catch (e) {
     console.error("Stripe subscription checkout error:", e.message);
     send(res, 502, { error: "Could not start the subscription checkout. Please try again." });
+  }
+});
+
+// ── Live billing summary for the org's Settings page ──
+// Reads the subscription back from Stripe so the account holder sees exactly what they'll be
+// charged and when: the monthly amount (billed seats × the volume-tier rate), the next charge
+// date, and the seat count Stripe is actually billing. Best-effort — if Stripe can't be
+// reached it falls back to the locally-known active-staff count so the panel still shows.
+route("GET", "/api/org/billing", async (req, res) => {
+  const sess = authSession(req);
+  if (!sess) return send(res, 401, { error: "Please sign in." });
+
+  let orgId = null;
+  if (sess.kind === "org") orgId = sess.subject_id;
+  else if (sess.kind === "staff") {
+    const st = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(sess.subject_id);
+    if (st) orgId = st.org_id;
+  }
+  if (!orgId) return send(res, 400, { error: "Not an organisation account." });
+
+  const org = db.prepare("SELECT id, subscription_status, stripe_subscription_id FROM organisations WHERE id = ?").get(orgId);
+  if (!org) return send(res, 404, { error: "Account not found." });
+  if (org.subscription_status !== "active") return send(res, 200, { subscribed: false });
+
+  const localSeats = Math.max(1, ((db.prepare("SELECT COUNT(*) AS n FROM staff WHERE org_id = ? AND active = 1").get(orgId)) || {}).n || 0);
+  const build = (seats, nextChargeAt, cancelAtPeriodEnd, live) => {
+    const rate = ratePenceForSeats(seats);
+    return {
+      subscribed: true,
+      live: !!live,
+      seats,
+      currency: "gbp",
+      ratePerLearnerPence: rate,
+      monthlyAmountPence: seats * rate,
+      nextChargeAt: nextChargeAt || null,
+      cancelAtPeriodEnd: !!cancelAtPeriodEnd,
+    };
+  };
+
+  if (!process.env.STRIPE_SECRET_KEY || !org.stripe_subscription_id) {
+    return send(res, 200, build(localSeats, null, false, false));
+  }
+
+  try {
+    const sub = await stripeRequest("GET", "/v1/subscriptions/" + encodeURIComponent(org.stripe_subscription_id), null);
+    const item = sub && sub.items && sub.items.data && sub.items.data[0];
+    const seats = (item && Number(item.quantity)) || localSeats;
+    // current_period_end sits on the subscription in most API versions, on the item in newer ones.
+    const nextChargeAt = (sub && sub.current_period_end) || (item && item.current_period_end) || null;
+    return send(res, 200, build(seats, nextChargeAt, sub && sub.cancel_at_period_end, true));
+  } catch (e) {
+    console.error("Billing summary fetch failed for", orgId, "—", e.message);
+    return send(res, 200, build(localSeats, null, false, false));
   }
 });
 

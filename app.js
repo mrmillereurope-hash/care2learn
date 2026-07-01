@@ -249,6 +249,35 @@ async function startSubscribe() {
   }
 }
 
+// Fetch the live billing picture from Stripe and render it into the Settings subscription
+// card (#billinglive): the monthly amount, the next charge date, and the billed seat count.
+async function loadBillingPanel() {
+  const box = document.getElementById("billinglive");
+  if (!box) return;
+  try {
+    const b = await api("/org/billing");
+    if (!b || !b.subscribed) { box.innerHTML = ""; return; }
+    const cur = PRICING.currency;
+    const amount = cur + (b.monthlyAmountPence / 100).toFixed(2);
+    const rate = cur + (b.ratePerLearnerPence / 100).toFixed(2);
+    const when = b.nextChargeAt ? fmtDate(b.nextChargeAt * 1000) : "—";
+    const seatLine = `${b.seats} active learner${b.seats === 1 ? "" : "s"} × ${rate}/mo`;
+    const cancelNote = b.cancelAtPeriodEnd
+      ? `<p style="font-size:12px;color:#E0902E;margin-top:10px">Set to cancel at the end of the current period — no further charges after ${when}.</p>`
+      : "";
+    const staleNote = b.live ? "" : `<p style="font-size:12px;color:#8E99A8;margin-top:10px">Showing your latest known figures — live Stripe details couldn't be reached just now.</p>`;
+    box.innerHTML = `
+      <div style="border-top:1px solid #E7ECF2;padding-top:14px">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Monthly amount</span><span style="font-size:15px;font-weight:700;color:#1E3A5F">${amount}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Next charge</span><span style="font-size:14px;font-weight:600;color:#1E3A5F">${when}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Billed seats</span><span style="font-size:14px;font-weight:600;color:#1E3A5F">${seatLine}</span></div>
+        ${cancelNote}${staleNote}
+      </div>`;
+  } catch (e) {
+    box.innerHTML = `<p style="font-size:12px;color:#8E99A8">Billing details are unavailable right now.</p>`;
+  }
+}
+
 // Header pill showing the org's plan: a green "Subscribed" badge, or the credit balance
 // (amber when empty). Always rendered; clicking opens the credits/plan modal.
 function creditPillHtml(org) {
@@ -1118,7 +1147,7 @@ async function paintOrgTab(org) {
         <h3>Subscription</h3>
         <div style="padding:0 20px 16px">
           ${o.subscription_status === "active"
-            ? `<span class="pill green">✓ Subscribed</span><p style="font-size:13px;color:#586473;line-height:1.6;margin-top:8px">Your monthly subscription is active — all ${state.courses.length} mandatory courses, unlimited staff licences, assignments, certificates and CQC reporting are included.</p>`
+            ? `<span class="pill green">✓ Subscribed</span><p style="font-size:13px;color:#586473;line-height:1.6;margin-top:8px">Your monthly subscription is active — all ${state.courses.length} mandatory courses, unlimited staff licences, assignments, certificates and CQC reporting are included.</p><div id="billinglive" style="margin-top:6px"><p style="font-size:13px;color:#8E99A8">Loading billing details…</p></div>`
             : `<span class="pill" style="background:#1E3A5F18;color:#1A5276">Pay as you go</span><p style="font-size:13px;color:#586473;line-height:1.6;margin:8px 0 12px">Subscribe for just ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month to cover your whole team — every mandatory course included, with volume discounts as you grow.</p><button class="mini-btn" id="subscribe">⭐ Subscribe</button>`
           }
         </div>
@@ -1139,6 +1168,7 @@ async function paintOrgTab(org) {
     document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
     const subBtn = document.getElementById("subscribe");
     if (subBtn) subBtn.onclick = () => startSubscribe();
+    if (o.subscription_status === "active") loadBillingPanel();
     const remToggle = document.getElementById("remtoggle");
     if (remToggle) remToggle.onchange = async () => {
       try { await api("/org/settings", "POST", { remindersEnabled: remToggle.checked }); toast(remToggle.checked ? "Reminders turned on." : "Reminders turned off."); }
