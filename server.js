@@ -430,6 +430,31 @@ function retrieveStripeSession(sessionId) {
   });
 }
 
+// Generic Stripe API request (form-encoded). Returns parsed JSON or rejects with the error.
+// Used for prices and subscription-item updates so the monthly bill can track headcount.
+function stripeRequest(method, path, form) {
+  return new Promise((resolve, reject) => {
+    const body = form ? form.toString() : null;
+    const headers = { "Authorization": "Bearer " + process.env.STRIPE_SECRET_KEY };
+    if (body != null) {
+      headers["Content-Type"] = "application/x-www-form-urlencoded";
+      headers["Content-Length"] = Buffer.byteLength(body);
+    }
+    const sreq = https.request({ hostname: "api.stripe.com", path, method, headers }, (sres) => {
+      let data = "";
+      sres.on("data", (c) => (data += c));
+      sres.on("end", () => {
+        let json;
+        try { json = JSON.parse(data); } catch { return reject(new Error("Invalid response from Stripe")); }
+        if (sres.statusCode >= 200 && sres.statusCode < 300) resolve(json);
+        else reject(new Error((json.error && json.error.message) || ("Stripe error " + sres.statusCode)));
+      });
+    });
+    sreq.on("error", reject);
+    if (body != null) sreq.write(body);
+    sreq.end();
+  });
+}
 route("POST", "/api/checkout/payg", async (req, res) => {
   if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
 
@@ -495,6 +520,107 @@ route("POST", "/api/checkout/payg", async (req, res) => {
   }
 });
 
+// Volume tiers for the team subscription: [up_to_seats, pence_per_seat]. Last tier is open-ended.
+// Mirrors PRICING in public/app.js. Stripe applies the right rate automatically from the quantity.
+const SUBSCRIPTION_TIERS = [[49, 200], [99, 180], [199, 160], [299, 140], [399, 120], ["inf", 100]];
+
+// Ensure a single volume-tiered recurring Price exists in Stripe (created once, then cached in
+// system_state). Using one tiered price means the bill applies the correct per-learner rate
+// automatically based on the seat quantity — so we only ever have to update the quantity.
+async function ensureSubscriptionPriceId() {
+  const row = db.prepare("SELECT value FROM system_state WHERE key = ?").get("stripe_sub_price_id");
+  if (row && row.value) return row.value;
+  const form = new URLSearchParams();
+  form.set("currency", "gbp");
+  form.set("recurring[interval]", "month");
+  form.set("billing_scheme", "tiered");
+  form.set("tiers_mode", "volume");
+  form.set("product_data[name]", "Care2Learn — unlimited team subscription");
+  SUBSCRIPTION_TIERS.forEach(([upTo, amt], i) => {
+    form.set(`tiers[${i}][up_to]`, String(upTo));
+    form.set(`tiers[${i}][unit_amount]`, String(amt));
+  });
+  const price = await stripeRequest("POST", "/v1/prices", form);
+  if (!price || !price.id) throw new Error("Stripe did not return a price id.");
+  db.prepare("INSERT INTO system_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run("stripe_sub_price_id", price.id);
+  return price.id;
+}
+
+// Keep the Stripe subscription quantity in step with the org's active-staff count, so the
+// monthly bill tracks headcount. Best-effort: it never throws, so it can't block or fail a
+// staff operation. Changes apply from the next invoice (no mid-cycle proration).
+async function syncSubscriptionSeats(orgId) {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY || !orgId) return;
+    const org = db.prepare("SELECT subscription_status, stripe_subscription_id, stripe_subscription_item_id FROM organisations WHERE id = ?").get(orgId);
+    if (!org || org.subscription_status !== "active" || !org.stripe_subscription_id) return;
+    const seats = Math.max(1, ((db.prepare("SELECT COUNT(*) AS n FROM staff WHERE org_id = ? AND active = 1").get(orgId)) || {}).n || 0);
+    let itemId = org.stripe_subscription_item_id;
+    if (!itemId) {
+      const sub = await stripeRequest("GET", "/v1/subscriptions/" + encodeURIComponent(org.stripe_subscription_id), null);
+      itemId = sub && sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].id;
+      if (!itemId) return;
+      db.prepare("UPDATE organisations SET stripe_subscription_item_id = ? WHERE id = ?").run(itemId, orgId);
+    }
+    const form = new URLSearchParams();
+    form.set("quantity", String(seats));
+    form.set("proration_behavior", "none");
+    await stripeRequest("POST", "/v1/subscription_items/" + encodeURIComponent(itemId), form);
+    console.log(`↔ Subscription seats synced: ${orgId} → ${seats}`);
+  } catch (e) {
+    console.error("Subscription seat sync failed for", orgId, "—", e.message);
+  }
+}
+
+// ── Start a subscription checkout (server-created session, like PAYG) ──
+// Creating the session here (rather than sending the buyer to a static Payment Link) means
+// they return to /app with a session id, so /api/checkout/confirm activates the subscription
+// immediately — a reliable path that does not depend on the Stripe webhook being configured.
+route("POST", "/api/checkout/subscription", async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
+  const sess = authSession(req);
+  if (!sess) return send(res, 401, { error: "Please sign in to subscribe." });
+
+  let orgId = null;
+  if (sess.kind === "org") orgId = sess.subject_id;
+  else if (sess.kind === "staff") {
+    const st = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(sess.subject_id);
+    if (st) orgId = st.org_id;
+  }
+  if (!orgId) return send(res, 400, { error: "Only organisations can subscribe." });
+  const org = db.prepare("SELECT id, subscription_status FROM organisations WHERE id = ?").get(orgId);
+  if (!org) return send(res, 404, { error: "Account not found." });
+  if (org.subscription_status === "active") return send(res, 400, { error: "This account already has an active subscription." });
+
+  // Bill on the current team size; the tiered price applies the right per-learner rate.
+  const learners = ((db.prepare("SELECT COUNT(*) AS n FROM staff WHERE org_id = ? AND active = 1").get(orgId)) || {}).n || 0;
+  const seats = Math.max(1, learners);
+
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const base = proto + "://" + (req.headers["host"] || "localhost");
+
+  try {
+    const priceId = await ensureSubscriptionPriceId();
+    const form = new URLSearchParams();
+    form.set("mode", "subscription");
+    form.set("success_url", base + "/app?checkout=success&session_id={CHECKOUT_SESSION_ID}");
+    form.set("cancel_url", base + "/app?checkout=cancelled");
+    form.set("line_items[0][price]", priceId);
+    form.set("line_items[0][quantity]", String(seats));
+    form.set("client_reference_id", orgId);
+    form.set("metadata[account_id]", orgId);
+    form.set("subscription_data[metadata][account_id]", orgId);
+
+    const session = await createStripeCheckout(form);
+    if (!session.url) return send(res, 502, { error: "Stripe did not return a checkout URL." });
+    send(res, 200, { url: session.url });
+  } catch (e) {
+    console.error("Stripe subscription checkout error:", e.message);
+    send(res, 502, { error: "Could not start the subscription checkout. Please try again." });
+  }
+});
+
 // ── Reconcile a checkout the instant the buyer returns to the app ──
 // A reliable backup to the webhook: we ask Stripe directly whether the session was paid,
 // then apply the same effect (credits or subscription) the webhook would. Idempotent via
@@ -526,7 +652,7 @@ route("POST", "/api/checkout/confirm", async (req, res) => {
 
   if (session.mode === "subscription") {
     if (session.client_reference_id === accountId) {
-      try { markSubscriptionActive(accountId, session.subscription, session.customer); }
+      try { markSubscriptionActive(accountId, session.subscription, session.customer); syncSubscriptionSeats(accountId); }
       catch (e) { console.error("Confirm subscription failed:", e.message); }
     }
     return send(res, 200, { ok: true, mode: "subscription", subscribed: true });
@@ -935,6 +1061,7 @@ route("POST", "/api/org/staff", async (req, res) => {
   }
 
   const member = db.prepare("SELECT * FROM staff WHERE id = ?").get(id);
+  syncSubscriptionSeats(s.subject_id); // keep the subscription bill in step with headcount
   send(res, 201, { staff: { ...member, active: !!member.active }, pin, note });
 });
 
@@ -1007,6 +1134,7 @@ route("POST", "/api/org/staff/bulk", async (req, res) => {
   }
 
   console.log(`📥 BULK IMPORT: org ${s.subject_id} — created ${created.length}, skipped ${skipped.length}`);
+  if (created.length) syncSubscriptionSeats(s.subject_id); // keep the subscription bill in step with headcount
   send(res, 200, { created, skipped, summary: { total: rows.length, created: created.length, skipped: skipped.length }, courseNote });
 });
 
@@ -1022,6 +1150,7 @@ route("PATCH", "/api/org/staff/:id", async (req, res) => {
   const role = b.role ?? member.role;
   const active = b.active === undefined ? member.active : (b.active ? 1 : 0);
   db.prepare("UPDATE staff SET name = ?, role = ?, active = ? WHERE id = ?").run(name, role, active, member.id);
+  if ((member.active ? 1 : 0) !== active) syncSubscriptionSeats(member.org_id); // headcount changed → update the bill
   const updated = db.prepare("SELECT * FROM staff WHERE id = ?").get(member.id);
   send(res, 200, { staff: { ...updated, active: !!updated.active } });
 });

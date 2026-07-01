@@ -225,6 +225,9 @@ export function initSchema() {
   if (!orgCols.some((c) => c.name === "subscription_updated_at")) {
     db.exec("ALTER TABLE organisations ADD COLUMN subscription_updated_at TEXT");
   }
+  if (!orgCols.some((c) => c.name === "stripe_subscription_item_id")) {
+    db.exec("ALTER TABLE organisations ADD COLUMN stripe_subscription_item_id TEXT");
+  }
   // Backfill a unique referral code for any account that doesn't have one yet.
   backfillReferralCodes();
 }
