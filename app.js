@@ -250,7 +250,8 @@ async function startSubscribe() {
 }
 
 // Fetch the live billing picture from Stripe and render it into the Settings subscription
-// card (#billinglive): the monthly amount, the next charge date, and the billed seat count.
+// card (#billinglive): the monthly amount, next charge date, billed seat count, and — depending
+// on state — a "Cancel subscription" (30 days' notice) or "Keep my subscription" control.
 async function loadBillingPanel() {
   const box = document.getElementById("billinglive");
   if (!box) return;
@@ -262,20 +263,155 @@ async function loadBillingPanel() {
     const rate = cur + (b.ratePerLearnerPence / 100).toFixed(2);
     const when = b.nextChargeAt ? fmtDate(b.nextChargeAt * 1000) : "—";
     const seatLine = `${b.seats} active learner${b.seats === 1 ? "" : "s"} × ${rate}/mo`;
-    const cancelNote = b.cancelAtPeriodEnd
-      ? `<p style="font-size:12px;color:#E0902E;margin-top:10px">Set to cancel at the end of the current period — no further charges after ${when}.</p>`
-      : "";
+    const endDate = b.cancelAt ? fmtDate(b.cancelAt * 1000) : null;
     const staleNote = b.live ? "" : `<p style="font-size:12px;color:#8E99A8;margin-top:10px">Showing your latest known figures — live Stripe details couldn't be reached just now.</p>`;
-    box.innerHTML = `
-      <div style="border-top:1px solid #E7ECF2;padding-top:14px">
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Monthly amount</span><span style="font-size:15px;font-weight:700;color:#1E3A5F">${amount}</span></div>
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Next charge</span><span style="font-size:14px;font-weight:600;color:#1E3A5F">${when}</span></div>
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Billed seats</span><span style="font-size:14px;font-weight:600;color:#1E3A5F">${seatLine}</span></div>
-        ${cancelNote}${staleNote}
-      </div>`;
+
+    const rows = `
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Monthly amount</span><span style="font-size:15px;font-weight:700;color:#1E3A5F">${amount}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">${endDate ? "Next charge (during notice)" : "Next charge"}</span><span style="font-size:14px;font-weight:600;color:#1E3A5F">${when}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0"><span style="font-size:13px;color:#586473">Billed seats</span><span style="font-size:14px;font-weight:600;color:#1E3A5F">${seatLine}</span></div>`;
+
+    let action;
+    if (endDate) {
+      action = `
+        <div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:#FBF3E6;border:1px solid #F0D9B0">
+          <p style="font-size:13px;color:#8A5A12;line-height:1.5;margin:0">Cancellation scheduled. Your subscription stays active and continues billing until <b>${endDate}</b>, then ends — you keep full access until that date.</p>
+        </div>
+        <button class="mini-btn" id="subresume" style="margin-top:12px">↩ Keep my subscription</button>`;
+    } else {
+      action = `
+        <div style="margin-top:14px">
+          <button class="mini-btn" id="subcancel" style="background:#fff;color:#586473;border:1px solid #E7ECF2">Cancel subscription</button>
+          <p style="font-size:12px;color:#8E99A8;margin-top:8px">Cancelling gives <b>30 days' notice</b> — see the <button class="linkbtn" id="subterms">Subscription Terms</button>.</p>
+        </div>`;
+    }
+
+    box.innerHTML = `<div style="border-top:1px solid #E7ECF2;padding-top:14px">${rows}${action}${staleNote}</div>`;
+
+    const rez = document.getElementById("subresume");
+    if (rez) rez.onclick = () => resumeSubscription();
+    const can = document.getElementById("subcancel");
+    if (can) can.onclick = () => requestCancelSubscription();
+    const st = document.getElementById("subterms");
+    if (st) st.onclick = () => showSubscriptionTerms();
   } catch (e) {
     box.innerHTML = `<p style="font-size:12px;color:#8E99A8">Billing details are unavailable right now.</p>`;
   }
+}
+
+// Confirm and give 30 days' notice to cancel the subscription.
+function requestCancelSubscription() {
+  const endDate = fmtDate(Date.now() + 30 * 864e5); // 30 days from today
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal" style="max-width:470px">
+      <div class="modal-h"><div><h2>Cancel subscription?</h2><p>30 days' notice applies</p></div><button class="x" id="cx">✕</button></div>
+      <div style="padding:4px 24px 8px">
+        <p style="font-size:14px;color:#586473;line-height:1.6">Cancelling gives <b>30 days' notice</b>, in line with the Subscription Terms. Your subscription will:</p>
+        <ul style="font-size:14px;color:#586473;line-height:1.7;margin:10px 0 4px;padding-left:20px">
+          <li>stay active with full access until <b>${endDate}</b></li>
+          <li>continue to be billed monthly through the notice period</li>
+          <li>end automatically on that date, with no charges after it</li>
+        </ul>
+        <p style="font-size:13px;color:#8E99A8;line-height:1.6;margin-top:10px">You can withdraw the cancellation at any time before it takes effect.</p>
+      </div>
+      <div class="terms-foot" style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn-cancel" id="cnokeep">Keep subscription</button>
+        <button class="btn-save" id="cgo" style="background:#E5484D">Give 30 days' notice</button>
+      </div>
+    </div>`);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  modal.querySelector("#cx").onclick = close;
+  modal.querySelector("#cnokeep").onclick = close;
+  modal.querySelector("#cgo").onclick = async () => {
+    modal.querySelector("#cgo").disabled = true;
+    try {
+      await api("/org/subscription/cancel", "POST", {});
+      close();
+      toast("Cancellation scheduled — 30 days' notice given.");
+      loadBillingPanel();
+    } catch (e) {
+      modal.querySelector("#cgo").disabled = false;
+      toast(e.message || "Couldn't schedule the cancellation. Please try again.");
+    }
+  };
+}
+
+// Withdraw a scheduled cancellation so the subscription continues.
+async function resumeSubscription() {
+  if (!confirm("Keep your subscription and remove the scheduled end date? Your subscription will continue as normal.")) return;
+  try {
+    await api("/org/subscription/resume", "POST", {});
+    toast("Your subscription will continue — cancellation withdrawn.");
+    loadBillingPanel();
+  } catch (e) {
+    toast(e.message || "Couldn't update the subscription. Please try again.");
+  }
+}
+
+// Subscription Terms & Conditions (covers the 30-day cancellation notice period).
+function showSubscriptionTerms() {
+  const updated = "1 July 2026";
+  const overlay = el(`<div class="overlay"></div>`);
+  const modal = el(`
+    <div class="modal terms-modal">
+      <div class="modal-h">
+        <div><h2>Subscription Terms &amp; Conditions</h2><p>Care2Learn team subscription · Last updated ${updated}</p></div>
+        <button class="x" id="close">✕</button>
+      </div>
+      <div class="terms-doc">
+        <p class="terms-intro">These terms govern the Care2Learn monthly team subscription (the “Subscription”) for <b>organisation accounts</b>. By subscribing, you agree to these terms. They sit alongside, and do not replace, your statutory rights.</p>
+
+        <h3>1. What the Subscription includes</h3>
+        <ul>
+          <li>Unlimited course assignments for the learners on your account — every mandatory course, staff licence, assignment, certificate and CQC report is included.</li>
+          <li>The Subscription is charged <b>monthly in advance</b>, per active learner, at the per-learner rate for your team size. Volume discounts apply automatically as your team grows.</li>
+          <li>Your current monthly amount, next charge date and billed learner count are always shown in your Settings.</li>
+        </ul>
+
+        <h3>2. Billing and headcount</h3>
+        <ul>
+          <li>Each month you are billed for the number of active learners on your account at that time, at the applicable tier rate.</li>
+          <li>Adding or removing active learners adjusts the amount billed on your next invoice. Changes during a month are not separately pro-rated.</li>
+        </ul>
+
+        <h3>3. Cancellation — 30 days' notice</h3>
+        <ul>
+          <li>You may cancel the Subscription at any time by giving <b>30 days' notice</b>, which you can do yourself from your Settings.</li>
+          <li>During the 30-day notice period the Subscription remains active, you keep full access, and monthly billing continues as normal.</li>
+          <li>At the end of the notice period the Subscription ends automatically and no further charges are made after that date.</li>
+          <li>Payments already made, including those falling within the notice period, are non-refundable except where a refund is required by law. Cancelling does not refund the current or any prior month.</li>
+          <li>You may withdraw a cancellation at any time before it takes effect, and the Subscription will continue uninterrupted.</li>
+        </ul>
+
+        <h3>4. Price changes</h3>
+        <p>Care2Learn may change subscription pricing. Where a change affects you, we will take reasonable steps to make you aware in advance. Continuing the Subscription after a change takes effect means you accept the updated pricing.</p>
+
+        <h3>5. Non-payment, suspension and closure</h3>
+        <p>If a payment fails, or the account is closed or suspended, access to subscription features may be paused or withdrawn. We may attempt to collect a failed payment before the Subscription is affected.</p>
+
+        <h3>6. General</h3>
+        <p>Nothing in these terms limits or excludes any rights you have under applicable law, including your statutory rights, or any liability that cannot lawfully be limited or excluded.</p>
+
+        <h3>7. Governing law</h3>
+        <p>These terms and any dispute relating to the Subscription are governed by the laws of England and Wales, and are subject to the non-exclusive jurisdiction of the courts of England and Wales.</p>
+
+        <h3>8. Contact</h3>
+        <p>Questions about the Subscription or these terms? Contact us via the in-app <b>Feedback</b> option or at <a href="mailto:support@care2learn.co.uk">support@care2learn.co.uk</a>.</p>
+      </div>
+      <div class="terms-foot">
+        <button class="btn-save" id="termsok" style="background:#1E3A5F">Got it</button>
+      </div>
+    </div>
+  `);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  modal.querySelector("#close").onclick = () => overlay.remove();
+  modal.querySelector("#termsok").onclick = () => overlay.remove();
 }
 
 // Header pill showing the org's plan: a green "Subscribed" badge, or the credit balance
@@ -1148,7 +1284,7 @@ async function paintOrgTab(org) {
         <div style="padding:0 20px 16px">
           ${o.subscription_status === "active"
             ? `<span class="pill green">✓ Subscribed</span><p style="font-size:13px;color:#586473;line-height:1.6;margin-top:8px">Your monthly subscription is active — all ${state.courses.length} mandatory courses, unlimited staff licences, assignments, certificates and CQC reporting are included.</p><div id="billinglive" style="margin-top:6px"><p style="font-size:13px;color:#8E99A8">Loading billing details…</p></div>`
-            : `<span class="pill" style="background:#1E3A5F18;color:#1A5276">Pay as you go</span><p style="font-size:13px;color:#586473;line-height:1.6;margin:8px 0 12px">Subscribe for just ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month to cover your whole team — every mandatory course included, with volume discounts as you grow.</p><button class="mini-btn" id="subscribe">⭐ Subscribe</button>`
+            : `<span class="pill" style="background:#1E3A5F18;color:#1A5276">Pay as you go</span><p style="font-size:13px;color:#586473;line-height:1.6;margin:8px 0 12px">Subscribe for just ${PRICING.currency}${PRICING.subscriptionPerLearnerMonth} per learner / month to cover your whole team — every mandatory course included, with volume discounts as you grow.</p><button class="mini-btn" id="subscribe">⭐ Subscribe</button><p style="font-size:12px;color:#8E99A8;margin-top:12px">The subscription is a monthly rolling plan with 30 days' notice to cancel. <button class="linkbtn" id="subtermslink">Read the Subscription Terms</button>.</p>`
           }
         </div>
       </div>
@@ -1168,6 +1304,8 @@ async function paintOrgTab(org) {
     document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
     const subBtn = document.getElementById("subscribe");
     if (subBtn) subBtn.onclick = () => startSubscribe();
+    const stLink = document.getElementById("subtermslink");
+    if (stLink) stLink.onclick = () => showSubscriptionTerms();
     if (o.subscription_status === "active") loadBillingPanel();
     const remToggle = document.getElementById("remtoggle");
     if (remToggle) remToggle.onchange = async () => {

@@ -547,6 +547,9 @@ function ratePenceForSeats(seats) {
   return SUBSCRIPTION_TIERS[SUBSCRIPTION_TIERS.length - 1][1];
 }
 
+// Notice period an org must give to cancel a subscription (per the Subscription Terms).
+const CANCELLATION_NOTICE_DAYS = 30;
+
 // Ensure a single volume-tiered recurring Price exists in Stripe (created once, then cached in
 // system_state). Using one tiered price means the bill applies the correct per-learner rate
 // automatically based on the seat quantity — so we only ever have to update the quantity.
@@ -684,7 +687,7 @@ route("GET", "/api/org/billing", async (req, res) => {
   if (org.subscription_status !== "active") return send(res, 200, { subscribed: false });
 
   const localSeats = Math.max(1, ((db.prepare("SELECT COUNT(*) AS n FROM staff WHERE org_id = ? AND active = 1").get(orgId)) || {}).n || 0);
-  const build = (seats, nextChargeAt, cancelAtPeriodEnd, live) => {
+  const build = (seats, nextChargeAt, cancelAt, live) => {
     const rate = ratePenceForSeats(seats);
     return {
       subscribed: true,
@@ -694,12 +697,12 @@ route("GET", "/api/org/billing", async (req, res) => {
       ratePerLearnerPence: rate,
       monthlyAmountPence: seats * rate,
       nextChargeAt: nextChargeAt || null,
-      cancelAtPeriodEnd: !!cancelAtPeriodEnd,
+      cancelAt: cancelAt || null,
     };
   };
 
   if (!process.env.STRIPE_SECRET_KEY || !org.stripe_subscription_id) {
-    return send(res, 200, build(localSeats, null, false, false));
+    return send(res, 200, build(localSeats, null, null, false));
   }
 
   try {
@@ -708,10 +711,71 @@ route("GET", "/api/org/billing", async (req, res) => {
     const seats = (item && Number(item.quantity)) || localSeats;
     // current_period_end sits on the subscription in most API versions, on the item in newer ones.
     const nextChargeAt = (sub && sub.current_period_end) || (item && item.current_period_end) || null;
-    return send(res, 200, build(seats, nextChargeAt, sub && sub.cancel_at_period_end, true));
+    // cancel_at is set when the org has given notice; the sub stays active until that date.
+    return send(res, 200, build(seats, nextChargeAt, sub && sub.cancel_at ? sub.cancel_at : null, true));
   } catch (e) {
     console.error("Billing summary fetch failed for", orgId, "—", e.message);
-    return send(res, 200, build(localSeats, null, false, false));
+    return send(res, 200, build(localSeats, null, null, false));
+  }
+});
+
+// ── Give notice to cancel the subscription (30 days) ──
+// Per the Subscription Terms, cancellation takes 30 days' notice: we schedule Stripe to end the
+// subscription 30 days from now via `cancel_at`. It stays active and keeps billing monthly
+// through the notice period, then cancels automatically (the webhook flips status to canceled).
+route("POST", "/api/org/subscription/cancel", async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
+  const sess = authSession(req);
+  if (!sess) return send(res, 401, { error: "Please sign in." });
+  let orgId = null;
+  if (sess.kind === "org") orgId = sess.subject_id;
+  else if (sess.kind === "staff") {
+    const st = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(sess.subject_id);
+    if (st) orgId = st.org_id;
+  }
+  if (!orgId) return send(res, 400, { error: "Not an organisation account." });
+  const org = db.prepare("SELECT id, subscription_status, stripe_subscription_id FROM organisations WHERE id = ?").get(orgId);
+  if (!org) return send(res, 404, { error: "Account not found." });
+  if (org.subscription_status !== "active" || !org.stripe_subscription_id) {
+    return send(res, 400, { error: "There's no active subscription to cancel." });
+  }
+  const cancelAt = Math.floor(Date.now() / 1000) + CANCELLATION_NOTICE_DAYS * 24 * 60 * 60;
+  try {
+    const form = new URLSearchParams();
+    form.set("cancel_at", String(cancelAt));
+    const sub = await stripeRequest("POST", "/v1/subscriptions/" + encodeURIComponent(org.stripe_subscription_id), form);
+    console.log(`⏳ Cancellation scheduled for ${orgId} at ${new Date(cancelAt * 1000).toISOString()}`);
+    return send(res, 200, { ok: true, cancelAt: (sub && sub.cancel_at) || cancelAt, noticeDays: CANCELLATION_NOTICE_DAYS });
+  } catch (e) {
+    console.error("Subscription cancel scheduling failed for", orgId, "—", e.message);
+    return send(res, 502, { error: "Couldn't schedule the cancellation. Please try again." });
+  }
+});
+
+// ── Withdraw a scheduled cancellation (keep the subscription) ──
+// Clears `cancel_at` so the subscription continues uninterrupted.
+route("POST", "/api/org/subscription/resume", async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY) return send(res, 503, { error: "not_configured" });
+  const sess = authSession(req);
+  if (!sess) return send(res, 401, { error: "Please sign in." });
+  let orgId = null;
+  if (sess.kind === "org") orgId = sess.subject_id;
+  else if (sess.kind === "staff") {
+    const st = db.prepare("SELECT org_id FROM staff WHERE id = ?").get(sess.subject_id);
+    if (st) orgId = st.org_id;
+  }
+  if (!orgId) return send(res, 400, { error: "Not an organisation account." });
+  const org = db.prepare("SELECT id, stripe_subscription_id FROM organisations WHERE id = ?").get(orgId);
+  if (!org || !org.stripe_subscription_id) return send(res, 400, { error: "No subscription found." });
+  try {
+    const form = new URLSearchParams();
+    form.set("cancel_at", ""); // an empty value clears the scheduled cancellation
+    await stripeRequest("POST", "/v1/subscriptions/" + encodeURIComponent(org.stripe_subscription_id), form);
+    console.log(`↩ Scheduled cancellation withdrawn for ${orgId}`);
+    return send(res, 200, { ok: true });
+  } catch (e) {
+    console.error("Resume subscription failed for", orgId, "—", e.message);
+    return send(res, 502, { error: "Couldn't keep the subscription. Please try again." });
   }
 });
 
