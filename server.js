@@ -2103,13 +2103,16 @@ function serveStatic(req, res, urlPath) {
       // SPA fallback to index.html
       fs.readFile(path.join(PUBLIC_DIR, "index.html"), (e2, html) => {
         if (e2) return send(res, 404, { error: "index.html was not found on the server. Make sure index.html and app.js were uploaded (ideally inside a 'public' folder)." });
-        res.writeHead(200, { "Content-Type": "text/html" });
+        res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
         res.end(html);
       });
       return;
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
+    // Never let the browser serve a stale app shell or script — always revalidate on load.
+    if (ext === ".html" || ext === ".js") headers["Cache-Control"] = "no-cache";
+    res.writeHead(200, headers);
     res.end(data);
   });
 }

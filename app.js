@@ -238,11 +238,15 @@ function subscribeUrl(orgId, email) {
 // logged-out visitor registers first, then subscribes from Settings — so the payment
 // is always linked to an account and fulfils automatically via the webhook.
 async function startSubscribe() {
-  if (state.token && state.kind === "org") {
-    try { const me = await api("/org/me"); window.location.href = subscribeUrl(me.org.id, me.org.email); return; }
-    catch (e) { /* fall through to registration */ }
+  if (!(state.token && state.kind === "org")) { renderOrgRegister(); return; }
+  toast("Setting up secure checkout…");
+  try {
+    const data = await api("/checkout/subscription", "POST", {});
+    if (data && data.url) { window.location.href = data.url; return; }
+    toast("Couldn't start the subscription checkout. Please try again.");
+  } catch (e) {
+    toast(e.message || "Couldn't start the subscription checkout. Please try again.");
   }
-  renderOrgRegister();
 }
 
 // Header pill showing the org's plan: a green "Subscribed" badge, or the credit balance
@@ -307,7 +311,7 @@ function showCreditsModal(me) {
     modal.querySelectorAll(".cred-amt").forEach(b => b.onclick = () => { qtyInput.value = b.dataset.q; refresh(); });
     modal.querySelector("#buycred").onclick = () => { const n = Math.max(1, Math.floor(Number(qtyInput.value) || 0)); overlay.remove(); startCreditTopUp(n); };
     const gosub = modal.querySelector("#gosub");
-    if (gosub) gosub.onclick = () => { overlay.remove(); window.open(subscribeUrl(org.id, org.email), "_blank", "noopener"); };
+    if (gosub) gosub.onclick = () => { overlay.remove(); startSubscribe(); };
   }
 }
 
@@ -1134,7 +1138,7 @@ async function paintOrgTab(org) {
     `));
     document.getElementById("orgchgpw").onclick = () => openChangePassword("/org/change-password");
     const subBtn = document.getElementById("subscribe");
-    if (subBtn) subBtn.onclick = () => window.open(subscribeUrl(o.id, o.email), "_blank", "noopener");
+    if (subBtn) subBtn.onclick = () => startSubscribe();
     const remToggle = document.getElementById("remtoggle");
     if (remToggle) remToggle.onchange = async () => {
       try { await api("/org/settings", "POST", { remindersEnabled: remToggle.checked }); toast(remToggle.checked ? "Reminders turned on." : "Reminders turned off."); }
